@@ -35,7 +35,7 @@
 
 ## Current Known Issues / Risks
 - `npm run lint` is wired for non-interactive use when `CI=true` (see GitHub Actions). Local runs use existing [`src/renderer/.eslintrc.json`](../../src/renderer/.eslintrc.json). **Unused-handler lint** in [`system-health-panel.tsx`](../../src/renderer/components/system-health-panel.tsx) was fixed (commit `da417f2`).
-- **Next `15.0.0`**: npm reports security advisory **CVE-2025-66478** — plan a deliberate upgrade to a patched Next minor when ready (may need regression pass).
+- ~~**Next `15.0.0` / CVE-2025-66478**~~ — Addressed on **`Node-Launcher-v3`**: **`next@15.0.7`** + **`eslint-config-next@15.0.7`** (same 15.0 line; see [Next security advisory](https://nextjs.org/blog/CVE-2025-66478)).
 - **Transitive deprecations / `npm audit`**: noisy but expected until upstream bumps (ESLint 8, old `glob`/`rimraf`, etc.).
 - Some legacy design/reference files may still be large in git; [`.cursorignore`](../../.cursorignore) ignores [`_design_references/`](../../_design_references/) for Cursor indexing; full repo cleanup remains optional.
 - If a managed project appears "running" but URL does not load, verify:
