@@ -37,6 +37,10 @@ Thumbs.db
 *.tmp
 *.temp
 *.pid
+
+# intentional repo content (keep tracked)
+# - media/: launcher thumbnails etc.
+# - _design_references/: layout / UI reference snapshots
 src/main/db/vader-engine.json
 src/main/db/vader.sqlite
 src/main/db/vader.sqlite-*
