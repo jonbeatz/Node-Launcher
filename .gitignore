@@ -45,6 +45,3 @@ src/main/db/vader-engine.json
 src/main/db/vader.sqlite
 src/main/db/vader.sqlite-*
 
-# keep local cursor internals out of repo
-.cursor/
-

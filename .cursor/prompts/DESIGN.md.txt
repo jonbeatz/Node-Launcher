@@ -1,0 +1,204 @@
+CRITICAL: This is a DESKTOP APPLICATION. Generate a 1440px wide desktop dashboard. Do NOT generate a mobile layout. Do NOT use mobile breakpoints. This is for a desktop Electron app running on a high-performance workstation.
+
+Generate a high-fidelity, production-ready React dashboard UI with Tailwind CSS for a Node.js process management desktop application called "Vader Project Engine (VPE)."
+
+## Core Design System
+
+### Colors (Strict Palette)
+- Main Background: #121212
+- Surface/Cards: #1c1c1c
+- Accent (Vader Red): #e02b20
+- Borders: #333333
+- Text Primary: #FFFFFF
+- Text Muted: #A0A0A0
+- Terminal Background: #0a0a0a
+- Focus Rings: 2px solid #e02b20
+
+### Typography
+- JetBrains Mono for all code, terminal, telemetry, and monospace data
+- Space Grotesk for headlines and UI labels (fallback to system sans-serif)
+- All pill badges and secondary labels use uppercase JetBrains Mono
+
+### Shapes & Borders
+- All containers: 0px border radius (sharp, brutalist)
+- Exception: "9700x Tuned" pill badge uses fully rounded (pill-shaped) border
+- Every container has a 1px solid #333333 border
+- No soft shadows on standard containers
+
+### Depth & Glass
+- Elevated surfaces (modals, drawers) use backdrop-blur (12px-20px) over #1c1c1c at 80% opacity
+- Active/high-priority elements use "vader-glow": 0px 0px 15px #e02b20
+- Terminal areas include a subtle CRT scanline overlay: repeating 1px horizontal lines at #000000 2% opacity, 3px spacing
+- Terminal areas also have an inner vignette: inset 0 0 100px rgba(0,0,0,0.6)
+
+### Spacing
+- Base unit: 4px
+- Card gap: 20px
+- Main content padding: 24px
+- HUD inset from viewport edges: 2rem
+
+---
+
+## Global Layout (DESKTOP — 1440px width)
+
+### HUD Frame
+- 1px horizontal lines in Vader Red (#e02b20) at 30% opacity across the extreme top and bottom edges of the entire viewport
+- These lines span full 1440px viewport width
+
+### Top Bar
+- Height: 48px
+- Width: full 1440px
+- Background: #1c1c1c
+- Border-bottom: 1px solid #333333
+- Left side: "VPE" logomark (small, bold, #FFFFFF) + dynamic breadcrumb in muted text (#A0A0A0): `VPE > Projects > MSC Media Pro`
+- Right side: Settings gear icon
+
+### Main Content Area
+- flex-1, padding 24px, scrollable vertical
+- Dark background #121212
+- Contains the project grid AND the log drawer side by side
+
+### Footer
+- Height: 32px
+- Background: #1c1c1c
+- Centered text in muted (#A0A0A0): "Powered by the MSC Media Engine"
+
+---
+
+## Dashboard Project Grid (Desktop Only)
+
+Use CSS Grid: `grid-template-columns: repeat(auto-fill, minmax(320px, 1fr))` with 20px gap.
+Show 3-4 cards in a row at 1440px width.
+
+### Each Project Card
+- Minimum width: 320px
+- Maximum width: 380px
+- Background: #1c1c1c
+- Border: 1px solid #333333
+- Border-radius: 0px (sharp)
+- On hover: transform scale(1.02), apply vader-glow shadow
+
+#### Card Internal Layout (top to bottom):
+
+**1. Thumbnail Area**
+- 4:3 aspect ratio placeholder at the very top of the card
+- Background: darker shade (#0a0a0a) with a subtle grid pattern
+- Border-bottom: 1px solid #333333
+- "9700x Tuned" pill badge positioned in the top-right corner
+  - Pill shape (fully rounded)
+  - Background: #e02b20
+  - Text: "9700x TUNED" in uppercase JetBrains Mono, color #000000, small font
+  - Border: 1px solid #333333
+
+**2. Project Info Row**
+- Project name: Bold, #FFFFFF, Space Grotesk, 16px
+- Pulsing status LED: 8px square, color #e02b20, CSS animation pulsing between 40% and 100% opacity
+- Label next to LED: "RUNNING" or "STOPPED" in JetBrains Mono, uppercase, small
+- Port number: #A0A0A0, JetBrains Mono (e.g., "PORT: 9000")
+- Uptime: #A0A0A0, JetBrains Mono (e.g., "UPTIME: 824H")
+
+**3. Performance Sparkline Strip**
+- Height: 40px
+- Border-top: 1px solid #333333
+- Border-bottom: 1px solid #333333
+- Inside: A small sparkline waveform in low-opacity Vader Red (#e02b20 at 30% opacity)
+- No axes, no labels
+
+**4. Action Button Row**
+- Three pill-shaped buttons horizontally:
+  - START/STOP: Pill shape, 1px #333333 border, dark background
+  - REPAIR: Pill shape, 1px #333333 border, dark background
+  - NUKE: Pill shape, 1px #333333 border, dark background
+- Hover: border turns #e02b20
+- Focus-visible: 2px solid #e02b20 ring
+
+#### Card States
+- Running: Green-tinted status area, pulsing LED
+- Stopped: Dim LED (no pulse), gray-tinted status
+- Error: Card border solid #e02b20, warning icon, error snippet in red
+
+---
+
+## Log Drawer (Right Panel — Desktop)
+
+The log drawer is ALWAYS VISIBLE on desktop as part of the layout. It does not slide over content — it sits beside the project grid.
+
+- Width: 420px
+- Height: fills the space between top bar and footer
+- Background: #1c1c1c at 80% opacity with backdrop-blur (16px)
+- Border-left: 1px solid #333333
+
+### Log Drawer Internal Layout:
+
+**Tab Bar (top)**
+- Horizontal tabs: "MEDIA_PRO", "PRIMARY_GATE", "BACKUP_NODE"
+- Active tab: #e02b20 background, white JetBrains Mono text
+- Inactive tabs: transparent, #A0A0A0 text
+- Close button (X) in top-right corner
+
+**Terminal Area**
+- Background: #0a0a0a
+- Font: JetBrains Mono, 12px
+- CRT scanline overlay: 1px horizontal lines at 2% opacity
+- Inner vignette shadow
+- Realistic system logs with ANSI colors (green for success, red for errors, yellow for warnings)
+- Shows PM2 process output streaming
+
+**Bottom Status Bar**
+- Shows: "PID: 48291 | RUNTIME: 824H"
+- Font: JetBrains Mono, 11px, #A0A0A0
+
+---
+
+## Vader Repair Suite (Modal — Desktop)
+
+### Modal Overlay
+- Full 1440px width, full height
+- Background: #000000 at 60% opacity, backdrop-blur 4px
+
+### Modal Container
+- Centered on screen
+- Max-width: 900px
+- Background: #1c1c1c
+- Border: 1px solid #333333
+
+### Diff Viewer (Split Pane)
+- Left: "ORIGINAL (.vader-backup)" — background #0a0a0a
+- Right: "PATCHED" — background #0a0a0a
+- Line numbers in #A0A0A0, JetBrains Mono
+- Added lines: green background tint, green text
+- Removed lines: red background tint, red text
+
+### Modal Footer
+- "APPLY FIX": Solid #e02b20, white text, pill shape
+- "UNDO": Ghost button, 1px #333333 border
+- "CANCEL": Ghost button, muted text
+
+---
+
+## Nuke Confirmation Modal (Desktop)
+- Smaller modal, ~400px wide, centered
+- 2px solid #e02b20 border that pulses
+- "CONFIRM NUKE" title in Vader Red
+- Solid red NUKE button + ghost CANCEL button
+
+---
+
+## Toasts (Desktop)
+- Position: Top-right corner of the 1440px viewport
+- Background: #1c1c1c
+- Border-left: 3px solid #e02b20
+- Auto-dismiss after 4 seconds
+
+---
+
+## What to Generate
+
+Generate this as a SINGLE 1440px wide desktop screen showing:
+1. HUD frame (top and bottom red lines)
+2. Top Bar with "VPE" logo, breadcrumb, and settings icon
+3. Left/main area: Project grid with 3-4 cards (mix of running, stopped, and error states)
+4. Right side: Log Drawer open with terminal logs visible
+5. Footer with "Powered by the MSC Media Engine"
+
+THIS IS A DESKTOP APP. 1440px fixed width. No mobile layout. No responsive breakpoints. Desktop only.

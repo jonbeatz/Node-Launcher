@@ -1,0 +1,22 @@
+---
+description: Enforce Vader Shield IPC security and contextBridge isolation
+globs: ["src/renderer/**", "src/main/**", "src/preload/**"]
+---
+
+# Vader Shield Security Protocol
+
+## 1. Zero Direct Node Access
+- NEVER suggest `require('fs')`, `require('path')`, or `require('child_process')` inside any file in `src/renderer/`.
+- NEVER allow `nodeIntegration: true` or `contextIsolation: false` in any `new BrowserWindow()` configuration within the main process[cite: 15].
+- **Preload Only:** All privileged operations MUST be defined in `src/preload/main.ts` using `contextBridge.exposeInMainWorld`[cite: 10, 13].
+
+## 2. IPC Communication
+- Use `ipcRenderer.invoke` for asynchronous operations that return data (e.g., fetching the project registry)[cite: 13].
+- Use `ipcRenderer.send` for "fire and forget" actions (e.g., toggling a process)[cite: 13].
+
+## 3. Implementation Guardrail
+- If a user asks for a feature requiring system access, first check if the method exists in the `window.vader` (or equivalent) API[cite: 13].
+- If the method is missing, follow this strict three-step implementation workflow:
+  1. Implement the IPC handler in `src/main`[cite: 13].
+  2. Define the bridge in `src/preload`[cite: 13].
+  3. Execute the call in `src/renderer`[cite: 13].

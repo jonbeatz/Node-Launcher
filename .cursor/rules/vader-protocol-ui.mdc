@@ -1,0 +1,20 @@
+---
+description: Apply Vader Protocol (Studio Dark/Glassmorphic) UI standards
+globs: ["**/*.{css,scss,tsx,jsx}"]
+---
+
+# Vader Protocol UI Standards
+
+## 1. Visual Tokens & Color Discipline
+- **Primary Palette:** Background #121212 | Surface #1c1c1c | Accent #e02b20 (Vader Red)[cite: 11, 13].
+- **Utility:** Borders 1px solid #333333 | Shadows always use `vader-glow` (0 0 15px rgba(224, 43, 32, 0.4))[cite: 11, 13].
+- **No Hardcoding:** Strictly prohibit hardcoded hex values outside the Vader Protocol palette[cite: 17]. Always reference design tokens or Tailwind configuration values (e.g., `bg-vader-bg`, `text-msc-text`)[cite: 17].
+
+## 2. Component Architecture
+- **Vader Cards:** Implement 4:3 WebP thumbnails with a 40px sparkline strip at the bottom[cite: 11, 13].
+- **Log Drawer:** Utilize `backdrop-blur` glassmorphic effects combined with 1px CRT horizontal scanlines at 2% opacity[cite: 11, 13].
+- **HUD Framing:** Every main container must include 1px horizontal framing lines at the extreme top and bottom edges (#e02b20 at 30% opacity)[cite: 11, 13].
+
+## 3. Naming & Typography
+- **Naming:** Prefix all project-specific Tailwind classes or CSS modules with `msc-`[cite: 12, 13].
+- **Typography:** Use JetBrains Mono for all code, terminal, and monospace data contexts[cite: 11, 12, 13].
