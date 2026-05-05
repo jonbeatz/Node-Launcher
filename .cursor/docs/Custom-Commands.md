@@ -2,6 +2,8 @@
 
 This file tracks shorthand commands you want me to execute in this repo.
 
+**Active branch:** `Node-Launcher-v3` (see [Checkpoint](Checkpoint.md) for full status).
+
 ## start app
 
 Intent: run a clean app startup.
@@ -37,6 +39,14 @@ Run from repo root, in order:
 6. Sanity scripts:  
    `npm run repair:ast` → `npm run test:e2e` → `npm run lint`
 
+## package production (.exe)
+
+Intent: ship Electron installer after renderer is production-built.
+
+1. `npm run build:renderer` (or rely on full build step 2).
+2. `npm run build` — runs **`build:renderer`** then **`build:main`** (`electron-builder`).  
+   Ensure no stray **node/electron** holds locks; icons may live under [`_design_references/`](../../_design_references/) — wire in builder config if needed.
+
 ## new git branch
 
 Intent: finish current iteration and start a clean next branch.
@@ -46,8 +56,8 @@ When you say **"new git branch"**, I will:
 1. Check changes and commit with an appropriate message.
 2. Push the current branch to remote.
 3. Create/switch to the next versioned branch using this pattern:
-   - `Node-Launcher-v2`
-   - `Node-Launcher-v3`
-   - `Node-Launcher-v4`
+   - `Node-Launcher-v2` (shipped major integration + CI/repair/userData work)
+   - **`Node-Launcher-v3`** ← *current*
+   - `Node-Launcher-v4` ← *next increment*
    - ...and so on (always increment the last number by 1).
 4. Confirm branch is clean and ready as a new starting point.

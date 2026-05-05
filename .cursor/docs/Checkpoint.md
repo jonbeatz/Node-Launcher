@@ -1,6 +1,21 @@
 # VPE Checkpoint (2026-05-05)
 
-**Last doc update:** 2026-05-05 — tracks `Node-Launcher-v2` through green lint + CI hardening.
+**Last doc update:** 2026-05-05 — active dev branch: **`Node-Launcher-v3`** (`origin/Node-Launcher-v3`).
+
+## Current project status (snapshot)
+
+| Area | Status |
+|------|--------|
+| **Branch** | **`Node-Launcher-v3`** — iteration after v2 (repair/CI/userData work landed on v2; v3 adds security + packaging prep). |
+| **Renderer** | **Next.js `15.0.7`** + **React `19.0.0`** — patches **CVE-2025-66478** line (see [advisory](https://nextjs.org/blog/CVE-2025-66478)); `npm run build:renderer` → **4/4** static routes. |
+| **Quality gates** | **`npm run lint`** clean; CI: lint → build → AST stub → Playwright (Chromium `--with-deps`). |
+| **Persistence** | SQLite/JSON under **`app.getPath('userData')/vpe-db`**; thumbnails scratch under **`userData/media/thumbnails`**. |
+| **Native modules** | **`npm run rebuild:natives`** = `electron-rebuild -f -o better-sqlite3` only (avoids Windows **node-pty** + Spectre MSVC trap). |
+| **Design assets** | Committed: [`_design_references/VPE.ico`](../../_design_references/VPE.ico), [`_design_references/msc-icon.png`](../../_design_references/msc-icon.png) (commit `e7bcdd3`). [`.cursorignore`](../../.cursorignore) still excludes `_design_references/` from **Cursor indexing** only — files **are** in git. |
+| **Git markers** | Empty restore-point commit before packaging: **`Clean restore-point about to make.exe`** (`1adddf9`). |
+| **Next packaging step** | Run **`npm run build`** (renderer + `electron-builder`) when ready for **`.exe`**; confirm icons wired in [`package.json`](../../package.json) / electron-builder config if you switch from defaults. |
+
+**Context — health line on cards:** `GET /` probe does not follow redirects. **HTTP 307** on a project = server responded with redirect (e.g. Next middleware); browser **OPEN** still works. Green **“Active — HTTP 200”** only for **2xx** (see [`Msc_ProjectCard.tsx`](../../src/renderer/components/Msc_ProjectCard.tsx) `getHealthLine`).
 
 ## What Was Set Up
 - Initialized git and connected GitHub remote: `https://github.com/jonbeatz/Node-Launcher`.
@@ -37,7 +52,7 @@
 - `npm run lint` is wired for non-interactive use when `CI=true` (see GitHub Actions). Local runs use existing [`src/renderer/.eslintrc.json`](../../src/renderer/.eslintrc.json). **Unused-handler lint** in [`system-health-panel.tsx`](../../src/renderer/components/system-health-panel.tsx) was fixed (commit `da417f2`).
 - ~~**Next `15.0.0` / CVE-2025-66478**~~ — Addressed on **`Node-Launcher-v3`**: **`next@15.0.7`** + **`eslint-config-next@15.0.7`** (same 15.0 line; see [Next security advisory](https://nextjs.org/blog/CVE-2025-66478)).
 - **Transitive deprecations / `npm audit`**: noisy but expected until upstream bumps (ESLint 8, old `glob`/`rimraf`, etc.).
-- Some legacy design/reference files may still be large in git; [`.cursorignore`](../../.cursorignore) ignores [`_design_references/`](../../_design_references/) for Cursor indexing; full repo cleanup remains optional.
+- **`_design_references/`**: tracked icons added (`VPE.ico`, `msc-icon.png`); [`.cursorignore`](../../.cursorignore) only limits **Cursor** indexing of that folder — not git ignore. Optional future cleanup: trim or move very large reference dumps if the repo grows awkwardly.
 - If a managed project appears "running" but URL does not load, verify:
   - port is not reserved for the launcher (`3000` by default)
   - project path has correct root `package.json`
@@ -48,7 +63,7 @@
 2. ~~**Harden managed project diagnostics**~~ — Done: [`project-runner.js`](../../src/main/project-runner.js) `_runDevPreflight` (reserved port, port-in-use, script port mismatch); [`path-guard.js`](../../src/main/path-guard.js) validates `package.json`.
 3. ~~**Improve thumbnail pipeline (IPC limits)**~~ — Done in [`vpe-ipc.js`](../../src/main/vpe-ipc.js): `MAX_THUMB_EDGE` 960, `MAX_THUMB_BYTES` 512 KiB; picker scratch files go under `app.getPath('userData')/media/thumbnails` (not `cwd`), see milestone below.
 4. ~~**CI/Lint stabilization**~~ — Done: ESLint green locally; CI includes Playwright smoke, AST stub, `actions/checkout@v6` + `setup-node@v6`, Chromium `--with-deps` on Ubuntu.
-5. **Repository cleanup pass** — Optional: archive or split `_design_references/` out of main history if size remains a concern.
+5. ~~**Repository cleanup pass**~~ — Partially addressed: key icons committed; optional later pass if non-essential binaries bloat the tree.
 
 ## Regain Context (Read This First Next Session)
 1. Read this file: `.cursor/docs/Checkpoint.md`.
@@ -76,7 +91,7 @@
 - **Boot reconcile** ([`boot-running-reconcile.js`](../../src/main/boot-running-reconcile.js) + [`main.js`](../../src/main/main.js)): On engine start, rows with `status === 'running'` get a one-shot HTTP health probe ([`health-probe.js`](../../src/main/health-probe.js)); unreachable within probe timeout → stopped + health cleared; `_emitProjectsRefresh` updates UI.
 - **System Health IPC** ([`vpe-ipc.js`](../../src/main/vpe-ipc.js), [`preload.js`](../../src/preload/preload.js), [`vpe-bridge.ts`](../../src/renderer/lib/vpe-bridge.ts), [`system-health-panel.tsx`](../../src/renderer/components/system-health-panel.tsx), [`use-vpe-system-stats.ts`](../../src/renderer/hooks/use-vpe-system-stats.ts)): `vpe:get-system-stats` exposes uptime, memory, PM2 reachability, project counts; panel polls ~3s while open.
 - **Task D — Native CPU**: [`host-cpu-ticks.js`](../../src/main/host-cpu-ticks.js) replaces Windows PowerShell WMI polling; tick-delta `%` with first-call baseline (`—` until second sample). Handler wrapped in **try/catch** with `VpeSystemStats`-shaped fallback on failure.
-- **CI**: [`ci.yml`](../../.github/workflows/ci.yml) runs **`npm run lint`** (with `CI=true`) before **`npm run build:renderer`**. Root [`.npmrc`](../../.npmrc) sets **`legacy-peer-deps=true`** so **`npm ci`** succeeds with React 19 + Next 15.0 peer metadata (GitHub “lint-and-build failed in ~11s” was typically **`ERESOLVE`** on install).
+- **CI**: [`ci.yml`](../../.github/workflows/ci.yml) runs **`npm run lint`** (with `CI=true`) before **`npm run build:renderer`**. Root [`.npmrc`](../../.npmrc) sets **`legacy-peer-deps=true`** so **`npm ci`** succeeds with React 19 + Next **15.0.x** peer metadata (GitHub “lint-and-build failed in ~11s” was typically **`ERESOLVE`** on install). Renderer pins **Next `15.0.7`** for security patches.
 
 See also: [`health-scheduler.js`](../../src/main/health-scheduler.js), [`launcher-port.js`](../../src/main/launcher-port.js), [`package-json-script-patch.js`](../../src/main/package-json-script-patch.js) for related runner/IPC behavior.
 
@@ -103,4 +118,6 @@ See also: [`health-scheduler.js`](../../src/main/health-scheduler.js), [`launche
   - `npm run repair:ast`
   - `npm run test:e2e`
   - `npm run lint`
+- Production installer (after renderer build succeeds):
+  - `npm run build` (runs `build:renderer` then `electron-builder` / `build:main`)
 
