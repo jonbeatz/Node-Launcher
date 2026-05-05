@@ -9,8 +9,9 @@ on:
 jobs:
   lint-and-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
-    # Dev / Electron: launcher UI is http://localhost:3000; managed apps use higher ports.
+    # Dev / Electron: launcher UI is http://127.0.0.1:3000 in CI (Playwright); managed apps use higher ports.
 
     steps:
       - name: Checkout
@@ -39,8 +40,9 @@ jobs:
       - name: AST repair stub
         run: npm run repair:ast
 
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium
+      # Chromium needs OS libs on ubuntu-latest; --with-deps avoids launch failures in headless CI.
+      - name: Install Playwright Chromium (with system deps)
+        run: npx playwright install chromium --with-deps
 
       - name: E2E smoke (renderer)
         env:

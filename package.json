@@ -12,7 +12,7 @@
     "build:renderer": "next build src/renderer",
     "lint": "next lint src/renderer",
     "test:e2e": "playwright test",
-    "repair:ast": "node scripts/vpe-repair-stub.mjs"
+    "repair:ast": "node scripts/vpe-repair-stub.cjs"
   },
   "dependencies": {
     "@babel/generator": "^7.29.1",

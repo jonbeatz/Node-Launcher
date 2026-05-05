@@ -8,12 +8,15 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:3000',
   },
   webServer: {
-    command: 'npm run dev:renderer',
-    url: 'http://localhost:3000',
+    // CI: bind explicitly so the readiness URL matches (avoids localhost/IPv6 quirks).
+    command: process.env.CI
+      ? 'npm run dev:renderer -- -H 127.0.0.1'
+      : 'npm run dev:renderer',
+    url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
   },
 })

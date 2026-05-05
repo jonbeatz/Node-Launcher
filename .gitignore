@@ -1,6 +1,10 @@
 # dependencies
 node_modules/
 
+# Git LFS (optional): run `git lfs install` once per machine. This repo does not ship a
+# .gitattributes LFS map yet; if pushes fail on ghost LFS objects from old history, use:
+#   git config --local lfs.allowmissingghostobjects true
+
 # next / build artifacts
 .next/
 out/
@@ -13,6 +17,7 @@ coverage/
 .turbo/
 .cache/
 cache/
+cache/thumbnails/
 
 # logs
 *.log

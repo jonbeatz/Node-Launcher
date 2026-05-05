@@ -1,9 +1,13 @@
 /**
  * Minimal AST smoke for the repair toolchain (@babel/parser + @babel/traverse).
- * Run: node scripts/vpe-repair-stub.mjs
+ * CJS avoids ESM/default-export quirks on Linux CI.
+ * Run: node scripts/vpe-repair-stub.cjs
  */
-import { parse } from '@babel/parser'
-import traverse from '@babel/traverse'
+'use strict'
+
+const { parse } = require('@babel/parser')
+const traverseMod = require('@babel/traverse')
+const traverse = typeof traverseMod === 'function' ? traverseMod : traverseMod.default
 
 const code = `export default function Page() { return <div>ok</div> }`
 const ast = parse(code, { sourceType: 'module', plugins: ['jsx', 'typescript'] })
