@@ -2,11 +2,57 @@ const fs = require('fs');
 const path = require('path');
 const { msc_launcherRendererPort } = require('../launcher-port');
 
-const STORE_DIR = __dirname;
-const SQLITE_PATH = path.join(STORE_DIR, 'vader.sqlite');
-const JSON_STORE_PATH = path.join(STORE_DIR, 'vader-engine.json');
 /** One-time migrate source; cwd file is archived to media/_vpe_archive after boot. */
 const LEGACY_REGISTRY = path.join(process.cwd(), 'projects.json');
+
+/**
+ * Writable DB directory: `app.getPath("userData")/vpe-db` in Electron (avoids SQLite inside read-only app.asar).
+ * Falls back to `__dirname` when `electron` is not available (plain Node / tests).
+ * @returns {{ storeDir: string, sqlitePath: string, jsonPath: string }}
+ */
+function msc_getStorePaths() {
+  let storeDir;
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') {
+      storeDir = path.join(app.getPath('userData'), 'vpe-db');
+    }
+  } catch {
+    /* electron not loadable */
+  }
+  if (!storeDir) {
+    storeDir = __dirname;
+  }
+  return {
+    storeDir,
+    sqlitePath: path.join(storeDir, 'vader.sqlite'),
+    jsonPath: path.join(storeDir, 'vader-engine.json'),
+  };
+}
+
+/** Copy legacy DB files that lived next to this module (dev / pre-migration) into the userData store. */
+function msc_migrateLegacyDbFiles(paths) {
+  const legacySqlite = path.join(__dirname, 'vader.sqlite');
+  const legacyJson = path.join(__dirname, 'vader-engine.json');
+  try {
+    if (!fs.existsSync(paths.sqlitePath) && fs.existsSync(legacySqlite)) {
+      fs.mkdirSync(paths.storeDir, { recursive: true });
+      fs.copyFileSync(legacySqlite, paths.sqlitePath);
+      console.log('VPE: Migrated vader.sqlite to userData vpe-db.');
+    }
+  } catch (e) {
+    console.warn('VPE: Legacy SQLite migration skipped:', e?.message ?? e);
+  }
+  try {
+    if (!fs.existsSync(paths.jsonPath) && fs.existsSync(legacyJson)) {
+      fs.mkdirSync(paths.storeDir, { recursive: true });
+      fs.copyFileSync(legacyJson, paths.jsonPath);
+      console.log('VPE: Migrated vader-engine.json to userData vpe-db.');
+    }
+  } catch (e) {
+    console.warn('VPE: Legacy JSON migration skipped:', e?.message ?? e);
+  }
+}
 
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 
@@ -209,15 +255,18 @@ class SqlitePersistence {
 }
 
 class JsonPersistence {
-  constructor() {
+  /** @param {{ storeDir: string, jsonPath: string }} paths */
+  constructor(paths) {
+    this._storeDir = paths.storeDir;
+    this._jsonPath = paths.jsonPath;
     /** @type {{ projects: Record<string, any>, logs: any[], logSeq: number, repairRuns: any[] }} */
     this._data = { projects: {}, logs: [], logSeq: 0, repairRuns: [] };
   }
 
   load() {
     try {
-      if (fs.existsSync(JSON_STORE_PATH)) {
-        const raw = JSON.parse(fs.readFileSync(JSON_STORE_PATH, 'utf8'));
+      if (fs.existsSync(this._jsonPath)) {
+        const raw = JSON.parse(fs.readFileSync(this._jsonPath, 'utf8'));
         this._data = {
           projects: raw.projects && typeof raw.projects === 'object' ? raw.projects : {},
           logs: Array.isArray(raw.logs) ? raw.logs : [],
@@ -267,8 +316,8 @@ class JsonPersistence {
   }
 
   save() {
-    fs.mkdirSync(STORE_DIR, { recursive: true });
-    fs.writeFileSync(JSON_STORE_PATH, JSON.stringify(this._data, null, 2), 'utf8');
+    fs.mkdirSync(this._storeDir, { recursive: true });
+    fs.writeFileSync(this._jsonPath, JSON.stringify(this._data, null, 2), 'utf8');
   }
 
   _inferNextLogId() {
@@ -585,11 +634,13 @@ let storeSingleton = null;
 function msc_createPersistentStore() {
   if (storeSingleton) return storeSingleton;
 
-  fs.mkdirSync(STORE_DIR, { recursive: true });
+  const paths = msc_getStorePaths();
+  fs.mkdirSync(paths.storeDir, { recursive: true });
+  msc_migrateLegacyDbFiles(paths);
 
   try {
     const BetterSqlite3 = require('better-sqlite3');
-    const rawDb = new BetterSqlite3(SQLITE_PATH);
+    const rawDb = new BetterSqlite3(paths.sqlitePath);
     rawDb.pragma('journal_mode = WAL');
     rawDb.pragma('foreign_keys = ON');
 
@@ -638,7 +689,7 @@ function msc_createPersistentStore() {
       'VPE: SQLite unavailable (Electron/Node ABI or build tools); using JSON store.',
       err?.message ?? err,
     );
-    const j = new JsonPersistence();
+    const j = new JsonPersistence(paths);
     j.load();
     j.seedIfEmpty();
     storeSingleton = j;

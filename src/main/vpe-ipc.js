@@ -1,4 +1,4 @@
-const { ipcMain, BrowserWindow, dialog, shell, nativeImage } = require('electron');
+const { ipcMain, BrowserWindow, dialog, shell, nativeImage, app } = require('electron');
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -29,6 +29,18 @@ function msc_formatProcessUptime(sec) {
 
 function msc_bytesToGbLabel(bytes) {
   return `${(Number(bytes) / (1024 ** 3)).toFixed(2)} GB`;
+}
+
+/** Writable thumbnail scratch dir (not inside read-only app.asar). */
+function msc_userDataMediaThumbnailsDir() {
+  try {
+    if (typeof app?.getPath === 'function') {
+      return path.join(app.getPath('userData'), 'media', 'thumbnails');
+    }
+  } catch (_) {
+    /* non-Electron */
+  }
+  return path.join(process.cwd(), 'media', 'thumbnails');
 }
 
 function msc_pm2DaemonReachable() {
@@ -258,41 +270,45 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
 
   ipcMain.handle('vpe:get-system-stats', async () => {
     try {
-      const projects = store.listProjectsAlphabetical();
-      const projectsActive = projects.filter((p) => p.status === 'running').length;
-      const projectsTotal = projects.length;
+      try {
+        const projects = store.listProjectsAlphabetical();
+        const projectsActive = projects.filter((p) => p.status === 'running').length;
+        const projectsTotal = projects.length;
 
-      const totalMem = os.totalmem();
-      const freeMem = os.freemem();
-      const usedMem = Math.max(0, totalMem - freeMem);
-      const memoryUsedPercent =
-        totalMem > 0 ? Math.min(100, Math.round((usedMem / totalMem) * 100)) : 0;
+        const totalMem = os.totalmem();
+        const freeMem = os.freemem();
+        const usedMem = Math.max(0, totalMem - freeMem);
+        const memoryUsedPercent =
+          totalMem > 0 ? Math.min(100, Math.round((usedMem / totalMem) * 100)) : 0;
 
-      const vpeUptimeSec = process.uptime();
-      const vpeUptimeLabel = msc_formatProcessUptime(vpeUptimeSec);
+        const vpeUptimeSec = process.uptime();
+        const vpeUptimeLabel = msc_formatProcessUptime(vpeUptimeSec);
 
-      const cpuPercent = msc_hostCpuPercentSinceLastPoll();
-      const cpuSource = cpuPercent != null ? 'cpu_ticks' : 'unavailable';
+        const cpuPercent = msc_hostCpuPercentSinceLastPoll();
+        const cpuSource = cpuPercent != null ? 'cpu_ticks' : 'unavailable';
 
-      const pm2Online = await msc_pm2DaemonReachable();
+        const pm2Online = await msc_pm2DaemonReachable();
 
-      return {
-        vpeUptimeSec,
-        vpeUptimeLabel,
-        cpuPercent,
-        cpuSource,
-        memoryTotalBytes: totalMem,
-        memoryFreeBytes: freeMem,
-        memoryUsedPercent,
-        memoryFreeLabel: msc_bytesToGbLabel(freeMem),
-        memoryUsedLabel: msc_bytesToGbLabel(usedMem),
-        memoryTotalLabel: msc_bytesToGbLabel(totalMem),
-        pm2Online,
-        projectsActive,
-        projectsTotal,
-      };
-    } catch (err) {
-      return msc_fallbackSystemStats(err);
+        return {
+          vpeUptimeSec,
+          vpeUptimeLabel,
+          cpuPercent,
+          cpuSource,
+          memoryTotalBytes: totalMem,
+          memoryFreeBytes: freeMem,
+          memoryUsedPercent,
+          memoryFreeLabel: msc_bytesToGbLabel(freeMem),
+          memoryUsedLabel: msc_bytesToGbLabel(usedMem),
+          memoryTotalLabel: msc_bytesToGbLabel(totalMem),
+          pm2Online,
+          projectsActive,
+          projectsTotal,
+        };
+      } catch (innerErr) {
+        return msc_fallbackSystemStats(innerErr);
+      }
+    } catch (outerErr) {
+      return msc_fallbackSystemStats(outerErr);
     }
   });
 
@@ -491,7 +507,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     const ok = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(extRaw);
     const extForFile = ok ? `.${extRaw === 'jpeg' ? 'jpg' : extRaw}` : path.extname(src) || '.png';
 
-    const destDir = path.join(process.cwd(), 'media', 'thumbnails');
+    const destDir = msc_userDataMediaThumbnailsDir();
     fs.mkdirSync(destDir, { recursive: true });
     const fallbackDest = path.join(destDir, `${projectId}${extForFile}`);
     const dest = msc_optimizeThumbnailIfNeeded(src, fallbackDest);

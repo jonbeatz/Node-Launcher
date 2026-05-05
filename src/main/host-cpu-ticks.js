@@ -1,3 +1,8 @@
+/**
+ * Host CPU busy % from `os.cpus()` tick deltas (idle vs total across all cores).
+ * First call primes baseline and returns null so the UI can show "—" until the next poll (~3s).
+ * Result is clamped to [0, 100]; non-finite deltas reuse the last good value.
+ */
 const os = require('os');
 
 /** @type {{ idle: number, total: number } | null} */
@@ -47,7 +52,11 @@ function msc_hostCpuPercentSinceLastPoll() {
     return lastCpuPercent;
   }
 
-  const pct = Math.round((1 - idleDiff / totalDiff) * 100);
+  const busyRatio = 1 - idleDiff / totalDiff;
+  const pct = Math.round(busyRatio * 100);
+  if (!Number.isFinite(pct)) {
+    return lastCpuPercent;
+  }
   lastCpuPercent = Math.max(0, Math.min(100, pct));
   return lastCpuPercent;
 }
