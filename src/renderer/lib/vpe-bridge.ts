@@ -10,6 +10,18 @@ export interface VpeProjectRow {
   start_script: string
   build_script: string
   pkg_manager: string
+  /** Last HTTP status from GET / on project port after dev start; null if unreachable. */
+  health_http_code?: number | null
+  health_checked_at?: string | null
+  /** Whether TCP/HTTP reply was received (vs connection error). SQLite may return 0/1. */
+  health_reachable?: boolean | number | null
+}
+
+export interface VpeUnifiedLogRow {
+  project_id: string
+  timestamp: string
+  level: string
+  message: string
 }
 
 export interface VpeLogRow {
@@ -45,8 +57,26 @@ export interface AddProjectPayload {
   thumbnail_url?: string | null
 }
 
+/** Live host + VPE metrics from `vpe:get-system-stats`. */
+export interface VpeSystemStats {
+  vpeUptimeSec: number
+  vpeUptimeLabel: string
+  cpuPercent: number | null
+  cpuSource: 'loadavg' | 'win_ps' | 'cpu_ticks' | 'unavailable'
+  memoryTotalBytes: number
+  memoryFreeBytes: number
+  memoryUsedPercent: number
+  memoryFreeLabel: string
+  memoryUsedLabel: string
+  memoryTotalLabel: string
+  pm2Online: boolean
+  projectsActive: number
+  projectsTotal: number
+}
+
 export interface VpeApi {
   getProjects: () => Promise<VpeProjectRow[]>
+  getSystemStats?: () => Promise<VpeSystemStats>
   getLogs: (projectId: string) => Promise<VpeLogRow[]>
   inspectProject: (projectPath: string) => Promise<{
     ok?: boolean
@@ -62,6 +92,8 @@ export interface VpeApi {
   toggleStatus: (
     projectId: string,
   ) => Promise<{ ok?: boolean; status?: string }>
+  /** PM2 stop-all + runner kill-all + SQLite all stopped */
+  stopAllProjects?: () => Promise<{ ok?: boolean }>
   runBuild: (projectId: string) => Promise<{ ok?: boolean }>
   nukeProject: (projectId: string) => Promise<{ ok?: boolean; id?: string }>
   saveSettings: (payload: SaveSettingsPayload) => Promise<{ ok?: boolean }>
@@ -81,6 +113,16 @@ export interface VpeApi {
   subscribeProjectsUpdated: (
     callback: (data: { projects: VpeProjectRow[] }) => void,
   ) => () => void
+  getUnifiedLogs?: (limit?: number) => Promise<VpeUnifiedLogRow[]>
+  patchStartScript?: (
+    projectId: string,
+  ) => Promise<{
+    ok?: boolean
+    previous?: string
+    next?: string
+    backupPath?: string
+    scriptName?: string
+  }>
 }
 
 declare global {
@@ -107,6 +149,9 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   thumbnail_url?: string | null
   start_script: string
   build_script: string
+  health_http_code?: number | null
+  health_checked_at?: string | null
+  health_reachable?: boolean | null
 } {
   const pm =
     row.pkg_manager === 'yarn' || row.pkg_manager === 'pnpm'
@@ -117,7 +162,7 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   return {
     id: row.id,
     name: row.name,
-    port: Number(row.port) || 3000,
+    port: Number.isFinite(Number(row.port)) && Number(row.port) > 0 ? Number(row.port) : 3001,
     uptime: '--',
     status: st,
     cpu: 0,
@@ -127,5 +172,16 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
     thumbnail_url: row.thumbnail_url,
     start_script: row.start_script || 'dev',
     build_script: row.build_script || 'build',
+    health_http_code:
+      row.health_http_code === undefined || row.health_http_code === null
+        ? null
+        : Number(row.health_http_code),
+    health_checked_at: row.health_checked_at ?? null,
+    health_reachable:
+      row.health_reachable === true || row.health_reachable === 1
+        ? true
+        : row.health_reachable === false || row.health_reachable === 0
+          ? false
+          : null,
   }
 }

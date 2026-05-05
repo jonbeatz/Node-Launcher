@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Activity, RefreshCw, AlertTriangle, XCircle, Loader2, Zap, Trash2 } from 'lucide-react'
+import { useVpeSystemStats } from '@/hooks/use-vpe-system-stats'
 
 interface Warning {
   id: string
@@ -17,6 +18,7 @@ interface SystemHealthPanelProps {
 
 export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
   const [runningCheck, setRunningCheck] = useState(false)
+  const systemStats = useVpeSystemStats(isOpen, 3000)
   const [warnings, setWarnings] = useState<Warning[]>([
     { 
       id: '1', 
@@ -36,8 +38,6 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
       action: { label: 'CLEAR CACHE', onClick: () => handleClearCache('3') }
     },
   ])
-
-  if (!isOpen) return null
 
   const handleQuickCheck = async () => {
     setRunningCheck(true)
@@ -66,6 +66,19 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
     setWarnings(prev => prev.filter(w => w.id !== id))
   }
 
+  const cpuDisplay =
+    systemStats?.cpuPercent != null ? `${systemStats.cpuPercent}%` : '—'
+  const projectsLine =
+    systemStats != null
+      ? `${systemStats.projectsActive} of ${systemStats.projectsTotal} active`
+      : '—'
+  const resourcesLine =
+    systemStats != null
+      ? `CPU: ${cpuDisplay} | RAM: ${systemStats.memoryFreeLabel} free (${systemStats.memoryUsedPercent}% used)`
+      : '—'
+
+  if (!isOpen) return null
+
   return (
     <>
       {/* Backdrop */}
@@ -87,28 +100,57 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
           {/* VPE Uptime */}
           <div className="flex items-center justify-between">
             <span className="font-sans text-xs text-[#A0A0A0]">VPE Uptime</span>
-            <span className="font-sans text-sm text-white">3d 14h 22m</span>
+            <span className="font-sans text-sm text-white">
+              {systemStats?.vpeUptimeLabel ?? '—'}
+            </span>
           </div>
 
           {/* PM2 Daemon */}
           <div className="flex items-center justify-between">
             <span className="font-sans text-xs text-[#A0A0A0]">PM2 Daemon</span>
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#00cc66] animate-pulse-led" />
-              <span className="font-sans text-sm text-[#00cc66]">Online</span>
+              {systemStats != null ? (
+                <>
+                  <div
+                    className={
+                      systemStats.pm2Online
+                        ? 'w-2 h-2 rounded-full bg-[#00cc66] animate-pulse-led'
+                        : 'w-2 h-2 rounded-full bg-[#666666]'
+                    }
+                  />
+                  <span
+                    className={
+                      systemStats.pm2Online
+                        ? 'font-sans text-sm text-[#00cc66]'
+                        : 'font-sans text-sm text-[#A0A0A0]'
+                    }
+                  >
+                    {systemStats.pm2Online ? 'Online' : 'Offline'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="w-2 h-2 rounded-full bg-[#555555]" />
+                  <span className="font-sans text-sm text-[#A0A0A0]">—</span>
+                </>
+              )}
             </div>
           </div>
 
           {/* Projects */}
           <div className="flex items-center justify-between">
             <span className="font-sans text-xs text-[#A0A0A0]">Projects</span>
-            <span className="font-sans text-sm text-white">3 of 6 active</span>
+            <span className="font-sans text-sm text-white">{projectsLine}</span>
           </div>
 
           {/* System Resources */}
-          <div className="flex items-center justify-between">
-            <span className="font-sans text-xs text-[#A0A0A0]">System Resources</span>
-            <span className="font-sans text-sm text-white">CPU: 12% | RAM: 4.2GB free</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-sans text-xs text-[#A0A0A0] shrink-0">
+              System Resources
+            </span>
+            <span className="font-sans text-sm text-white text-right min-w-0 break-words">
+              {resourcesLine}
+            </span>
           </div>
 
           {/* Warnings Section - NO LEFT BORDER STROKE */}

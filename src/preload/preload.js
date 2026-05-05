@@ -2,8 +2,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('vpeAPI', {
   getProjects: () => ipcRenderer.invoke('vpe:getProjects'),
+  getSystemStats: () => ipcRenderer.invoke('vpe:get-system-stats'),
   getLogs: (projectId) => ipcRenderer.invoke('vpe:getLogs', projectId),
   toggleStatus: (projectId) => ipcRenderer.invoke('vpe:toggle-status', projectId),
+  stopAllProjects: () => ipcRenderer.invoke('vpe:stop-all'),
   runBuild: (projectId) => ipcRenderer.invoke('vpe:run-build', projectId),
   nukeProject: (projectId) => ipcRenderer.invoke('vpe:nuke-project', projectId),
   saveSettings: (payload) => ipcRenderer.invoke('vpe:save-settings', payload),
@@ -29,6 +31,10 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     return () =>
       ipcRenderer.removeListener('vpe:projects-updated', listener);
   },
+  getUnifiedLogs: (limit) =>
+    ipcRenderer.invoke('vpe:get-unified-logs', limit),
+  patchStartScript: (projectId) =>
+    ipcRenderer.invoke('vpe:patch-start-script', projectId),
 });
 
 contextBridge.exposeInMainWorld('vpeInfo', {

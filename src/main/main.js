@@ -8,6 +8,7 @@ const { msc_createDatabase, msc_getDatabase } = require('./db/database');
 const MSC_ProjectRunner = require('./project-runner');
 const { msc_registerVpeIpc } = require('./vpe-ipc');
 const { msc_archiveLegacyProjectsJson } = require('./legacy-projects-archive');
+const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile');
 
 function msc_ipcLegacyProjectRows(store) {
   return store.getProjects().map((row) => ({
@@ -42,8 +43,8 @@ function msc_wireRunnerPm2Sync(runner, pm) {
  * VPE Port Sync: Node-Launcher UI uses 3000; managed apps use 3001+.
  * Matches npm run dev:renderer -p 3000
  */
-const VPE_RENDERER_DEV_PORT =
-  parseInt(process.env.VPE_RENDERER_PORT || process.env.PORT || '3000', 10) || 3000;
+const { msc_launcherRendererPort } = require('./launcher-port');
+const VPE_RENDERER_DEV_PORT = msc_launcherRendererPort();
 const VPE_RENDERER_DEV_ORIGIN = `http://localhost:${VPE_RENDERER_DEV_PORT}`;
 
 /**
@@ -66,6 +67,8 @@ let mainWindow;
 let pm2Manager;
 let trayManager;
 let projectRunner;
+/** Set `pm2Manager` after daemon connect; `vpe:nuke-project` uses this. */
+const msc_vpeRuntime = { pm2Manager: null };
 
 function msc_configureWritablePaths() {
   const localAppData =
@@ -108,7 +111,7 @@ function msc_attachEngineAfterWindow(mainWin) {
       projectRunner.setMainWindow(mainWin);
     } else {
       projectRunner = new MSC_ProjectRunner(mainWin, db);
-      msc_registerVpeIpc(projectRunner, db);
+      msc_registerVpeIpc(projectRunner, db, msc_vpeRuntime);
     }
     console.log('VPE: Persistence + ProjectRunner IPC online.');
   } catch (e) {
@@ -121,6 +124,7 @@ function msc_attachEngineAfterWindow(mainWin) {
 
       const store = msc_getDatabase();
       pm2Manager = new MSC_PM2Manager(mainWin, store);
+      msc_vpeRuntime.pm2Manager = pm2Manager;
       msc_wireRunnerPm2Sync(projectRunner, pm2Manager);
       trayManager = new MSC_TrayManager(
         mainWin,
@@ -129,6 +133,15 @@ function msc_attachEngineAfterWindow(mainWin) {
         projectRunner,
       );
       console.log('Vader Shield: PM2 Manager & Tray synchronized.');
+
+      void msc_reconcileStaleRunningProjects({ store, projectRunner }).catch(
+        (err) => {
+          console.warn(
+            'VPE: Boot running reconcile failed:',
+            err?.message ?? err,
+          );
+        },
+      );
     } catch (e) {
       console.error('VPE: Engine attach failed (continuing UI-only)', e?.message ?? e);
     }

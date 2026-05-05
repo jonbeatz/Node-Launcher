@@ -1,11 +1,14 @@
 const fs = require('fs');
 const path = require('path');
+const { msc_launcherRendererPort } = require('../launcher-port');
 
 const STORE_DIR = __dirname;
 const SQLITE_PATH = path.join(STORE_DIR, 'vader.sqlite');
 const JSON_STORE_PATH = path.join(STORE_DIR, 'vader-engine.json');
 /** One-time migrate source; cwd file is archived to media/_vpe_archive after boot. */
 const LEGACY_REGISTRY = path.join(process.cwd(), 'projects.json');
+
+const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 
 const SEED_PROJECTS = [
   ['1', 'MSC_PRIMARY_GATE', 'C:/Users/Vader/Projects/msc-primary-gate', 8080, 'stopped', null, 'dev', 'build', 'npm'],
@@ -27,6 +30,9 @@ function rowFromTuple(tuple) {
     start_script: tuple[6],
     build_script: tuple[7],
     pkg_manager: tuple[8],
+    health_http_code: null,
+    health_checked_at: null,
+    health_reachable: null,
   };
 }
 
@@ -127,6 +133,15 @@ class SqlitePersistence {
       .reverse();
   }
 
+  logsRecentAll(limit = 200) {
+    return this._db
+      .prepare(
+        `SELECT project_id, timestamp, level, message FROM logs ORDER BY id DESC LIMIT ?`,
+      )
+      .all(limit)
+      .reverse();
+  }
+
   _trimLogs(projectId) {
     const { n } = this._db
       .prepare(`SELECT COUNT(*) AS n FROM logs WHERE project_id = ?`)
@@ -144,6 +159,24 @@ class SqlitePersistence {
     this._db
       .prepare(`DELETE FROM logs WHERE id IN (${placeholders})`)
       .run(...ids);
+  }
+
+  setProjectHealth(projectId, httpCode, checkedAtIso, reachable) {
+    const r =
+      reachable === true ? 1 : reachable === false ? 0 : null;
+    this._db
+      .prepare(
+        `UPDATE projects SET health_http_code = ?, health_checked_at = ?, health_reachable = ? WHERE id = ?`,
+      )
+      .run(httpCode, checkedAtIso, r, projectId);
+  }
+
+  clearProjectHealth(projectId) {
+    this._db
+      .prepare(
+        `UPDATE projects SET health_http_code = NULL, health_checked_at = NULL, health_reachable = NULL WHERE id = ?`,
+      )
+      .run(projectId);
   }
 }
 
@@ -166,6 +199,42 @@ class JsonPersistence {
     } catch {
       this._data = { projects: {}, logs: [], logSeq: 0 };
     }
+    this._migrateJsonHealthAndPorts();
+  }
+
+  /** One-time: health fields + move projects off launcher port (legacy port 3000 rows). */
+  _migrateJsonHealthAndPorts() {
+    let changed = false;
+    const launcher = MSC_VPE_RENDERER_PORT;
+    for (const p of Object.values(this._data.projects)) {
+      if (!p) continue;
+      if (p.health_http_code === undefined) {
+        p.health_http_code = null;
+        changed = true;
+      }
+      if (p.health_checked_at === undefined) {
+        p.health_checked_at = null;
+        changed = true;
+      }
+      if (p.health_reachable === undefined) {
+        p.health_reachable = null;
+        changed = true;
+      }
+    }
+    const list = Object.values(this._data.projects);
+    for (const p of list) {
+      if (!p || Number(p.port) !== launcher) continue;
+      const used = new Set(list.map((x) => Number(x?.port)));
+      let np = launcher + 1;
+      while (used.has(np)) np += 1;
+      p.port = np;
+      used.add(np);
+      changed = true;
+      console.log(
+        `VPE(JSON): Migrated project "${p.name}" off launcher port ${launcher} → ${np}.`,
+      );
+    }
+    if (changed) this.save();
   }
 
   save() {
@@ -200,6 +269,9 @@ class JsonPersistence {
         start_script: (p.detectedStartScript || 'dev').toString(),
         build_script: (p.buildScript || 'build').toString(),
         pkg_manager: (p.detectedPackageManager || 'npm').toString(),
+        health_http_code: null,
+        health_checked_at: null,
+        health_reachable: null,
       };
     }
   }
@@ -212,6 +284,7 @@ class JsonPersistence {
 
     if (Object.keys(this._data.projects).length > 0) {
       this.save();
+      this._migrateJsonHealthAndPorts();
       return;
     }
 
@@ -220,6 +293,7 @@ class JsonPersistence {
       this._data.projects[row.id] = row;
     }
     this.save();
+    this._migrateJsonHealthAndPorts();
   }
 
   getProjects() {
@@ -266,7 +340,12 @@ class JsonPersistence {
   }
 
   insertProject(payload) {
-    this._data.projects[payload.id] = { ...payload };
+    this._data.projects[payload.id] = {
+      ...payload,
+      health_http_code: null,
+      health_checked_at: null,
+      health_reachable: null,
+    };
     this.save();
   }
 
@@ -304,6 +383,38 @@ class JsonPersistence {
     const drop = sorted.slice(0, mine.length - 100).map((l) => l.id);
     this._data.logs = this._data.logs.filter((l) => !drop.includes(l.id));
   }
+
+  setProjectHealth(projectId, httpCode, checkedAtIso, reachable) {
+    const p = this._data.projects[projectId];
+    if (!p) return;
+    p.health_http_code = httpCode;
+    p.health_checked_at = checkedAtIso;
+    p.health_reachable = reachable === undefined ? null : Boolean(reachable);
+    this.save();
+  }
+
+  clearProjectHealth(projectId) {
+    const p = this._data.projects[projectId];
+    if (!p) return;
+    p.health_http_code = null;
+    p.health_checked_at = null;
+    p.health_reachable = null;
+    this.save();
+  }
+
+  /** Recent log lines across all projects (for unified feed). */
+  logsRecentAll(limit = 200) {
+    const slice = [...this._data.logs]
+      .sort((a, b) => (b.id || 0) - (a.id || 0))
+      .slice(0, limit)
+      .reverse();
+    return slice.map((row) => ({
+      project_id: row.project_id,
+      timestamp: row.timestamp,
+      level: row.level,
+      message: row.message,
+    }));
+  }
 }
 
 function msc_migrateFromProjectsJsonSQLite(db) {
@@ -340,6 +451,55 @@ function msc_migrateFromProjectsJsonSQLite(db) {
     }
   });
   tx();
+}
+
+function msc_sqliteTableColumnNames(db, table) {
+  return db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+}
+
+/** Add health columns; bump any project still on the launcher port (one-time). */
+function msc_sqliteMigrateSchemaAndPorts(db) {
+  let ver = Number(db.pragma('user_version', { simple: true })) || 0;
+  const launcher = MSC_VPE_RENDERER_PORT;
+
+  if (ver < 1) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('health_http_code')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN health_http_code INTEGER`);
+    }
+    if (!names.includes('health_checked_at')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN health_checked_at TEXT`);
+    }
+    ver = 1;
+  }
+
+  if (ver < 2) {
+    const rows = db.prepare(`SELECT id FROM projects WHERE port = ?`).all(launcher);
+    if (rows.length) {
+      for (const { id } of rows) {
+        const used = new Set(
+          db.prepare(`SELECT port FROM projects`).all().map((r) => r.port),
+        );
+        let np = launcher + 1;
+        while (used.has(np)) np += 1;
+        db.prepare(`UPDATE projects SET port = ? WHERE id = ?`).run(np, id);
+      }
+      console.log(
+        `VPE(SQLite): Migrated ${rows.length} project(s) off launcher port ${launcher}.`,
+      );
+    }
+    ver = 2;
+  }
+
+  if (ver < 3) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('health_reachable')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN health_reachable INTEGER`);
+    }
+    ver = 3;
+  }
+
+  db.pragma(`user_version = ${ver}`);
 }
 
 function msc_seedSqlite(database) {
@@ -407,6 +567,7 @@ function msc_createPersistentStore() {
       CREATE INDEX IF NOT EXISTS idx_logs_project_id ON logs(project_id);
     `);
 
+    msc_sqliteMigrateSchemaAndPorts(rawDb);
     msc_seedSqlite(rawDb);
     storeSingleton = new SqlitePersistence(rawDb);
     console.log('VPE persistence: SQLite (better-sqlite3)');

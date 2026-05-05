@@ -5,9 +5,11 @@ const net = require('net');
 const path = require('path');
 const treeKill = require('tree-kill');
 const { msc_validateProjectPath } = require('./path-guard');
+const { msc_probeHttpHealth } = require('./health-probe');
+const { msc_launcherRendererPort } = require('./launcher-port');
+const { msc_healthPollDelayMs, MSC_HEALTH_FIRST_MS } = require('./health-scheduler');
 
-const MSC_VPE_RENDERER_PORT =
-  parseInt(process.env.VPE_RENDERER_PORT || process.env.PORT || '3000', 10) || 3000;
+const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 
 class MSC_ProjectRunner extends EventEmitter {
   /**
@@ -18,8 +20,10 @@ class MSC_ProjectRunner extends EventEmitter {
     super();
     this.mainWindow = mainWindow;
     this.store = store;
-    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess }>} */
+    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess, healthPollTimer?: NodeJS.Timeout, healthStartedAt?: number }>} */
     this.children = new Map();
+    /** Serialize HTTP health checks across projects (one in flight). */
+    this._healthProbeChain = Promise.resolve();
   }
 
   setMainWindow(win) {
@@ -42,6 +46,83 @@ class MSC_ProjectRunner extends EventEmitter {
       level,
       message,
     });
+  }
+
+  _emitProjectsRefresh() {
+    this._broadcast('vpe:projects-updated', {
+      projects: this.store.getProjects(),
+    });
+  }
+
+  _queueHealthProbe(fn) {
+    const run = async () => {
+      try {
+        await fn();
+      } catch (_) {
+        /* ignore */
+      }
+    };
+    const p = this._healthProbeChain.then(run, run);
+    this._healthProbeChain = p.catch(() => {});
+    return p;
+  }
+
+  _clearHealthPolling(projectId) {
+    const rec = this.children.get(projectId);
+    if (rec?.healthPollTimer) {
+      clearTimeout(rec.healthPollTimer);
+      rec.healthPollTimer = undefined;
+    }
+  }
+
+  async _healthPollCycle(projectId) {
+    const rec = this.children.get(projectId);
+    if (!rec?.dev) return;
+    if (rec.healthPollTimer) {
+      clearTimeout(rec.healthPollTimer);
+      rec.healthPollTimer = undefined;
+    }
+
+    let row = this.store.getProject(projectId);
+    if (!row) return;
+
+    await this._queueHealthProbe(async () => {
+      const r = this.children.get(projectId);
+      if (!r?.dev) return;
+      row = this.store.getProject(projectId);
+      if (!row) return;
+
+      const { statusCode, reachedServer } = await msc_probeHttpHealth(row.port);
+      const code = typeof statusCode === 'number' ? statusCode : null;
+      const ts = new Date().toISOString();
+      this.store.setProjectHealth(projectId, code, ts, reachedServer);
+      let msg;
+      let lvl = 'info';
+      if (!reachedServer) {
+        msg = `[vpe] health probe: no TCP/HTTP response on ${row.port} (offline or still compiling)`;
+        lvl = 'warn';
+      } else if (code != null && code >= 500) {
+        msg = `[vpe] health probe: HTTP ${code} (server error)`;
+        lvl = 'warn';
+      } else if (code != null && code >= 200 && code < 300) {
+        msg = `[vpe] health probe: HTTP ${code}`;
+        lvl = 'info';
+      } else {
+        msg = `[vpe] health probe: HTTP ${code}`;
+        lvl = 'warn';
+      }
+      this._persistAndBroadcastLog(projectId, lvl, msg);
+      this._emitProjectsRefresh();
+    });
+
+    const r2 = this.children.get(projectId);
+    if (r2?.dev) {
+      const elapsed = Date.now() - (r2.healthStartedAt || Date.now());
+      const delay = msc_healthPollDelayMs(elapsed);
+      r2.healthPollTimer = setTimeout(() => {
+        void this._healthPollCycle(projectId);
+      }, delay);
+    }
   }
 
   _spawnScript(row, script, mode) {
@@ -218,11 +299,21 @@ class MSC_ProjectRunner extends EventEmitter {
     rec.dev = child;
 
     this.store.setProjectRunning(row.id);
+    this.store.clearProjectHealth(row.id);
+    this._emitProjectsRefresh();
+
+    rec.healthStartedAt = Date.now();
+    rec.healthPollTimer = setTimeout(() => {
+      void this._healthPollCycle(row.id);
+    }, MSC_HEALTH_FIRST_MS);
 
     child.on('close', () => {
       const r = this.children.get(row.id);
+      this._clearHealthPolling(row.id);
       if (r) r.dev = undefined;
+      this.store.clearProjectHealth(row.id);
       this.store.setProjectStopped(row.id);
+      this._emitProjectsRefresh();
     });
 
     this.emit('start', { projectId: row.id, mode: 'dev' });
@@ -232,10 +323,13 @@ class MSC_ProjectRunner extends EventEmitter {
   stopDev(projectId) {
     const rec = this.children.get(projectId);
     if (!rec?.dev) {
+      this.store.clearProjectHealth(projectId);
       this.store.setProjectStopped(projectId);
+      this._emitProjectsRefresh();
       return { ok: true, status: 'stopped' };
     }
 
+    this._clearHealthPolling(projectId);
     const pid = rec.dev.pid;
     this._persistAndBroadcastLog(
       projectId,
@@ -244,7 +338,9 @@ class MSC_ProjectRunner extends EventEmitter {
     );
     treeKill(pid, 'SIGTERM', () => {});
     rec.dev = undefined;
+    this.store.clearProjectHealth(projectId);
     this.store.setProjectStopped(projectId);
+    this._emitProjectsRefresh();
     this.emit('stop', { projectId, mode: 'dev' });
     return { ok: true, status: 'stopped' };
   }
@@ -288,18 +384,25 @@ class MSC_ProjectRunner extends EventEmitter {
   /** Stops dev + build for one project (registry delete, app quit, etc.). */
   stopProject(projectId) {
     const rec = this.children.get(projectId);
+    this._clearHealthPolling(projectId);
     if (rec?.build?.pid) treeKill(rec.build.pid, 'SIGTERM', () => {});
     if (rec?.dev?.pid) treeKill(rec.dev.pid, 'SIGTERM', () => {});
     if (rec) {
       rec.dev = undefined;
       rec.build = undefined;
     }
+    this.store.clearProjectHealth(projectId);
     this.store.setProjectStopped(projectId);
+    this._emitProjectsRefresh();
     return { ok: true };
   }
 
   killAll() {
     for (const [, rec] of this.children) {
+      if (rec.healthPollTimer) {
+        clearTimeout(rec.healthPollTimer);
+        rec.healthPollTimer = undefined;
+      }
       if (rec.dev?.pid) treeKill(rec.dev.pid, 'SIGTERM', () => {});
       if (rec.build?.pid) treeKill(rec.build.pid, 'SIGTERM', () => {});
     }

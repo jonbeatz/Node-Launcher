@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const pm2 = require('pm2');
 const treeKill = require('tree-kill');
+const { msc_launcherRendererPort } = require('./launcher-port');
+const { msc_probeHttpHealth } = require('./health-probe');
 
 class MSC_PM2Manager {
   /**
@@ -93,6 +95,16 @@ class MSC_PM2Manager {
   }
 
   /** Optional legacy subscriber */
+  _nukeStageLog(projectId, message, level = 'info') {
+    const ts = new Date().toISOString();
+    try {
+      this.store.insertLog(projectId, ts, level, message);
+    } catch (_) {
+      /* ignore */
+    }
+    this._sendVpeRenderer(projectId, ts, level, message);
+  }
+
   _sendLegacyRenderer(projectId, type, content) {
     const w = this.mainWindow;
     if (!w || w.isDestroyed() || !w.webContents || w.webContents.isDestroyed()) return;
@@ -198,6 +210,7 @@ class MSC_PM2Manager {
     const validatedPath = this.msc_validatePath(row.path);
     const label = row.name || row.id;
     console.log(`[VPE] Initiating NUKE sequence for ${label} at ${validatedPath}`);
+    this._nukeStageLog(projectId, '[nuke:stage] kill_started');
 
     await new Promise((resolve) => {
       pm2.describe(projectId, (errDesc, description) => {
@@ -215,11 +228,13 @@ class MSC_PM2Manager {
         }
       });
     });
+    this._nukeStageLog(projectId, '[nuke:stage] kill_done');
 
     const nmPath = path.join(validatedPath, 'node_modules');
     const nextPath = path.join(validatedPath, '.next');
 
     console.log('[VPE] Purging directories...');
+    this._nukeStageLog(projectId, '[nuke:stage] purge_started');
     try {
       if (fs.existsSync(nmPath))
         fs.rmSync(nmPath, { recursive: true, force: true, maxRetries: 3 });
@@ -227,10 +242,17 @@ class MSC_PM2Manager {
         fs.rmSync(nextPath, { recursive: true, force: true, maxRetries: 3 });
     } catch (err) {
       console.error('[VPE] Purge failed:', err);
+      this._nukeStageLog(
+        projectId,
+        `[nuke:stage] purge_error ${err?.message ?? err}`,
+        'warn',
+      );
     }
+    this._nukeStageLog(projectId, '[nuke:stage] purge_done');
 
     const pkgManager = row.pkg_manager || 'npm';
     console.log(`[VPE] Running ${pkgManager} install...`);
+    this._nukeStageLog(projectId, '[nuke:stage] install_started');
 
     const installProcess = spawn(pkgManager, ['install'], {
       cwd: validatedPath,
@@ -262,7 +284,41 @@ class MSC_PM2Manager {
 
     installProcess.on('close', (code) => {
       console.log(`[VPE] Install completed with code ${code}`);
+      this._nukeStageLog(projectId, `[nuke:stage] install_exit code=${code}`);
       if (code === 0) this.startProject(projectId);
+
+      const launcher = msc_launcherRendererPort();
+      const port = Number(row.port);
+      const delayMs = code === 0 ? 5000 : 0;
+      setTimeout(() => {
+        if (code !== 0) {
+          this._nukeStageLog(
+            projectId,
+            '[nuke:stage] verify_health_skipped install_failed',
+            'warn',
+          );
+          return;
+        }
+        void (async () => {
+          this._nukeStageLog(
+            projectId,
+            `[nuke:stage] verify_health port=${port} (launcher UI ${launcher})`,
+          );
+          try {
+            const { statusCode, reachedServer } = await msc_probeHttpHealth(port);
+            const line = !reachedServer
+              ? '[nuke:stage] verify_health_result offline'
+              : `[nuke:stage] verify_health_result HTTP ${statusCode}`;
+            this._nukeStageLog(projectId, line, 'info');
+          } catch (e) {
+            this._nukeStageLog(
+              projectId,
+              `[nuke:stage] verify_health_error ${e?.message ?? e}`,
+              'warn',
+            );
+          }
+        })();
+      }, delayMs);
     });
 
     return { success: true };

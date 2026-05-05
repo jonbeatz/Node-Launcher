@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, KeyboardEvent } from 'react'
+import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
 import { X, GripVertical, ChevronLeft, ChevronRight, ExternalLink, ArrowDownToLine } from 'lucide-react'
 import { getVpeApi } from '@/lib/vpe-bridge'
 
@@ -118,7 +118,7 @@ export function LogDrawer({
   const [logs, setLogs] = useState<LogEntry[]>(() => mscBootstrapLogs())
 
   /** Map IPC log line → drawer row */
-  const mscMapVpeLog = (payload: {
+  const mscMapVpeLog = useCallback((payload: {
     timestamp: string
     level: string
     message: string
@@ -143,12 +143,64 @@ export function LogDrawer({
       message: payload.message,
     }
     return le
-  }
+  }, [])
+
+  /** Prefix with project name for SYSTEM (all-projects) tab. */
+  const mscMapVpeUnifiedLog = useCallback(
+    (row: {
+      project_id: string
+      timestamp: string
+      level: string
+      message: string
+    }) => {
+      const tag =
+        projects.find((p) => p.id === row.project_id)?.name ?? row.project_id
+      return mscMapVpeLog({
+        timestamp: row.timestamp,
+        level: row.level,
+        message: `[${tag}] ${row.message}`,
+      })
+    },
+    [projects, mscMapVpeLog],
+  )
 
   /** Load persisted SQLite tail when switching tabs (Electron only). */
   useEffect(() => {
     const api = getVpeApi()
-    if (!api?.getLogs || !selectedProject) return
+    if (!selectedProject) return
+
+    if (selectedProject === '__vpe_all__') {
+      if (!api?.getUnifiedLogs) {
+        setLogs([])
+        return
+      }
+      let cancelled = false
+      api
+        .getUnifiedLogs(400)
+        .then((rows) => {
+          if (cancelled) return
+          if (!rows?.length) {
+            setLogs([])
+            return
+          }
+          setLogs(
+            rows.map((row) =>
+              mscMapVpeUnifiedLog({
+                project_id: row.project_id,
+                timestamp: row.timestamp,
+                level: row.level,
+                message: row.message,
+              }),
+            ),
+          )
+        })
+        .catch(() => {})
+      return () => {
+        cancelled = true
+      }
+    }
+
+    if (!api?.getLogs) return
     let cancelled = false
     api
       .getLogs(selectedProject)
@@ -167,18 +219,32 @@ export function LogDrawer({
     return () => {
       cancelled = true
     }
-  }, [selectedProject])
+  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog])
 
   /** Real-time IPC stream filtered to active drawer tab */
   useEffect(() => {
     const api = getVpeApi()
     if (!api?.subscribeLogUpdate) return
     const unsub = api.subscribeLogUpdate((payload) => {
+      if (selectedProject === '__vpe_all__') {
+        setLogs((prev) =>
+          [
+            ...prev,
+            mscMapVpeUnifiedLog({
+              project_id: payload.projectId,
+              timestamp: payload.timestamp,
+              level: payload.level,
+              message: payload.message,
+            }),
+          ].slice(-500),
+        )
+        return
+      }
       if (payload.projectId !== selectedProject) return
-      setLogs((prev) => [...prev, mscMapVpeLog(payload)])
+      setLogs((prev) => [...prev, mscMapVpeLog(payload)].slice(-500))
     })
     return unsub
-  }, [selectedProject])
+  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog])
   const [commandInput, setCommandInput] = useState('')
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
@@ -267,6 +333,7 @@ export function LogDrawer({
 
   const handleCloseTab = (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation()
+    if (projectId === '__vpe_all__') return
     onCloseTab?.(projectId)
   }
 
@@ -495,16 +562,18 @@ export function LogDrawer({
       {/* Tab Bar - SQUARED with 4px top radius only, dark grey active state */}
       <div className="h-10 bg-[#161616] border-b border-[#333333] flex items-center px-2 overflow-x-auto shrink-0">
         {projects.length === 0 ? (
-          <span className="font-sans text-xs text-[#555555] px-2">No active projects</span>
+          <span className="font-sans text-xs text-[#555555] px-2">No projects</span>
         ) : (
           projects.map((project) => {
             const isActive = selectedProject === project.id
             const isRunning = project.status === 'running' || project.status === 'building'
+            const isSystemTab = project.id === '__vpe_all__'
             
             return (
               <button
                 key={project.id}
                 onClick={() => handleProjectSelect(project.id)}
+                title={isSystemTab ? 'All projects (merged by time)' : project.name}
                 className={`
                   flex items-center gap-2 px-3 py-1.5 font-sans text-xs transition-all shrink-0 mr-1
                   ${isActive 
@@ -518,12 +587,14 @@ export function LogDrawer({
                 {isActive && (
                   <div className={`w-2 h-2 rounded-full ${getStatusColor(project.status)} ${isRunning ? 'animate-pulse-led' : ''}`} />
                 )}
-                <span className="truncate max-w-[100px]">{project.name}</span>
-                <X 
-                  size={12} 
-                  className="opacity-60 hover:opacity-100" 
-                  onClick={(e) => handleCloseTab(e, project.id)}
-                />
+                <span className="truncate max-w-[120px]">{project.name}</span>
+                {!isSystemTab ? (
+                  <X 
+                    size={12} 
+                    className="opacity-60 hover:opacity-100" 
+                    onClick={(e) => handleCloseTab(e, project.id)}
+                  />
+                ) : null}
               </button>
             )
           })
@@ -534,7 +605,7 @@ export function LogDrawer({
       {projects.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="font-sans text-[13px] text-[#A0A0A0] text-center px-4">
-            No active projects. Start a project to view logs.
+            No logs available.
           </p>
         </div>
       ) : (

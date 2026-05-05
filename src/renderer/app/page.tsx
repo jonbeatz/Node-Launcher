@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { LayoutGrid, List, FolderPlus } from 'lucide-react'
 import { AppSidebar } from '@/components/app-sidebar';
 import { TopBar } from '@/components/top-bar';
@@ -10,6 +10,7 @@ import { ProjectListView } from '@/components/project-list-view'
 import { LogDrawer } from '@/components/log-drawer'
 import { RepairModal } from '@/components/repair-modal'
 import { NukeModal } from '@/components/nuke-modal'
+import { NukeProgressOverlay } from '@/components/NukeProgressOverlay'
 import { AddProjectModal } from '@/components/add-project-modal'
 import { ProjectSettingsModal } from '@/components/project-settings-modal'
 import { DeleteConfirmModal } from '@/components/delete-confirm-modal'
@@ -40,6 +41,9 @@ interface Project {
   start_script?: string
   build_script?: string
   thumbnail_url?: string | null
+  health_http_code?: number | null
+  health_checked_at?: string | null
+  health_reachable?: boolean | null
 }
 
 /** Browser fallback when `window.vpeAPI` is unavailable (Next standalone). */
@@ -141,6 +145,10 @@ function DashboardContent() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [compactMode, setCompactMode] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [nukeOverlay, setNukeOverlay] = useState<
+    null | { id: string; name: string; port: number }
+  >(null)
+  const [nukeLogLines, setNukeLogLines] = useState<string[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
 
   // Context menu state
@@ -263,6 +271,17 @@ function DashboardContent() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  useEffect(() => {
+    if (!nukeOverlay) return
+    const api = getVpeApi()
+    if (!api?.subscribeLogUpdate) return
+    const unsub = api.subscribeLogUpdate((p) => {
+      if (p.projectId !== nukeOverlay.id) return
+      setNukeLogLines((prev) => [...prev, p.message].slice(-160))
+    })
+    return unsub
+  }, [nukeOverlay])
+
   const msc_pickProjectMeta = useCallback((projectName: string) => {
     const row = projects.find((p) => p.name === projectName)
     setSelectedProject(projectName)
@@ -320,23 +339,66 @@ function DashboardContent() {
 
   const handleConfirmNuke = async () => {
     const api = getVpeApi()
+    const row = projects.find((p) => p.id === selectedProjectId)
+    setNukeModalOpen(false)
     try {
-      if (api?.nukeProject && selectedProjectId) {
+      if (api?.nukeProject && selectedProjectId && row) {
+        setNukeOverlay({
+          id: selectedProjectId,
+          name: selectedProject,
+          port: row.port,
+        })
+        setNukeLogLines([])
         await api.nukeProject(selectedProjectId)
         await refreshProjects()
+        addToast(
+          'Nuke pipeline running',
+          'info',
+          'Tree-kill, purge, install, and verify — progress is in the overlay.',
+        )
       } else {
-        setProjects(prev => prev.map(p => p.name === selectedProject ? { ...p, status: 'stopped' as const } : p))
+        setNukeOverlay(null)
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.name === selectedProject ? { ...p, status: 'stopped' as const } : p,
+          ),
+        )
+        addToast('Nuke (demo)', 'info', `${selectedProject} marked stopped`)
       }
-      setNukeModalOpen(false)
-      addToast('Nuke completed', 'success', `${selectedProject} environment destroyed`)
     } catch (err: unknown) {
       const msg =
         err && typeof err === 'object' && 'message' in err
           ? String((err as { message?: string }).message)
           : 'Nuke failed'
       addToast('Nuke failed', 'error', msg)
+      setNukeOverlay(null)
     }
   }
+
+  const handlePatchStartScript = useCallback(
+    async (projectId: string) => {
+      const api = getVpeApi()
+      if (!api?.patchStartScript || !api.toggleStatus) return
+      try {
+        await api.patchStartScript(projectId)
+        await refreshProjects()
+        addToast(
+          'package.json patched',
+          'success',
+          'Hardcoded port flags removed (.vader-backup). Starting…',
+        )
+        await api.toggleStatus(projectId)
+        await refreshProjects()
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message?: string }).message)
+            : 'Patch failed'
+        addToast('Patch script failed', 'error', msg)
+      }
+    },
+    [addToast, refreshProjects],
+  )
 
   const handleAutoFixPort = useCallback(
     async (projectId: string) => {
@@ -425,18 +487,31 @@ function DashboardContent() {
         const canAutoFix = Boolean(
           api?.autoFixProjectPort && isPreflightError,
         )
+        const canPatchScript =
+          Boolean(api?.patchStartScript) && /hardcodes port/i.test(msg)
+        let action:
+          | { label: string; onClick: () => void }
+          | undefined
+        if (canPatchScript) {
+          action = {
+            label: 'Patch script',
+            onClick: () => {
+              void handlePatchStartScript(projectId)
+            },
+          }
+        } else if (canAutoFix) {
+          action = {
+            label: 'Auto-fix port',
+            onClick: () => {
+              void handleAutoFixPort(projectId)
+            },
+          }
+        }
         addToast(
           isPreflightError ? 'Preflight failed' : 'Process control failed',
           'error',
           msg,
-          canAutoFix
-            ? {
-                label: 'Auto-fix port',
-                onClick: () => {
-                  void handleAutoFixPort(projectId)
-                },
-              }
-            : undefined,
+          action,
         )
       }
       return
@@ -515,9 +590,28 @@ function DashboardContent() {
     addToast('Starting all projects...', 'info')
   }
 
-  const handleStopAll = () => {
-    setProjects(prev => prev.map(p => p.status === 'running' ? { ...p, status: 'stopped' as const } : p))
-    addToast('Stopping all projects...', 'info')
+  const handleStopAll = async () => {
+    const api = getVpeApi()
+    if (api?.stopAllProjects) {
+      try {
+        await api.stopAllProjects()
+        await refreshProjects()
+        addToast('All projects stopped', 'info', 'PM2 and dashboard processes were stopped.')
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message?: string }).message)
+            : 'Stop all failed'
+        addToast('Stop all failed', 'error', msg)
+      }
+      return
+    }
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.status === 'running' ? { ...p, status: 'stopped' as const } : p,
+      ),
+    )
+    addToast('Stopping all projects...', 'info', '(Demo — run in Electron for real stop)')
   }
 
   const handleRefreshAll = () => {
@@ -560,6 +654,18 @@ function DashboardContent() {
 
   // Projects for log drawer (only show projects with logs open)
   const logProjects = projects.filter(p => p.status === 'running' || p.status === 'building' || p.id === activeLogProject)
+
+  const logDrawerTabs = useMemo(() => {
+    const tail = logProjects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+    }))
+    return [
+      { id: '__vpe_all__', name: 'SYSTEM', status: 'running' as const },
+      ...tail,
+    ]
+  }, [logProjects])
 
   if (!clientReady || !projectsReady) {
     return (
@@ -727,6 +833,9 @@ function DashboardContent() {
                             port={project.port}
                             uptime={project.uptime}
                             status={project.status}
+                            health_http_code={project.health_http_code}
+                            health_checked_at={project.health_checked_at}
+                            health_reachable={project.health_reachable}
                             thumbnailUrl={
                               project.thumbnail_url ?? undefined
                             }
@@ -735,6 +844,7 @@ function DashboardContent() {
                             onStop={() => void handleToggleStatus(project.id)}
                             onBuild={() => void handleRunBuild(project.id)}
                             onLogs={() => handleLogs(project.id)}
+                            onViewErrorConsole={() => handleLogs(project.id)}
                             onRepair={() => handleRepair(project.name)}
                             onNuke={() => handleNuke(project.name)}
                             onSettings={() => handleSettings(project.name)}
@@ -788,14 +898,14 @@ function DashboardContent() {
 
             {/* Log Drawer */}
             <LogDrawer 
-              projects={logProjects.map(p => ({ id: p.id, name: p.name, status: p.status }))}
+              projects={logDrawerTabs}
               activeProject={activeLogProject}
               onProjectSelect={setActiveLogProject}
               onClose={() => setLogDrawerVisible(false)}
               isVisible={logDrawerVisible}
               onCloseTab={(projectId) => {
+                if (projectId === '__vpe_all__') return
                 if (logProjects.length > 1) {
-                  // Switch to another project
                   const remaining = logProjects.filter(p => p.id !== projectId)
                   if (remaining.length > 0) {
                     setActiveLogProject(remaining[0].id)
@@ -852,6 +962,14 @@ function DashboardContent() {
         projectName={selectedProject}
         onClose={() => setNukeModalOpen(false)}
         onConfirm={handleConfirmNuke}
+      />
+
+      <NukeProgressOverlay
+        open={Boolean(nukeOverlay)}
+        projectName={nukeOverlay?.name ?? ''}
+        projectPort={nukeOverlay?.port ?? 3001}
+        logLines={nukeLogLines}
+        onDismiss={() => setNukeOverlay(null)}
       />
 
       <AddProjectModal

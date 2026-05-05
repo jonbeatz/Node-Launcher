@@ -3,15 +3,88 @@ const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
+const os = require('os');
+const pm2 = require('pm2');
+const { msc_hostCpuPercentSinceLastPoll } = require('./host-cpu-ticks');
+const { msc_launcherRendererPort } = require('./launcher-port');
 const { msc_detectProjectScripts } = require('./project-detection');
 const { msc_validateProjectPath } = require('./path-guard');
+const { msc_patchPackageJsonStripScriptPorts } = require('./package-json-script-patch');
 
 let msc_vpeIpcRegistered = false;
 /** Node-Launcher UI port; managed projects must avoid this port. */
-const MSC_VPE_RENDERER_PORT =
-  parseInt(process.env.VPE_RENDERER_PORT || process.env.PORT || '3000', 10) || 3000;
+const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 const MAX_THUMB_EDGE = 1280;
 const MAX_THUMB_BYTES = 900 * 1024;
+
+function msc_formatProcessUptime(sec) {
+  const s = Math.floor(Number(sec) || 0);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${Math.max(0, m)}m`;
+}
+
+function msc_bytesToGbLabel(bytes) {
+  return `${(Number(bytes) / (1024 ** 3)).toFixed(2)} GB`;
+}
+
+function msc_pm2DaemonReachable() {
+  return new Promise((resolve) => {
+    try {
+      pm2.list((err) => resolve(!err));
+    } catch (_) {
+      resolve(false);
+    }
+  });
+}
+
+/** @param {unknown} err */
+function msc_fallbackSystemStats(err) {
+  console.error('[VPE get-system-stats]:', err?.message ?? err);
+  try {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = Math.max(0, totalMem - freeMem);
+    const memoryUsedPercent =
+      totalMem > 0 ? Math.min(100, Math.round((usedMem / totalMem) * 100)) : 0;
+    const vpeUptimeSec = process.uptime();
+    const vpeUptimeLabel = msc_formatProcessUptime(vpeUptimeSec);
+    return {
+      vpeUptimeSec,
+      vpeUptimeLabel,
+      cpuPercent: null,
+      cpuSource: 'unavailable',
+      memoryTotalBytes: totalMem,
+      memoryFreeBytes: freeMem,
+      memoryUsedPercent,
+      memoryFreeLabel: msc_bytesToGbLabel(freeMem),
+      memoryUsedLabel: msc_bytesToGbLabel(usedMem),
+      memoryTotalLabel: msc_bytesToGbLabel(totalMem),
+      pm2Online: false,
+      projectsActive: 0,
+      projectsTotal: 0,
+    };
+  } catch {
+    return {
+      vpeUptimeSec: Math.round(process.uptime()),
+      vpeUptimeLabel: '—',
+      cpuPercent: null,
+      cpuSource: 'unavailable',
+      memoryTotalBytes: 0,
+      memoryFreeBytes: 0,
+      memoryUsedPercent: 0,
+      memoryFreeLabel: '0.00 GB',
+      memoryUsedLabel: '0.00 GB',
+      memoryTotalLabel: '0.00 GB',
+      pm2Online: false,
+      projectsActive: 0,
+      projectsTotal: 0,
+    };
+  }
+}
 
 function msc_optimizeThumbnailIfNeeded(src, fallbackDest) {
   const ext = path.extname(src).toLowerCase();
@@ -61,8 +134,9 @@ function msc_optimizeThumbnailIfNeeded(src, fallbackDest) {
 /**
  * @param {import('./project-runner')} projectRunner
  * @param store SqlitePersistence | JsonPersistence
+ * @param {{ pm2Manager?: import('./pm2-manager') | null }} vpeRuntime mutated after PM2 init (`pm2Manager` set on main)
  */
-function msc_registerVpeIpc(projectRunner, store) {
+function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   const msc_isPortInUse = (port) =>
     new Promise((resolve) => {
       const socket = net.createConnection({ port, host: '127.0.0.1' });
@@ -140,6 +214,46 @@ function msc_registerVpeIpc(projectRunner, store) {
 
   ipcMain.handle('vpe:getProjects', () => store.listProjectsAlphabetical());
 
+  ipcMain.handle('vpe:get-system-stats', async () => {
+    try {
+      const projects = store.listProjectsAlphabetical();
+      const projectsActive = projects.filter((p) => p.status === 'running').length;
+      const projectsTotal = projects.length;
+
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const usedMem = Math.max(0, totalMem - freeMem);
+      const memoryUsedPercent =
+        totalMem > 0 ? Math.min(100, Math.round((usedMem / totalMem) * 100)) : 0;
+
+      const vpeUptimeSec = process.uptime();
+      const vpeUptimeLabel = msc_formatProcessUptime(vpeUptimeSec);
+
+      const cpuPercent = msc_hostCpuPercentSinceLastPoll();
+      const cpuSource = cpuPercent != null ? 'cpu_ticks' : 'unavailable';
+
+      const pm2Online = await msc_pm2DaemonReachable();
+
+      return {
+        vpeUptimeSec,
+        vpeUptimeLabel,
+        cpuPercent,
+        cpuSource,
+        memoryTotalBytes: totalMem,
+        memoryFreeBytes: freeMem,
+        memoryUsedPercent,
+        memoryFreeLabel: msc_bytesToGbLabel(freeMem),
+        memoryUsedLabel: msc_bytesToGbLabel(usedMem),
+        memoryTotalLabel: msc_bytesToGbLabel(totalMem),
+        pm2Online,
+        projectsActive,
+        projectsTotal,
+      };
+    } catch (err) {
+      return msc_fallbackSystemStats(err);
+    }
+  });
+
   ipcMain.handle('vpe:auto-fix-port', async (_event, projectId) => {
     if (!projectId) throw new Error('VPE: Missing project id');
     const row = store.getProject(projectId);
@@ -181,9 +295,65 @@ function msc_registerVpeIpc(projectRunner, store) {
     return store.logsForProjectDesc(projectId, 100);
   });
 
+  ipcMain.handle('vpe:get-unified-logs', (_event, limit) => {
+    const n = Number(limit);
+    const cap = Number.isFinite(n) && n > 0 ? Math.min(n, 800) : 300;
+    return typeof store.logsRecentAll === 'function'
+      ? store.logsRecentAll(cap)
+      : [];
+  });
+
+  ipcMain.handle('vpe:patch-start-script', async (_event, projectId) => {
+    if (!projectId) throw new Error('VPE: Missing project id');
+    const row = store.getProject(projectId);
+    if (!row) throw new Error('VPE: Project not found');
+    const root = msc_validateProjectPath(row.path);
+    const scriptName = (row.start_script || 'dev').toString();
+    const { previous, next, backupPath } = msc_patchPackageJsonStripScriptPorts(
+      root,
+      scriptName,
+    );
+    msc_emitProjectsUpdated();
+    return { ok: true, previous, next, backupPath, scriptName };
+  });
+
   ipcMain.handle('vpe:toggle-status', async (event, projectId) =>
     projectRunner.toggleStatus(projectId),
   );
+
+  /** Same engine path as tray "Stop all (PM2 + dashboard spawns)"; updates SQLite registry. */
+  ipcMain.handle('vpe:stop-all', async () => {
+    const pm = vpeRuntime.pm2Manager;
+    try {
+      if (pm && typeof pm.stopAll === 'function') await pm.stopAll();
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      if (pm && typeof pm.msc_pm2CleanupRegistered === 'function') {
+        await pm.msc_pm2CleanupRegistered();
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      projectRunner.killAll();
+    } catch (_) {
+      /* ignore */
+    }
+    for (const p of store.listProjectsAlphabetical()) {
+      if (p.status === 'running') {
+        try {
+          store.clearProjectHealth(p.id);
+          store.setProjectStopped(p.id);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
+    msc_emitProjectsUpdated();
+    return { ok: true };
+  });
 
   ipcMain.handle('vpe:run-build', async (event, projectId) =>
     projectRunner.runBuild(projectId),
@@ -315,14 +485,20 @@ function msc_registerVpeIpc(projectRunner, store) {
     }
   });
 
-  ipcMain.handle('vpe:nuke-project', async (event, projectId) => {
+  ipcMain.handle('vpe:nuke-project', async (_event, projectId) => {
     if (!projectId) throw new Error('VPE: Missing project id');
     const row = store.getProject(projectId);
     if (!row) throw new Error('VPE: Project not found');
     projectRunner.stopProject(projectId);
     store.setProjectStopped(projectId);
     msc_emitProjectsUpdated();
-    return { ok: true, id: projectId };
+    const pm = vpeRuntime.pm2Manager;
+    if (pm && typeof pm.nukeProject === 'function') {
+      await pm.nukeProject(projectId);
+      msc_emitProjectsUpdated();
+      return { ok: true, id: projectId };
+    }
+    return { ok: true, id: projectId, skipped: 'pm2_unavailable' };
   });
 }
 

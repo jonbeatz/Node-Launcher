@@ -33,6 +33,12 @@ interface Msc_ProjectCardProps {
   onContextMenu?: (e: React.MouseEvent) => void
   /** When running, opens project URL in the system browser (Electron). */
   onOpenInBrowser?: () => void
+  /** Last GET / health result from main after dev start. */
+  health_http_code?: number | null
+  health_checked_at?: string | null
+  health_reachable?: boolean | null
+  /** Opens log drawer (e.g. when health is degraded). */
+  onViewErrorConsole?: () => void
 }
 
 export function Msc_ProjectCard({
@@ -53,6 +59,10 @@ export function Msc_ProjectCard({
   onUnregister,
   onContextMenu,
   onOpenInBrowser,
+  health_http_code,
+  health_checked_at,
+  health_reachable,
+  onViewErrorConsole,
 }: Msc_ProjectCardProps) {
   const isRunning = status === 'running'
   const runUrl = `http://localhost:${port}`
@@ -82,6 +92,50 @@ export function Msc_ProjectCard({
     if (isBuilding) return 'BUILDING'
     return 'STOPPED'
   }
+
+  const getHealthLine = (): {
+    label: string
+    cls: string
+    showErrorCta?: boolean
+  } | null => {
+    if (!isRunning) return null
+    if (!health_checked_at && (health_http_code === undefined || health_http_code === null)) {
+      return {
+        label: 'Booting… (waiting for HTTP)',
+        cls: 'text-[#ffcc00]',
+      }
+    }
+    if (
+      health_reachable === false &&
+      (health_http_code === undefined || health_http_code === null)
+    ) {
+      return {
+        label: 'Offline (no TCP/HTTP)',
+        cls: 'text-[#e02b20]',
+        showErrorCta: true,
+      }
+    }
+    if (typeof health_http_code === 'number' && health_http_code >= 200 && health_http_code < 300) {
+      return { label: `Active — HTTP ${health_http_code}`, cls: 'text-[#4fde82]' }
+    }
+    if (typeof health_http_code === 'number' && health_http_code >= 500) {
+      return {
+        label: `Degraded — HTTP ${health_http_code}`,
+        cls: 'text-[#e02b20]',
+        showErrorCta: true,
+      }
+    }
+    if (typeof health_http_code === 'number') {
+      return {
+        label: `HTTP ${health_http_code}`,
+        cls: 'text-[#ffcc00]',
+        showErrorCta: health_http_code >= 400,
+      }
+    }
+    return { label: 'No HTTP response', cls: 'text-[#e02b20]', showErrorCta: true }
+  }
+
+  const healthLine = getHealthLine()
 
   return (
     <div
@@ -180,6 +234,26 @@ export function Msc_ProjectCard({
               >
                 {runUrl}
               </span>
+              {healthLine && (
+                <span
+                  className={`mt-1 block font-mono text-[11px] ${healthLine.cls}`}
+                  title="GET / on project port after start"
+                >
+                  {healthLine.label}
+                </span>
+              )}
+              {healthLine?.showErrorCta && onViewErrorConsole && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onViewErrorConsole()
+                  }}
+                  className="mt-2 font-sans text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
+                >
+                  View error console →
+                </button>
+              )}
             </div>
             {onOpenInBrowser && (
               <button

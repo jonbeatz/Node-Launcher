@@ -17,6 +17,9 @@ To maintain architectural integrity, all development must follow this strict hie
 
 ## 🛠 2. Technical Core & Architecture
 
+### **Local development URL**
+When you run **`npm run dev`**, the Node-Launcher shell (Electron + renderer) is served at **`http://localhost:3000`**. Registered managed projects must use **higher ports** (for example `3001+`), not `3000`.
+
 ### **The Tech Stack**
 | Layer | Technology | Purpose |
 | :--- | :--- | :--- |

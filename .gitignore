@@ -4,6 +4,7 @@ node_modules/
 # next / build artifacts
 .next/
 out/
+**/*.tsbuildinfo
 dist/
 build/
 coverage/

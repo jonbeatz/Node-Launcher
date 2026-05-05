@@ -26,6 +26,41 @@ interface Project {
   pkgManager: 'npm' | 'yarn' | 'pnpm'
   path: string
   hasBuilt?: boolean
+  health_http_code?: number | null
+  health_checked_at?: string | null
+  health_reachable?: boolean | null
+}
+
+function msc_healthCell(project: Project): { text: string; className: string } {
+  if (project.status !== 'running') {
+    return { text: '—', className: 'text-[#555555]' }
+  }
+  if (
+    !project.health_checked_at &&
+    (project.health_http_code === undefined || project.health_http_code === null)
+  ) {
+    return { text: 'Boot', className: 'text-[#ffcc00]' }
+  }
+  if (
+    project.health_reachable === false &&
+    (project.health_http_code === undefined || project.health_http_code === null)
+  ) {
+    return { text: 'Off', className: 'text-[#e02b20]' }
+  }
+  if (
+    typeof project.health_http_code === 'number' &&
+    project.health_http_code >= 200 &&
+    project.health_http_code < 300
+  ) {
+    return { text: `${project.health_http_code}`, className: 'text-[#4fde82]' }
+  }
+  if (typeof project.health_http_code === 'number' && project.health_http_code >= 500) {
+    return { text: `${project.health_http_code}`, className: 'text-[#e02b20]' }
+  }
+  if (typeof project.health_http_code === 'number') {
+    return { text: `${project.health_http_code}`, className: 'text-[#ffcc00]' }
+  }
+  return { text: 'fail', className: 'text-[#e02b20]' }
 }
 
 interface ProjectListViewProps {
@@ -163,6 +198,9 @@ export function ProjectListView({
               >
                 <span className="flex items-center gap-1">Port <SortIcon field="port" /></span>
               </th>
+              <th className="w-[88px] px-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]" title="GET / health after dev start">
+                HTTP
+              </th>
               <th className="w-16 px-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
                 PKG
               </th>
@@ -189,6 +227,7 @@ export function ProjectListView({
               const hasBuilt = project.hasBuilt !== false
               const rowBg = index % 2 === 0 ? 'bg-[#121212]' : 'bg-[#1a1a1a]'
               const isHovered = hoveredProject === project.id
+              const httpCell = msc_healthCell(project)
 
               return (
                 <tr 
@@ -241,6 +280,9 @@ export function ProjectListView({
                   </td>
                   <td className="px-3 font-sans text-[13px] text-[#A0A0A0]">
                     {project.status === 'building' ? '...' : project.port}
+                  </td>
+                  <td className="px-3 font-mono text-[11px]">
+                    <span className={httpCell.className}>{httpCell.text}</span>
                   </td>
                   <td className="px-3">
                     <span className="px-2 py-0.5 rounded bg-[#0a0a0a] font-sans text-[10px] text-[#A0A0A0] border border-[#333333]">
