@@ -6,12 +6,27 @@ const { msc_detectProjectScripts } = require('./project-detection');
 const { msc_validateProjectPath } = require('./path-guard');
 
 let msc_vpeIpcRegistered = false;
+const MSC_VPE_RENDERER_PORT =
+  parseInt(process.env.VPE_RENDERER_PORT || process.env.PORT || '3001', 10) || 3001;
 
 /**
  * @param {import('./project-runner')} projectRunner
  * @param store SqlitePersistence | JsonPersistence
  */
 function msc_registerVpeIpc(projectRunner, store) {
+  const msc_assertPortNotReserved = (portLike) => {
+    const parsed = Number(portLike);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new Error('VPE: Invalid project port.');
+    }
+    if (parsed === MSC_VPE_RENDERER_PORT) {
+      throw new Error(
+        `VPE: Port ${parsed} is reserved by Node-Launcher renderer. Choose another project port.`,
+      );
+    }
+    return parsed;
+  };
+
   if (msc_vpeIpcRegistered) return;
   msc_vpeIpcRegistered = true;
 
@@ -61,7 +76,7 @@ function msc_registerVpeIpc(projectRunner, store) {
       id,
       name,
       path: root,
-      port: Number(port),
+      port: msc_assertPortNotReserved(port),
       thumbnail_url: thumbnail_url ?? null,
       start_script: start,
       build_script: build,
@@ -79,7 +94,7 @@ function msc_registerVpeIpc(projectRunner, store) {
       id,
       name: payload.name,
       path: root,
-      port: Number(payload.port || 3000),
+      port: msc_assertPortNotReserved(payload.port || 3000),
       status: 'stopped',
       thumbnail_url: payload.thumbnail_url ?? null,
       start_script: det.start_script,

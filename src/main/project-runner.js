@@ -47,10 +47,17 @@ class MSC_ProjectRunner extends EventEmitter {
       args = ['run', script];
     }
 
+    const configuredPort = Number(row.port);
+    const env = { ...process.env, FORCE_COLOR: '1' };
+    if (Number.isFinite(configuredPort) && configuredPort > 0) {
+      env.PORT = String(configuredPort);
+      env.NEXT_PORT = String(configuredPort);
+    }
+
     const child = spawn(cmd, args, {
       cwd,
       shell: process.platform === 'win32',
-      env: { ...process.env, FORCE_COLOR: '1' },
+      env,
     });
 
     const flushLines = (bufRef, chunk, streamLevel) => {
