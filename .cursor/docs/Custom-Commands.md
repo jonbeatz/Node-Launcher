@@ -16,6 +16,27 @@ Notes:
 - This is a destructive stop for currently running Node/Electron processes on your machine session.
 - Launcher UI dev server defaults to `http://localhost:3000`; managed projects should use `3001+`.
 
+## hardened setup (lint, natives, e2e)
+
+Intent: reproduce a clean local pipeline after dependency or Node upgrades (especially **Node 24+**).
+
+Run from repo root, in order:
+
+1. Stop processes (same as **start app**):  
+   `Get-Process -Name node,electron -ErrorAction SilentlyContinue | Stop-Process -Force`
+2. Optional — clear Next dev output:  
+   `Remove-Item -Recurse -Force src/renderer/.next -ErrorAction SilentlyContinue`
+3. Install (peer deps are already controlled by **`.npmrc`** `legacy-peer-deps=true`):  
+   `npm install`  
+   Do **not** append `--legacy-peer-deps` to **`npx @electron/rebuild`** — that flag is for **npm** only; passing it to the rebuild CLI causes **`ERR_PARSE_ARGS_UNKNOWN_OPTION`** on Node 24.
+4. Rebuild **better-sqlite3** for the installed Electron:  
+   `npm run rebuild:natives`  
+   (equivalent to `electron-rebuild -f -w better-sqlite3` via local `node_modules/.bin`.)
+5. Optional — Playwright browser + OS deps (Windows):  
+   `npx playwright install chromium --with-deps`
+6. Sanity scripts:  
+   `npm run repair:ast` → `npm run test:e2e` → `npm run lint`
+
 ## new git branch
 
 Intent: finish current iteration and start a clean next branch.
