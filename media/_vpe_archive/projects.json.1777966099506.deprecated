@@ -1,0 +1,17 @@
+{
+  "projects": [
+    {
+      "id": "msc-media-pro",
+      "path": "d:/Cursor_Projectz/msc-media-pro",
+      "displayName": "MSC Media Pro",
+      "portLock": true,
+      "preferredPort": 3000,
+      "detectedPackageManager": "npm",
+      "detectedStartScript": "dev",
+      "status": "stopped",
+      "lastThumbnail": "",
+      "createdAt": "2026-05-04T21:19:00Z",
+      "lastLaunched": ""
+    }
+  ]
+}

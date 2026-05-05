@@ -1,0 +1,43 @@
+{
+  "projects": {
+    "msc-media-pro": {
+      "id": "msc-media-pro",
+      "name": "v0-MSC-Pro",
+      "path": "D:\\Cursor_Projectz\\v0-MSC-Pro",
+      "port": 3000,
+      "status": "stopped",
+      "thumbnail_url": null,
+      "start_script": "dev",
+      "build_script": "build",
+      "pkg_manager": "pnpm"
+    },
+    "smoke-1777966507582": {
+      "id": "smoke-1777966507582",
+      "name": "SMOKE_PROJECT",
+      "path": "D:\\Cursor_Projectz\\Node-Launcher",
+      "port": 3017,
+      "status": "stopped",
+      "thumbnail_url": null,
+      "start_script": "dev",
+      "build_script": "build",
+      "pkg_manager": "npm"
+    }
+  },
+  "logs": [
+    {
+      "id": 1,
+      "project_id": "msc-media-pro",
+      "timestamp": "2026-05-05T07:44:27.408Z",
+      "level": "info",
+      "message": "[vpe] starting build (npm run build)"
+    },
+    {
+      "id": 2,
+      "project_id": "msc-media-pro",
+      "timestamp": "2026-05-05T07:44:33.598Z",
+      "level": "info",
+      "message": "[vpe] starting build (npm run build)"
+    }
+  ],
+  "logSeq": 2
+}
