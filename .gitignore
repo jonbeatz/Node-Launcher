@@ -7,10 +7,11 @@ node_modules/
 
 # next / build artifacts
 .next/
-out/
+# Ignore only repo-root `out/`; keep `src/renderer/out/` packable for Electron static export.
+/out/
 **/*.tsbuildinfo
 dist/
-build/
+# build/ holds electron-builder buildResources (e.g. icon.ico); do not ignore — tracked for releases.
 coverage/
 
 # electron / bundler caches

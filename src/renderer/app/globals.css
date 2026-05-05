@@ -1,8 +1,12 @@
+/* Loaded via URL so static export + assetPrefix './' works under Electron file:// */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
   /* VPE Squared Registry - v6 */
   --background: #121212;
   --foreground: #FFFFFF;

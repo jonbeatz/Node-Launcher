@@ -67,6 +67,14 @@ let mainWindow;
 let pm2Manager;
 let trayManager;
 let projectRunner;
+
+/**
+ * Packaged UI: Next static export at `src/renderer/out/index.html` (inside app.asar).
+ * @returns {string}
+ */
+function msc_getRendererIndexPath() {
+  return path.join(__dirname, '..', 'renderer', 'out', 'index.html');
+}
 /** Set `pm2Manager` after daemon connect; `vpe:nuke-project` uses this. */
 const msc_vpeRuntime = { pm2Manager: null };
 
@@ -97,6 +105,29 @@ function msc_configureWritablePaths() {
   }
 }
 msc_configureWritablePaths();
+
+/**
+ * Window / taskbar icon: dev → repo `build/icon.ico` (same path as electron-builder `win.icon`);
+ * packaged → `extraResources` copy at `resources/icon.ico` (ASAR-safe).
+ * @returns {string | undefined}
+ */
+function msc_resolveAppIconPath() {
+  const candidates = [];
+  if (isDev) {
+    candidates.push(path.join(__dirname, '..', '..', 'build', 'icon.ico'));
+    candidates.push(path.join(process.cwd(), 'build', 'icon.ico'));
+  } else {
+    candidates.push(path.join(process.resourcesPath, 'icon.ico'));
+  }
+  for (const p of candidates) {
+    try {
+      if (p && fs.existsSync(p)) return p;
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  return undefined;
+}
 
 /**
  * MSC Deferred Engine Attach
@@ -153,10 +184,12 @@ function msc_attachEngineAfterWindow(mainWin) {
  * Forces Studio Dark aesthetic (#121212) and loads the launcher renderer (default port 3000).
  */
 function msc_createWindow() {
+  const msc_iconPath = msc_resolveAppIconPath();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 850,
     backgroundColor: '#121212', // Studio Dark Base
+    ...(msc_iconPath ? { icon: msc_iconPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       nodeIntegration: false,
@@ -167,21 +200,25 @@ function msc_createWindow() {
     show: false,
   });
 
-  const startUrl = isDev
-    ? VPE_RENDERER_DEV_ORIGIN
-    : `file://${path.join(__dirname, '../renderer/out/index.html')}`;
-
-  mainWindow.loadURL(startUrl);
+  if (isDev) {
+    mainWindow.loadURL(VPE_RENDERER_DEV_ORIGIN);
+    mainWindow.webContents.openDevTools();
+    console.log(`Vader Shield: UI load URL ${VPE_RENDERER_DEV_ORIGIN}`);
+  } else {
+    const msc_indexHtml = msc_getRendererIndexPath();
+    if (!fs.existsSync(msc_indexHtml)) {
+      console.error(
+        'VPE: Renderer bundle missing. Run `npm run build:renderer` before `npm run build:main`.',
+        msc_indexHtml,
+      );
+    }
+    void mainWindow.loadFile(msc_indexHtml);
+    console.log(`Vader Shield: UI loadFile ${msc_indexHtml}`);
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
-
-  if (isDev) {
-    mainWindow.webContents.openDevTools();
-  }
-
-  console.log(`Vader Shield: UI load URL ${startUrl}`);
   
   // Attach background services after window creation to prevent hangs
   msc_attachEngineAfterWindow(mainWindow);
