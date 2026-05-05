@@ -87,7 +87,7 @@ See also: [`health-scheduler.js`](../../src/main/health-scheduler.js), [`launche
 - **AST smoke**: [`scripts/vpe-repair-stub.cjs`](../../scripts/vpe-repair-stub.cjs) + `npm run repair:ast` (CJS for stable `@babel/traverse` interop on Linux CI).
 - **Writable persistence (ASAR-safe)**: Store files live under **`app.getPath('userData')/vpe-db`** (see `msc_getStorePaths` / `msc_migrateLegacyDbFiles` in [`persistent-store.js`](../../src/main/db/persistent-store.js)); legacy copies from `src/main/db/` when upgrading.
 - **System stats hardening**: [`vpe-ipc.js`](../../src/main/vpe-ipc.js) nested try/catch on **`vpe:get-system-stats`** → `msc_fallbackSystemStats`; [`host-cpu-ticks.js`](../../src/main/host-cpu-ticks.js) documents poll semantics + `Number.isFinite` guard before clamping CPU %.
-- **Node 24 + `@electron/rebuild`**: Do **not** pass **`--legacy-peer-deps`** to the rebuild CLI (npm-only flag → `ERR_PARSE_ARGS_UNKNOWN_OPTION`). Use **`npm run rebuild:natives`** ([`package.json`](../../package.json)) after `npm install`; peer deps remain controlled by [`.npmrc`](../../.npmrc).
+- **Node 24 + `@electron/rebuild`**: Do **not** pass **`--legacy-peer-deps`** to the rebuild CLI (npm-only flag → `ERR_PARSE_ARGS_UNKNOWN_OPTION`). Use **`npm run rebuild:natives`** ([`package.json`](../../package.json)) after `npm install` — script uses **`electron-rebuild -f -o better-sqlite3`** (`--only`) so Windows does not also rebuild **node-pty** (which may require Spectre-mitigated MSVC components). Peer deps remain controlled by [`.npmrc`](../../.npmrc).
 
 ## Quick Command Snippets
 - Clean restart:

@@ -13,7 +13,7 @@
     "lint": "next lint src/renderer",
     "test:e2e": "playwright test",
     "repair:ast": "node scripts/vpe-repair-stub.cjs",
-    "rebuild:natives": "electron-rebuild -f -w better-sqlite3"
+    "rebuild:natives": "electron-rebuild -f -o better-sqlite3"
   },
   "dependencies": {
     "@babel/generator": "^7.29.1",

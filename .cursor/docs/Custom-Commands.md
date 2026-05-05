@@ -31,7 +31,7 @@ Run from repo root, in order:
    Do **not** append `--legacy-peer-deps` to **`npx @electron/rebuild`** — that flag is for **npm** only; passing it to the rebuild CLI causes **`ERR_PARSE_ARGS_UNKNOWN_OPTION`** on Node 24.
 4. Rebuild **better-sqlite3** for the installed Electron:  
    `npm run rebuild:natives`  
-   (equivalent to `electron-rebuild -f -w better-sqlite3` via local `node_modules/.bin`.)
+   (runs `electron-rebuild -f -o better-sqlite3` — **`--only`** so **node-pty** is not rebuilt; full-tree rebuild can require **Spectre-mitigated** MSVC libs on Windows.)
 5. Optional — Playwright browser + OS deps (Windows):  
    `npx playwright install chromium --with-deps`
 6. Sanity scripts:  
