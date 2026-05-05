@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, FolderSearch, Package, Check, Loader2, FolderOpen } from 'lucide-react'
+import { X, FolderSearch, Package, Check, Loader2, FolderOpen, Upload, Camera } from 'lucide-react'
 
 interface AddProjectModalProps {
   isOpen: boolean
@@ -10,24 +10,32 @@ interface AddProjectModalProps {
 }
 
 interface ProjectData {
+  id: string
   name: string
   path: string
   packageManager: 'npm' | 'pnpm' | 'yarn' | null
   startScript: string
   port: string
   portLock: boolean
+  thumbnailUrl?: string | null
 }
 
 export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalProps) {
+  const createDraftId = () =>
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `project-${Date.now()}`
   const [isScanning, setIsScanning] = useState(false)
   const [scanned, setScanned] = useState(false)
   const [projectData, setProjectData] = useState<ProjectData>({
+    id: createDraftId(),
     name: '',
     path: '',
     packageManager: null,
     startScript: 'dev',
-    port: '3000',
+    port: '3001',
     portLock: false,
+    thumbnailUrl: null,
   })
 
   if (!isOpen) return null
@@ -41,16 +49,42 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     }
     const base = pickedPath.split(/[\\/]/).filter(Boolean).pop() ?? 'NEW_PROJECT_NODE'
     const normalizedName = base.replace(/[-\s]+/g, '_').toUpperCase()
+    let detectedPackageManager: ProjectData['packageManager'] = 'pnpm'
+    let detectedStartScript = 'dev'
+    let suggestedPort = '3001'
+    try {
+      if (window.vpeAPI?.inspectProject) {
+        const info = await window.vpeAPI.inspectProject(pickedPath)
+        detectedPackageManager = info?.detection?.pkg_manager ?? detectedPackageManager
+        detectedStartScript = info?.detection?.start_script ?? detectedStartScript
+        suggestedPort = String(info?.suggestedPort ?? suggestedPort)
+      }
+    } catch {
+      // Keep modal usable even if inspect IPC fails.
+    }
     setProjectData({
+      id: projectData.id || createDraftId(),
       name: normalizedName,
       path: pickedPath,
-      packageManager: 'pnpm',
-      startScript: 'dev',
-      port: '3000',
+      packageManager: detectedPackageManager,
+      startScript: detectedStartScript,
+      port: String(suggestedPort),
       portLock: false,
+      thumbnailUrl: projectData.thumbnailUrl ?? null,
     })
     setScanned(true)
     setIsScanning(false)
+  }
+
+  const handlePickThumbnail = async () => {
+    if (!window.vpeAPI?.pickThumbnail) return
+    try {
+      const href = await window.vpeAPI.pickThumbnail(projectData.id)
+      if (!href) return
+      setProjectData((prev) => ({ ...prev, thumbnailUrl: href }))
+    } catch {
+      // Keep setup flow resilient; save path still works without thumbnail.
+    }
   }
 
   const handleSubmit = () => {
@@ -58,12 +92,14 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     onClose()
     setScanned(false)
     setProjectData({
+      id: createDraftId(),
       name: '',
       path: '',
       packageManager: null,
       startScript: 'dev',
-      port: '3000',
+      port: '3001',
       portLock: false,
+      thumbnailUrl: null,
     })
   }
 
@@ -146,6 +182,35 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
                 />
               </div>
 
+              {/* Thumbnail */}
+              <div>
+                <label className="block font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] mb-2">
+                  Thumbnail (Optional)
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="w-16 h-12 rounded bg-[#0a0a0a] border border-[#333333] overflow-hidden flex items-center justify-center shrink-0">
+                    {projectData.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={projectData.thumbnailUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Camera size={14} className="text-[#555555]" />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handlePickThumbnail()}
+                    className="h-8 px-3 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-xs text-[#A0A0A0] hover:text-white hover:border-[#4fde82] transition-all vader-focus flex items-center gap-2"
+                  >
+                    <Upload size={12} />
+                    UPLOAD THUMBNAIL
+                  </button>
+                </div>
+              </div>
+
               {/* Project Path */}
               <div>
                 <label className="block font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] mb-2">
@@ -211,7 +276,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] mb-2">
-                    Default Port
+                    Port (3000 = launcher; use 3001+)
                   </label>
                   <input
                     type="number"

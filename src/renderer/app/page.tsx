@@ -80,7 +80,7 @@ const FALLBACK_PROJECTS: Project[] = [
   { 
     id: '4', 
     name: 'MSC_CONTENT_API', 
-    port: 3001, 
+    port: 3010, 
     uptime: '--', 
     status: 'stopped',
     cpu: 0,
@@ -338,6 +338,53 @@ function DashboardContent() {
     }
   }
 
+  const handleAutoFixPort = useCallback(
+    async (projectId: string) => {
+      const api = getVpeApi()
+      if (!api?.autoFixProjectPort || !api.toggleStatus) return
+      try {
+        const fix = await api.autoFixProjectPort(projectId)
+        await refreshProjects()
+        addToast(
+          'Port reassigned',
+          'success',
+          `Saved port ${fix.port}${fix.start_script ? ` (${fix.start_script})` : ''}. Starting…`,
+        )
+        try {
+          const r = await api.toggleStatus(projectId)
+          await refreshProjects()
+          if (r?.status === 'running' && api.getProjects) {
+            const rows = await api.getProjects()
+            const fresh = rows.find((x) => x.id === projectId)
+            const disp = fresh ? Number(fresh.port) : fix.port
+            const name =
+              fresh?.name ??
+              projects.find((p) => p.id === projectId)?.name ??
+              'Project'
+            addToast(
+              'Server started',
+              'success',
+              `${name} — started on http://localhost:${disp}`,
+            )
+          }
+        } catch (startErr: unknown) {
+          const smsg =
+            startErr && typeof startErr === 'object' && 'message' in startErr
+              ? String((startErr as { message?: string }).message)
+              : 'Start failed'
+          addToast('Start failed after auto-fix', 'error', smsg)
+        }
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message?: string }).message)
+            : 'Auto-fix failed'
+        addToast('Auto-fix failed', 'error', msg)
+      }
+    },
+    [addToast, refreshProjects, projects],
+  )
+
   const handleToggleStatus = async (projectId: string) => {
     const project = projects.find((p) => p.id === projectId)
     if (!project) return
@@ -348,21 +395,49 @@ function DashboardContent() {
         const r = await api.toggleStatus(projectId)
         await refreshProjects()
         const running = r?.status === 'running'
-        const projectUrl = `http://localhost:${project.port}`
-        addToast(
-          running ? 'Server Started' : 'Server Stopped',
-          running ? 'success' : 'info',
-          `${project.name} ${running ? `running on ${projectUrl}` : 'stopped'}`,
-        )
-        if (running && api?.openProjectUrl) {
-          await api.openProjectUrl(projectUrl)
+        let displayPort = project.port
+        if (running && api.getProjects) {
+          try {
+            const rows = await api.getProjects()
+            const fresh = rows.find((x) => x.id === projectId)
+            if (fresh) displayPort = Number(fresh.port) || displayPort
+          } catch {
+            /* keep cached port */
+          }
         }
+        const projectUrl = `http://localhost:${displayPort}`
+        addToast(
+          running ? 'Server started' : 'Server stopped',
+          running ? 'success' : 'info',
+          running
+            ? `${project.name} — started on ${projectUrl}`
+            : `${project.name} stopped`,
+        )
       } catch (err: unknown) {
         const msg =
           err && typeof err === 'object' && 'message' in err
             ? String((err as { message?: string }).message)
             : 'Toggle failed'
-        addToast('Process control failed', 'error', msg)
+        const isPreflightError =
+          /reserved|already in use|invalid project port|hardcodes port|hardcode|not a node project|folder not found|package\.json/i.test(
+            msg,
+          )
+        const canAutoFix = Boolean(
+          api?.autoFixProjectPort && isPreflightError,
+        )
+        addToast(
+          isPreflightError ? 'Preflight failed' : 'Process control failed',
+          'error',
+          msg,
+          canAutoFix
+            ? {
+                label: 'Auto-fix port',
+                onClick: () => {
+                  void handleAutoFixPort(projectId)
+                },
+              }
+            : undefined,
+        )
       }
       return
     }
@@ -377,10 +452,32 @@ function DashboardContent() {
       ),
     )
     addToast(
-      newStatus === 'running' ? 'Server Started' : 'Server Stopped',
+      newStatus === 'running' ? 'Server started' : 'Server stopped',
       newStatus === 'running' ? 'success' : 'info',
-      `${project.name} ${newStatus === 'running' ? `running on port ${project.port}` : 'gracefully stopped'}`,
+      newStatus === 'running'
+        ? `${project.name} — started on http://localhost:${project.port}`
+        : `${project.name} gracefully stopped`,
     )
+  }
+
+  const handleOpenProjectUrl = async (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId)
+    if (!project) return
+    const url = `http://localhost:${project.port}`
+    const api = getVpeApi()
+    try {
+      if (api?.openProjectUrl) {
+        await api.openProjectUrl(url)
+      } else if (typeof window !== 'undefined') {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      }
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message?: string }).message)
+          : 'Open failed'
+      addToast('Could not open browser', 'error', msg)
+    }
   }
 
   const handleRunBuild = async (projectId: string) => {
@@ -515,10 +612,10 @@ function DashboardContent() {
               {activeNav === 'repair-logs' ? (
                 /* Repair History View */
                 <RepairHistoryView
-                  onViewDiff={(id) => {
+                  onViewDiff={() => {
                     setRepairModalOpen(true)
                   }}
-                  onUndo={(id) => {
+                  onUndo={() => {
                     addToast('Undo successful', 'success', 'Previous state restored from .vader-backup')
                   }}
                 />
@@ -630,8 +727,6 @@ function DashboardContent() {
                             port={project.port}
                             uptime={project.uptime}
                             status={project.status}
-                            cpu={project.cpu}
-                            ram={project.ram}
                             thumbnailUrl={
                               project.thumbnail_url ?? undefined
                             }
@@ -645,6 +740,9 @@ function DashboardContent() {
                             onSettings={() => handleSettings(project.name)}
                             onUnregister={() => handleUnregister(project.name)}
                             onContextMenu={(e) => handleContextMenu(e, project.id)}
+                            onOpenInBrowser={() =>
+                              void handleOpenProjectUrl(project.id)
+                            }
                           />
                         ))}
                       </div>
@@ -678,6 +776,7 @@ function DashboardContent() {
                           const project = projects.find(p => p.id === id)
                           if (project) handleUnregister(project.name)
                         }}
+                        onOpenInBrowser={(id) => void handleOpenProjectUrl(id)}
                         compact={compactMode}
                         onToggleCompact={() => setCompactMode(!compactMode)}
                       />
@@ -718,9 +817,6 @@ function DashboardContent() {
           y={contextMenu.y}
           isOpen={true}
           onClose={() => setContextMenu(null)}
-          projectName={projects.find(p => p.id === contextMenu.projectId)?.name}
-          projectPath={projects.find(p => p.id === contextMenu.projectId)?.path}
-          projectPort={projects.find(p => p.id === contextMenu.projectId)?.port}
           onOpenExplorer={() => addToast('Opening Explorer...', 'info')}
           onOpenVSCode={() => addToast('Opening VS Code...', 'info')}
           onOpenTerminal={() => addToast('Opening Terminal...', 'info')}
@@ -767,9 +863,11 @@ function DashboardContent() {
           try {
             if (api?.addProject) {
               await api.addProject({
+                id: data.id,
                 name: data.name,
                 path: data.path,
                 port: portNum,
+                thumbnail_url: data.thumbnailUrl ?? null,
               })
               await refreshProjects()
             } else {
@@ -819,7 +917,7 @@ function DashboardContent() {
           projects.find((p) => p.id === selectedProjectId)?.thumbnail_url ?? null
         }
         onClose={() => setSettingsModalOpen(false)}
-        onSave={async (payload) => {
+        onSave={async () => {
           try {
             await refreshProjects()
             setSettingsModalOpen(false)

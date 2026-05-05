@@ -1,7 +1,13 @@
 const EventEmitter = require('events');
 const { spawn } = require('child_process');
+const fs = require('fs');
+const net = require('net');
+const path = require('path');
 const treeKill = require('tree-kill');
 const { msc_validateProjectPath } = require('./path-guard');
+
+const MSC_VPE_RENDERER_PORT =
+  parseInt(process.env.VPE_RENDERER_PORT || process.env.PORT || '3000', 10) || 3000;
 
 class MSC_ProjectRunner extends EventEmitter {
   /**
@@ -52,6 +58,7 @@ class MSC_ProjectRunner extends EventEmitter {
     if (Number.isFinite(configuredPort) && configuredPort > 0) {
       env.PORT = String(configuredPort);
       env.NEXT_PORT = String(configuredPort);
+      env.DEV_PORT = String(configuredPort);
     }
 
     const child = spawn(cmd, args, {
@@ -103,13 +110,93 @@ class MSC_ProjectRunner extends EventEmitter {
     return child;
   }
 
+  _assertPortConfigured(portLike) {
+    const parsed = Number(portLike);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new Error('VPE: Invalid project port. Use a managed port above the launcher UI (e.g. 3001).');
+    }
+    if (parsed === MSC_VPE_RENDERER_PORT) {
+      throw new Error(
+        `VPE: Port ${parsed} is reserved for Node-Launcher UI. Choose another port.`,
+      );
+    }
+    return parsed;
+  }
+
+  _isPortInUse(port) {
+    return new Promise((resolve) => {
+      const socket = net.createConnection({ port, host: '127.0.0.1' });
+      let settled = false;
+      const done = (inUse) => {
+        if (settled) return;
+        settled = true;
+        try {
+          socket.destroy();
+        } catch (_) {
+          /* ignore */
+        }
+        resolve(inUse);
+      };
+      socket.setTimeout(350);
+      socket.on('connect', () => done(true));
+      socket.on('timeout', () => done(false));
+      socket.on('error', () => done(false));
+      socket.on('close', () => done(false));
+    });
+  }
+
+  async _runDevPreflight(row) {
+    // Validates path/root and package.json before process spawn.
+    const projectRoot = msc_validateProjectPath(row.path);
+    const port = this._assertPortConfigured(row.port);
+    this._assertScriptPortCompatibility(projectRoot, row, port);
+    const inUse = await this._isPortInUse(port);
+    if (inUse) {
+      throw new Error(
+        [
+          `VPE: Port ${port} is already in use.`,
+          `Stop the process using ${port} or pick another project port in Settings.`,
+        ].join(' '),
+      );
+    }
+  }
+
+  _assertScriptPortCompatibility(projectRoot, row, configuredPort) {
+    const packageJsonPath = path.join(projectRoot, 'package.json');
+    let packageJson;
+    try {
+      packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    } catch (_) {
+      return;
+    }
+    const scripts =
+      packageJson && typeof packageJson.scripts === 'object'
+        ? packageJson.scripts
+        : {};
+    const scriptName = row.start_script || 'dev';
+    const command = typeof scripts[scriptName] === 'string' ? scripts[scriptName] : '';
+    if (!command) return;
+    const m = command.match(/(?:^|\s)(?:-p|--port)\s*(?:=)?\s*(\d{2,5})(?:\s|$)/i);
+    if (!m || !m[1]) return;
+    const scriptPort = Number(m[1]);
+    if (!Number.isFinite(scriptPort) || scriptPort <= 0) return;
+    if (scriptPort !== configuredPort) {
+      throw new Error(
+        [
+          `VPE: Start script "${scriptName}" hardcodes port ${scriptPort} but project is configured for ${configuredPort}.`,
+          `Update package.json script or set project port to ${scriptPort}.`,
+        ].join(' '),
+      );
+    }
+  }
+
   getRow(projectId) {
     const row = this.store.getProject(projectId);
     if (!row) throw new Error('Project not found');
     return row;
   }
 
-  startDev(row) {
+  async startDev(row) {
     let rec = this.children.get(row.id);
     if (!rec) {
       rec = {};
@@ -118,6 +205,8 @@ class MSC_ProjectRunner extends EventEmitter {
     if (rec.dev) {
       throw new Error('Dev process already running for this project');
     }
+
+    await this._runDevPreflight(row);
 
     this._persistAndBroadcastLog(
       row.id,
@@ -160,7 +249,7 @@ class MSC_ProjectRunner extends EventEmitter {
     return { ok: true, status: 'stopped' };
   }
 
-  toggleStatus(projectId) {
+  async toggleStatus(projectId) {
     const row = this.getRow(projectId);
     const rec = this.children.get(projectId);
     if (rec?.dev) {

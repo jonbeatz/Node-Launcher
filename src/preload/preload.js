@@ -8,8 +8,12 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   nukeProject: (projectId) => ipcRenderer.invoke('vpe:nuke-project', projectId),
   saveSettings: (payload) => ipcRenderer.invoke('vpe:save-settings', payload),
   addProject: (payload) => ipcRenderer.invoke('vpe:add-project', payload),
+  autoFixProjectPort: (projectId) =>
+    ipcRenderer.invoke('vpe:auto-fix-port', projectId),
   deleteProject: (projectId) => ipcRenderer.invoke('vpe:delete-project', projectId),
   openDirectory: () => ipcRenderer.invoke('vpe:open-directory'),
+  inspectProject: (projectPath) =>
+    ipcRenderer.invoke('vpe:inspect-project', projectPath),
   pickThumbnail: (projectId) =>
     ipcRenderer.invoke('vpe:pick-thumbnail', projectId),
   openProjectUrl: (url) => ipcRenderer.invoke('vpe:open-project-url', url),

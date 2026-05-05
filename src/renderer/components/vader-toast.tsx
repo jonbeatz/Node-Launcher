@@ -8,11 +8,17 @@ interface Toast {
   title: string
   description?: string
   type?: 'success' | 'error' | 'warning' | 'info'
+  action?: { label: string; onClick: () => void }
 }
 
 interface ToastContextType {
   toasts: Toast[]
-  addToast: (title: string, type?: Toast['type'], description?: string) => void
+  addToast: (
+    title: string,
+    type?: Toast['type'],
+    description?: string,
+    action?: Toast['action'],
+  ) => void
   removeToast: (id: string) => void
 }
 
@@ -29,17 +35,25 @@ export function useToast() {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  const addToast = useCallback((title: string, type: Toast['type'] = 'info', description?: string) => {
+  const addToast = useCallback(
+    (
+      title: string,
+      type: Toast['type'] = 'info',
+      description?: string,
+      action?: Toast['action'],
+    ) => {
     const id = Math.random().toString(36).substr(2, 9)
     setToasts(prev => {
       // Max 5 toasts
-      const newToasts = [...prev, { id, title, description, type }]
+      const newToasts = [...prev, { id, title, description, type, action }]
       if (newToasts.length > 5) {
         return newToasts.slice(-5)
       }
       return newToasts
     })
-  }, [])
+  },
+  [],
+)
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
@@ -117,7 +131,19 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       <div className="flex-1 min-w-0">
         <p className="font-sans text-[13px] font-medium text-white">{toast.title}</p>
         {toast.description && (
-          <p className="font-sans text-[11px] text-[#A0A0A0] mt-0.5">{toast.description}</p>
+          <p className="font-sans text-[11px] text-[#A0A0A0] mt-0.5 break-words">{toast.description}</p>
+        )}
+        {toast.action && (
+          <button
+            type="button"
+            onClick={() => {
+              toast.action?.onClick()
+              onRemove(toast.id)
+            }}
+            className="mt-2 h-7 px-3 rounded border border-[#4fde82] font-sans text-[11px] font-medium uppercase tracking-wide text-[#4fde82] hover:bg-[#4fde82] hover:text-black transition-colors"
+          >
+            {toast.action.label}
+          </button>
         )}
       </div>
 

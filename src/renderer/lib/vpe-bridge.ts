@@ -48,6 +48,17 @@ export interface AddProjectPayload {
 export interface VpeApi {
   getProjects: () => Promise<VpeProjectRow[]>
   getLogs: (projectId: string) => Promise<VpeLogRow[]>
+  inspectProject: (projectPath: string) => Promise<{
+    ok?: boolean
+    path: string
+    detection: {
+      pkg_manager: 'npm' | 'pnpm' | 'yarn'
+      start_script: string
+      build_script: string
+    }
+    suggestedPort: number
+    reservedPort: number
+  }>
   toggleStatus: (
     projectId: string,
   ) => Promise<{ ok?: boolean; status?: string }>
@@ -56,6 +67,10 @@ export interface VpeApi {
   saveSettings: (payload: SaveSettingsPayload) => Promise<{ ok?: boolean }>
   addProject: (payload: AddProjectPayload) => Promise<{ ok?: boolean; id?: string }>
   deleteProject: (projectId: string) => Promise<{ ok?: boolean }>
+  /** Reassign port + refresh detected scripts/package manager after preflight failure. */
+  autoFixProjectPort: (
+    projectId: string,
+  ) => Promise<{ ok?: boolean; port: number; start_script?: string }>
   openDirectory: () => Promise<string | null>
   pickThumbnail: (projectId: string) => Promise<string | null>
   openProjectUrl: (url: string) => Promise<{ ok?: boolean }>

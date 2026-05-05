@@ -26,9 +26,6 @@ interface ContextMenuProps {
   isOpen: boolean
   onClose: () => void
   items?: ContextMenuItem[]
-  projectName?: string
-  projectPath?: string
-  projectPort?: number
   onOpenExplorer?: () => void
   onOpenVSCode?: () => void
   onOpenTerminal?: () => void
@@ -44,9 +41,6 @@ export function ContextMenu({
   y,
   isOpen,
   onClose,
-  projectName,
-  projectPath = 'C:/Users/Vader/Projects/msc-media-pro',
-  projectPort = 3000,
   onOpenExplorer,
   onOpenVSCode,
   onOpenTerminal,

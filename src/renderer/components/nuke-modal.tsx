@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, AlertTriangle, Flame } from 'lucide-react'
+import { Flame } from 'lucide-react'
 
 interface NukeModalProps {
   isOpen: boolean

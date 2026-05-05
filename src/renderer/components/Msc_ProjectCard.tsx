@@ -1,14 +1,24 @@
 'use client'
 
-import { Play, Square, Wrench, Trash2, Terminal, X, Settings, AlertTriangle, Hammer } from 'lucide-react'
+import Image from 'next/image'
+import {
+  Play,
+  Square,
+  Wrench,
+  Trash2,
+  Terminal,
+  X,
+  Settings,
+  AlertTriangle,
+  Hammer,
+  ExternalLink,
+} from 'lucide-react'
 
 interface Msc_ProjectCardProps {
   name: string
   port: number
   uptime: string
   status: 'running' | 'stopped' | 'error' | 'building'
-  cpu?: number
-  ram?: string
   errorMessage?: string
   thumbnailUrl?: string
   hasBuilt?: boolean
@@ -21,6 +31,8 @@ interface Msc_ProjectCardProps {
   onSettings?: () => void
   onUnregister?: () => void
   onContextMenu?: (e: React.MouseEvent) => void
+  /** When running, opens project URL in the system browser (Electron). */
+  onOpenInBrowser?: () => void
 }
 
 export function Msc_ProjectCard({
@@ -28,8 +40,6 @@ export function Msc_ProjectCard({
   port,
   uptime,
   status,
-  cpu = 0,
-  ram = '0MB',
   errorMessage,
   thumbnailUrl,
   hasBuilt = true,
@@ -42,10 +52,11 @@ export function Msc_ProjectCard({
   onSettings,
   onUnregister,
   onContextMenu,
+  onOpenInBrowser,
 }: Msc_ProjectCardProps) {
   const isRunning = status === 'running'
+  const runUrl = `http://localhost:${port}`
   const isError = status === 'error'
-  const isStopped = status === 'stopped'
   const isBuilding = status === 'building'
 
   const getPrimaryButton = () => {
@@ -79,10 +90,13 @@ export function Msc_ProjectCard({
     >
       <div className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]" style={{ borderRadius: '4px 4px 0 0' }}>
         {thumbnailUrl ? (
-          <img
+          <Image
             src={thumbnailUrl}
             alt={name}
-            className="w-full h-full object-cover opacity-80"
+            fill
+            unoptimized
+            sizes="(max-width: 768px) 100vw, 380px"
+            className="object-cover opacity-80"
           />
         ) : (
           <div className="w-full h-full vader-grid-pattern flex items-center justify-center">
@@ -151,6 +165,35 @@ export function Msc_ProjectCard({
         {isError && errorMessage && (
           <div className="mt-3 p-2 rounded bg-[#ff4444]/10 border border-[#ff4444]/30">
             <span className="font-sans text-[11px] text-[#ff4444]">{errorMessage}</span>
+          </div>
+        )}
+
+        {isRunning && (
+          <div className="mt-3 flex flex-col gap-2 rounded border border-[#2a4a3a] bg-[#0d1a14] px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <span className="mb-0.5 block font-sans text-[9px] uppercase tracking-wider text-[#555555]">
+                Started on
+              </span>
+              <span
+                className="block truncate font-mono text-[12px] text-[#4fde82]"
+                title={runUrl}
+              >
+                {runUrl}
+              </span>
+            </div>
+            {onOpenInBrowser && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenInBrowser()
+                }}
+                className="flex shrink-0 items-center justify-center gap-1.5 self-start rounded border border-[#4fde82] bg-transparent px-3 py-1.5 font-sans text-[11px] font-medium uppercase tracking-wide text-[#4fde82] transition-colors hover:bg-[#4fde82] hover:text-black vader-focus sm:self-center"
+              >
+                <ExternalLink size={14} />
+                Open
+              </button>
+            )}
           </div>
         )}
       </div>

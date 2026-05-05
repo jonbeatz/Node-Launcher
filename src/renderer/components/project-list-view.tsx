@@ -1,9 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  Play, Square, Wrench, Trash2, Terminal, Settings, X, 
-  ChevronUp, ChevronDown, Hammer
+import {
+  Play,
+  Square,
+  Wrench,
+  Trash2,
+  Terminal,
+  Settings,
+  X,
+  ChevronUp,
+  ChevronDown,
+  Hammer,
+  ExternalLink,
 } from 'lucide-react'
 
 interface Project {
@@ -31,6 +40,8 @@ interface ProjectListViewProps {
   onNuke: (id: string) => void
   onSettings: (id: string) => void
   onUnregister: (id: string) => void
+  /** Opens managed project URL in the system browser when running. */
+  onOpenInBrowser?: (id: string) => void
   compact?: boolean
   onToggleCompact?: () => void
 }
@@ -50,6 +61,7 @@ export function ProjectListView({
   onNuke,
   onSettings,
   onUnregister,
+  onOpenInBrowser,
 }: ProjectListViewProps) {
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -160,7 +172,7 @@ export function ProjectListView({
               >
                 <span className="flex items-center gap-1">Path <SortIcon field="path" /></span>
               </th>
-              <th className="w-[180px] px-3 text-center font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+              <th className="min-w-[200px] px-3 text-center font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
                 Actions
               </th>
             </tr>
@@ -270,6 +282,16 @@ export function ProjectListView({
                           `}
                         >
                           {isRunning ? <Square size={14} /> : <Play size={14} />}
+                        </button>
+                      )}
+
+                      {isRunning && onOpenInBrowser && (
+                        <button
+                          onClick={() => onOpenInBrowser(project.id)}
+                          title={`Open http://localhost:${project.port} in browser`}
+                          className="w-7 h-7 rounded flex items-center justify-center border border-[#4fde82] text-[#4fde82] hover:bg-[#4fde82] hover:text-black transition-all"
+                        >
+                          <ExternalLink size={14} />
                         </button>
                       )}
                       

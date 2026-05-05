@@ -26,7 +26,10 @@ function msc_detectProjectScripts(projectRoot) {
   };
   return {
     pkg_manager: msc_detectPackageManager(root),
-    start_script: pick(['dev', 'start', 'serve'], 'dev'),
+    start_script: pick(
+      ['dev:launcher', 'dev', 'start', 'serve', 'develop'],
+      'dev',
+    ),
     build_script: pick(['build', 'compile'], 'build'),
   };
 }

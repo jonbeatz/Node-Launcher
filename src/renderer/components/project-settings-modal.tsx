@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { X, Camera, Upload, FolderOpen, Play, Trash, Terminal, AlertTriangle, Check, Loader2, Stethoscope } from 'lucide-react'
 import { useToast } from '@/components/vader-toast'
 
@@ -205,12 +206,15 @@ export function ProjectSettingsModal({
           <section>
             <h3 className="font-sans text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">THUMBNAIL</h3>
             <div className="flex items-center gap-4">
-              <div className="w-[200px] aspect-[4/3] rounded bg-[#0a0a0a] border border-[#333333] flex items-center justify-center overflow-hidden shrink-0">
+              <div className="relative w-[200px] aspect-[4/3] rounded bg-[#0a0a0a] border border-[#333333] flex items-center justify-center overflow-hidden shrink-0">
                 {thumbnailUrl ? (
-                  <img
+                  <Image
                     src={thumbnailUrl}
                     alt=""
-                    className="w-full h-full object-cover opacity-95"
+                    fill
+                    unoptimized
+                    sizes="200px"
+                    className="object-cover opacity-95"
                   />
                 ) : (
                   <Camera size={24} className="text-[#333333]" />

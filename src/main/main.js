@@ -38,12 +38,12 @@ function msc_wireRunnerPm2Sync(runner, pm) {
   });
 }
 
-/** 
- * VPE Port Sync: Fixed to 3001 per Vader Protocol 
- * Matches npm run dev:renderer -p 3001
+/**
+ * VPE Port Sync: Node-Launcher UI uses 3000; managed apps use 3001+.
+ * Matches npm run dev:renderer -p 3000
  */
 const VPE_RENDERER_DEV_PORT =
-  parseInt(process.env.VPE_RENDERER_PORT || process.env.PORT || '3001', 10) || 3001;
+  parseInt(process.env.VPE_RENDERER_PORT || process.env.PORT || '3000', 10) || 3000;
 const VPE_RENDERER_DEV_ORIGIN = `http://localhost:${VPE_RENDERER_DEV_PORT}`;
 
 /**
@@ -137,7 +137,7 @@ function msc_attachEngineAfterWindow(mainWin) {
 
 /**
  * Core UI Initialization
- * Forces Studio Dark aesthetic (#121212) and loads the Port 3001 renderer.
+ * Forces Studio Dark aesthetic (#121212) and loads the launcher renderer (default port 3000).
  */
 function msc_createWindow() {
   mainWindow = new BrowserWindow({
@@ -190,7 +190,7 @@ app.on('web-contents-created', (event, contents) => {
     try {
       const parsedUrl = new URL(navigationUrl);
       if (isDev) {
-        // Dev Mode: Allow localhost/3001
+        // Dev Mode: allow local HTTP(S) host
         const hostOk = parsedUrl.hostname === 'localhost' || parsedUrl.hostname === '127.0.0.1';
         if (!hostOk || (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:')) {
           event.preventDefault();

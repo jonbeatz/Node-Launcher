@@ -1,7 +1,5 @@
 'use client'
-
-import { useState } from 'react'
-import { X, Wrench, RotateCcw, Check, Loader2 } from 'lucide-react'
+import { X, RotateCcw, Check, Loader2 } from 'lucide-react'
 
 interface RepairModalProps {
   isOpen: boolean
@@ -35,18 +33,10 @@ export default function Page() {
 }`
 
 export function RepairModal({ isOpen, onClose, onApply, onUndo }: RepairModalProps) {
-  const [isScanning, setIsScanning] = useState(false)
-  const [scanComplete, setScanComplete] = useState(true) // For demo, start with scan complete
+  const isScanning = false
+  const scanComplete = true // For demo, start with scan complete
 
   if (!isOpen) return null
-
-  const handleStartScan = async () => {
-    setIsScanning(true)
-    setScanComplete(false)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsScanning(false)
-    setScanComplete(true)
-  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
