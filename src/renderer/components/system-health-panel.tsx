@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Activity, RefreshCw, AlertTriangle, XCircle, Loader2, Zap, Trash2 } from 'lucide-react'
 import { useVpeSystemStats } from '@/hooks/use-vpe-system-stats'
+import { getVpeApi } from '@/lib/vpe-bridge'
 
 interface Warning {
   id: string
@@ -18,36 +19,24 @@ interface SystemHealthPanelProps {
 
 export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
   const [runningCheck, setRunningCheck] = useState(false)
-  const systemStats = useVpeSystemStats(isOpen, 3000)
-  const [warnings, setWarnings] = useState<Warning[]>([
-    { 
-      id: '1', 
-      severity: 'warning', 
-      message: 'Port 3000 conflict — MSC_PRIMARY_GATE',
-      action: { label: 'KILL PROCESS', onClick: () => handleKillProcess('1') }
-    },
-    { 
-      id: '2', 
-      severity: 'warning', 
-      message: 'Node version mismatch — v18.17.0 detected, v20.11.0 expected' 
-    },
-    { 
-      id: '3', 
-      severity: 'warning', 
-      message: 'Build cache stale — 14 days old',
-      action: { label: 'CLEAR CACHE', onClick: () => handleClearCache('3') }
-    },
-  ])
+  const { stats: systemStats, refetch: refetchSystemStats } =
+    useVpeSystemStats(isOpen, 3000)
+  /** Only real diagnostics; populated when wired to engine checks */
+  const [warnings, setWarnings] = useState<Warning[]>([])
 
   const handleQuickCheck = async () => {
     setRunningCheck(true)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setRunningCheck(false)
+    try {
+      if (getVpeApi()?.getSystemStats) {
+        await refetchSystemStats()
+      }
+    } finally {
+      setRunningCheck(false)
+    }
   }
 
   const handleAutoResolve = () => {
-    // Simulate auto-resolve by removing fixable warnings
-    setWarnings(prev => prev.filter(w => !w.action))
+    setWarnings((prev) => prev.filter((w) => !w.action))
   }
 
   const handleDismissAll = () => {
@@ -216,7 +205,7 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
               {/* Dismiss Subtext */}
               <div className="px-3 py-1.5 bg-[#0a0a0a]">
                 <p className="font-sans text-[9px] text-[#555555] text-center">
-                  Warnings will reappear on next diagnostic check.
+                  Clearing dismisses until new diagnostics exist.
                 </p>
               </div>
             </div>
@@ -226,7 +215,9 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
           {warnings.length === 0 && (
             <div className="p-4 rounded bg-[#00cc66]/10 border border-[#00cc66]/30 flex items-center gap-3">
               <Zap size={16} className="text-[#00cc66]" />
-              <span className="font-sans text-sm text-[#00cc66]">All systems healthy</span>
+              <span className="font-sans text-sm text-[#00cc66]">
+                No actionable warnings — metrics poll every 3s
+              </span>
             </div>
           )}
 

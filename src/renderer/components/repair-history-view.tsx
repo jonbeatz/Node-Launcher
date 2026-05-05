@@ -12,12 +12,8 @@ interface RepairLog {
   description: string
 }
 
-const SAMPLE_REPAIRS: RepairLog[] = [
-  { id: '1', date: '2026-05-04 14:22:31', projectName: 'MSC_PRIMARY_GATE', filesChanged: 3, status: 'success', description: 'Suspense boundary auto-fix applied to page.tsx' },
-  { id: '2', date: '2026-05-03 09:15:42', projectName: 'MEDIA_PRO_RENDER_V4', filesChanged: 1, status: 'success', description: 'Missing key prop added to list component' },
-  { id: '3', date: '2026-05-02 18:30:11', projectName: 'MSC_PRIMARY_GATE', filesChanged: 5, status: 'partial', description: 'Dynamic import wrapper applied (2 manual fixes needed)' },
-  { id: '4', date: '2026-05-01 11:45:00', projectName: 'VADER_BACKUP_NODE', filesChanged: 2, status: 'failed', description: 'Unable to resolve circular dependency' },
-]
+/** Persisted repair runs will populate via IPC/store (not implemented yet). */
+const REPAIR_LOGS: RepairLog[] = []
 
 interface RepairHistoryViewProps {
   onViewDiff: (repairId: string) => void
@@ -28,7 +24,7 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState('all')
 
-  const filteredRepairs = SAMPLE_REPAIRS.filter(repair => {
+  const filteredRepairs = REPAIR_LOGS.filter((repair) => {
     if (searchTerm && !repair.projectName.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false
     }
@@ -48,12 +44,18 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
     }
   }
 
-  if (filteredRepairs.length === 0 && !searchTerm) {
+  if (filteredRepairs.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center">
+      <div className="h-full flex flex-col items-center justify-center px-6">
         <FileText size={48} className="text-[#333333] mb-4" />
-        <p className="font-sans text-[#A0A0A0] mb-1">No repairs performed yet</p>
-        <p className="font-sans text-sm text-[#555555]">Repair operations will appear here</p>
+        <p className="font-sans text-[#A0A0A0] mb-1 text-center">
+          {searchTerm ? 'No matching repairs' : 'No repairs performed yet'}
+        </p>
+        <p className="font-sans text-sm text-[#555555] text-center max-w-md">
+          {searchTerm
+            ? 'Try another project name.'
+            : 'Repair history will list real runs only after the repair pipeline is persisted (no demo rows).'}
+        </p>
       </div>
     )
   }
@@ -63,7 +65,7 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
       {/* Header */}
       <div className="px-6 py-4 border-b border-[#333333]">
         <h2 className="font-sans font-bold text-white text-lg mb-4">REPAIR HISTORY</h2>
-        
+
         {/* Filters */}
         <div className="flex items-center gap-3">
           <div className="flex-1 relative">
@@ -106,7 +108,7 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
           </thead>
           <tbody>
             {filteredRepairs.map((repair, index) => (
-              <tr 
+              <tr
                 key={repair.id}
                 className={`${index % 2 === 0 ? 'bg-[#121212]' : 'bg-[#1a1a1a]'} hover:bg-[#1c1c1c] transition-colors`}
               >
@@ -118,6 +120,7 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
                     <button
+                      type="button"
                       onClick={() => onViewDiff(repair.id)}
                       className="flex items-center gap-1 px-3 h-6 rounded-sm border border-[#333333] font-sans text-[10px] text-[#A0A0A0] hover:text-white hover:border-[#4fde82] transition-all"
                     >
@@ -125,6 +128,7 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
                       VIEW DIFF
                     </button>
                     <button
+                      type="button"
                       onClick={() => onUndo(repair.id)}
                       disabled={repair.status === 'failed'}
                       className="flex items-center gap-1 px-3 h-6 rounded-sm border border-[#333333] font-sans text-[10px] text-[#A0A0A0] hover:text-white hover:border-[#4fde82] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
