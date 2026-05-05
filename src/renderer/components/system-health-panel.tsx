@@ -43,14 +43,6 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
     setWarnings([])
   }
 
-  const handleKillProcess = (id: string) => {
-    setWarnings(prev => prev.filter(w => w.id !== id))
-  }
-
-  const handleClearCache = (id: string) => {
-    setWarnings(prev => prev.filter(w => w.id !== id))
-  }
-
   const dismissWarning = (id: string) => {
     setWarnings(prev => prev.filter(w => w.id !== id))
   }
