@@ -2,6 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('vpeAPI', {
   getProjects: () => ipcRenderer.invoke('vpe:getProjects'),
+  getRepairRuns: (limit) => ipcRenderer.invoke('vpe:get-repair-runs', limit),
+  recordRepairRun: (payload) =>
+    ipcRenderer.invoke('vpe:record-repair-run', payload),
   getSystemStats: () => ipcRenderer.invoke('vpe:get-system-stats'),
   getLogs: (projectId) => ipcRenderer.invoke('vpe:getLogs', projectId),
   toggleStatus: (projectId) => ipcRenderer.invoke('vpe:toggle-status', projectId),

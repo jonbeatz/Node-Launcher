@@ -17,7 +17,7 @@ import { DeleteConfirmModal } from '@/components/delete-confirm-modal'
 import { ContextMenu } from '@/components/context-menu'
 import { AppSettingsModal } from '@/components/app-settings-modal'
 import { SystemHealthPanel } from '@/components/system-health-panel'
-import { RepairHistoryView } from '@/components/repair-history-view'
+import { RepairHistoryView, type RepairHistoryRow } from '@/components/repair-history-view'
 import { QuickActionsBar } from '@/components/quick-actions-bar'
 import { ToastProvider, useToast } from '@/components/vader-toast'
 import { getVpeApi, msc_rowToDashboardProject } from '@/lib/vpe-bridge'
@@ -133,6 +133,8 @@ function DashboardContent() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL')
   const [viewMode, setViewMode] = useState<ViewMode>('grid') // Card View as default per revision spec
   const [repairModalOpen, setRepairModalOpen] = useState(false)
+  const [repairLogRev, setRepairLogRev] = useState(0)
+  const [repairModalContext, setRepairModalContext] = useState<RepairHistoryRow | null>(null)
   const [nukeModalOpen, setNukeModalOpen] = useState(false)
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false)
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
@@ -290,6 +292,7 @@ function DashboardContent() {
 
   const handleRepair = (projectName: string) => {
     msc_pickProjectMeta(projectName)
+    setRepairModalContext(null)
     setRepairModalOpen(true)
   }
 
@@ -718,7 +721,9 @@ function DashboardContent() {
               {activeNav === 'repair-logs' ? (
                 /* Repair History View */
                 <RepairHistoryView
-                  onViewDiff={() => {
+                  refreshSignal={repairLogRev}
+                  onViewDiff={(row) => {
+                    setRepairModalContext(row)
                     setRepairModalOpen(true)
                   }}
                   onUndo={() => {
@@ -947,10 +952,39 @@ function DashboardContent() {
       {/* Modals */}
       <RepairModal
         isOpen={repairModalOpen}
-        onClose={() => setRepairModalOpen(false)}
-        onApply={() => {
+        onClose={() => {
           setRepairModalOpen(false)
-          addToast('Fix applied successfully', 'success', '3 files patched')
+          setRepairModalContext(null)
+        }}
+        onApply={async () => {
+          const api = getVpeApi()
+          const projectId = repairModalContext?.projectId ?? selectedProjectId
+          const projectName = repairModalContext?.projectName ?? selectedProject
+          const filesChanged = 3
+          const description = 'Suspense / RSC repair (demo apply)'
+          if (api?.recordRepairRun && projectId) {
+            try {
+              await api.recordRepairRun({
+                projectId,
+                projectName: projectName || undefined,
+                description,
+                filesChanged,
+                status: 'success',
+              })
+              setRepairLogRev((n) => n + 1)
+              addToast('Fix applied successfully', 'success', `${filesChanged} files patched`)
+            } catch (e) {
+              addToast(
+                'Could not record repair',
+                'warning',
+                e instanceof Error ? e.message : 'Main process rejected the run',
+              )
+            }
+          } else {
+            addToast('Fix applied (demo)', 'success', 'Electron IPC not available; run not persisted')
+          }
+          setRepairModalOpen(false)
+          setRepairModalContext(null)
         }}
         onUndo={() => {
           addToast('Undo not available', 'warning', 'No previous fix to revert')

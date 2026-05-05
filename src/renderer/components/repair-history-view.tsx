@@ -1,47 +1,172 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { FileText, Eye, Undo2, Search, Calendar } from 'lucide-react'
+import { format, isAfter, parseISO, subDays } from 'date-fns'
+import { getVpeApi, type VpeRepairRunRow, type VpeRepairRunStatus } from '@/lib/vpe-bridge'
 
-interface RepairLog {
+export interface RepairHistoryRow {
   id: string
   date: string
+  projectId: string
   projectName: string
   filesChanged: number
-  status: 'success' | 'partial' | 'failed'
+  status: VpeRepairRunStatus
   description: string
+  createdAtIso: string
 }
 
-/** Persisted repair runs will populate via IPC/store (not implemented yet). */
-const REPAIR_LOGS: RepairLog[] = []
-
 interface RepairHistoryViewProps {
-  onViewDiff: (repairId: string) => void
+  /** Increment after a repair is recorded so the list refetches. */
+  refreshSignal?: number
+  onViewDiff: (repair: RepairHistoryRow) => void
   onUndo: (repairId: string) => void
 }
 
-export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps) {
+function formatRepairDate(iso: string): string {
+  try {
+    const d = parseISO(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return format(d, 'yyyy-MM-dd HH:mm')
+  } catch {
+    return iso
+  }
+}
+
+export function RepairHistoryView({
+  refreshSignal = 0,
+  onViewDiff,
+  onUndo,
+}: RepairHistoryViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState('all')
+  const [rows, setRows] = useState<RepairHistoryRow[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(
+    () => typeof window !== 'undefined' && Boolean(getVpeApi()?.getRepairRuns),
+  )
 
-  const filteredRepairs = REPAIR_LOGS.filter((repair) => {
-    if (searchTerm && !repair.projectName.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false
+  useEffect(() => {
+    let cancelled = false
+    const api = getVpeApi()
+    if (!api?.getRepairRuns) {
+      if (!cancelled) {
+        setRows([])
+        setLoadError(null)
+        setLoading(false)
+      }
+      return
     }
-    return true
-  })
+    ;(async () => {
+      try {
+        setLoadError(null)
+        setLoading(true)
+        const raw: VpeRepairRunRow[] = await api.getRepairRuns!(200)
+        if (cancelled) return
+        const mapped: RepairHistoryRow[] = (raw ?? []).map((r) => {
+          const st: VpeRepairRunStatus =
+            r.status === 'partial' || r.status === 'failed' || r.status === 'success'
+              ? r.status
+              : 'success'
+          return {
+            id: r.id,
+            date: formatRepairDate(r.created_at),
+            projectId: r.project_id,
+            projectName: r.project_name?.trim() || r.project_id,
+            filesChanged: Number(r.files_changed) || 0,
+            status: st,
+            description: r.description || '',
+            createdAtIso: r.created_at,
+          }
+        })
+        setRows(mapped)
+      } catch (e) {
+        if (!cancelled) {
+          setRows([])
+          setLoadError(e instanceof Error ? e.message : 'Failed to load repair history')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [refreshSignal])
+
+  const filteredRepairs = useMemo(() => {
+    const cutoff =
+      dateFilter === '7d'
+        ? subDays(new Date(), 7)
+        : dateFilter === '30d'
+          ? subDays(new Date(), 30)
+          : null
+
+    return rows.filter((repair) => {
+      if (searchTerm && !repair.projectName.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return false
+      }
+      if (cutoff) {
+        const d = parseISO(repair.createdAtIso)
+        if (Number.isNaN(d.getTime()) || !isAfter(d, cutoff)) return false
+      }
+      return true
+    })
+  }, [rows, searchTerm, dateFilter])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'success':
-        return <span className="px-2 py-0.5 rounded-sm bg-[#00cc66]/20 text-[#00cc66] font-sans text-[10px]">SUCCESS</span>
+        return (
+          <span className="px-2 py-0.5 rounded-sm bg-[#00cc66]/20 text-[#00cc66] font-sans text-[10px]">
+            SUCCESS
+          </span>
+        )
       case 'partial':
-        return <span className="px-2 py-0.5 rounded-sm bg-[#3daef2]/20 text-[#3daef2] font-sans text-[10px]">PARTIAL</span>
+        return (
+          <span className="px-2 py-0.5 rounded-sm bg-[#3daef2]/20 text-[#3daef2] font-sans text-[10px]">
+            PARTIAL
+          </span>
+        )
       case 'failed':
-        return <span className="px-2 py-0.5 rounded-sm bg-[#333333]/40 text-[#777777] font-sans text-[10px]">FAILED</span>
+        return (
+          <span className="px-2 py-0.5 rounded-sm bg-[#333333]/40 text-[#777777] font-sans text-[10px]">
+            FAILED
+          </span>
+        )
       default:
         return null
     }
+  }
+
+  if (loadError) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center px-6">
+        <FileText size={48} className="text-[#333333] mb-4" />
+        <p className="font-sans text-[#e02b20] mb-1 text-center">{loadError}</p>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center px-6">
+        <FileText size={48} className="text-[#333333] mb-4 animate-pulse" />
+        <p className="font-sans text-[#A0A0A0] text-center">Loading repair history…</p>
+      </div>
+    )
+  }
+
+  if (!getVpeApi()?.getRepairRuns) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center px-6">
+        <FileText size={48} className="text-[#333333] mb-4" />
+        <p className="font-sans text-[#A0A0A0] mb-1 text-center">Repair history unavailable</p>
+        <p className="font-sans text-sm text-[#555555] text-center max-w-md">
+          Open the app in Electron to load persisted repair runs from the main process.
+        </p>
+      </div>
+    )
   }
 
   if (filteredRepairs.length === 0) {
@@ -49,12 +174,12 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
       <div className="h-full flex flex-col items-center justify-center px-6">
         <FileText size={48} className="text-[#333333] mb-4" />
         <p className="font-sans text-[#A0A0A0] mb-1 text-center">
-          {searchTerm ? 'No matching repairs' : 'No repairs performed yet'}
+          {searchTerm || dateFilter !== 'all' ? 'No matching repairs' : 'No repairs performed yet'}
         </p>
         <p className="font-sans text-sm text-[#555555] text-center max-w-md">
-          {searchTerm
-            ? 'Try another project name.'
-            : 'Repair history will list real runs only after the repair pipeline is persisted (no demo rows).'}
+          {searchTerm || dateFilter !== 'all'
+            ? 'Try another filter or project name.'
+            : 'Apply a fix from the repair modal to record a run here.'}
         </p>
       </div>
     )
@@ -98,12 +223,24 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
         <table className="w-full">
           <thead className="bg-[#161616] border-b border-[#333333] sticky top-0">
             <tr>
-              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">Date</th>
-              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">Project</th>
-              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">Files</th>
-              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">Status</th>
-              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">Description</th>
-              <th className="px-4 py-3 text-right font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">Actions</th>
+              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+                Date
+              </th>
+              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+                Project
+              </th>
+              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+                Files
+              </th>
+              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+                Status
+              </th>
+              <th className="px-4 py-3 text-left font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+                Description
+              </th>
+              <th className="px-4 py-3 text-right font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -113,15 +250,21 @@ export function RepairHistoryView({ onViewDiff, onUndo }: RepairHistoryViewProps
                 className={`${index % 2 === 0 ? 'bg-[#121212]' : 'bg-[#1a1a1a]'} hover:bg-[#1c1c1c] transition-colors`}
               >
                 <td className="px-4 py-3 font-sans text-[12px] text-[#555555]">{repair.date}</td>
-                <td className="px-4 py-3 font-sans text-[13px] text-white font-medium">{repair.projectName}</td>
-                <td className="px-4 py-3 font-sans text-[13px] text-[#A0A0A0]">{repair.filesChanged} files</td>
+                <td className="px-4 py-3 font-sans text-[13px] text-white font-medium">
+                  {repair.projectName}
+                </td>
+                <td className="px-4 py-3 font-sans text-[13px] text-[#A0A0A0]">
+                  {repair.filesChanged} files
+                </td>
                 <td className="px-4 py-3">{getStatusBadge(repair.status)}</td>
-                <td className="px-4 py-3 font-sans text-[12px] text-[#A0A0A0] max-w-[300px] truncate">{repair.description}</td>
+                <td className="px-4 py-3 font-sans text-[12px] text-[#A0A0A0] max-w-[300px] truncate">
+                  {repair.description}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => onViewDiff(repair.id)}
+                      onClick={() => onViewDiff(repair)}
                       className="flex items-center gap-1 px-3 h-6 rounded-sm border border-[#333333] font-sans text-[10px] text-[#A0A0A0] hover:text-white hover:border-[#4fde82] transition-all"
                     >
                       <Eye size={10} />

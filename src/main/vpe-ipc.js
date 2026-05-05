@@ -14,8 +14,8 @@ const { msc_patchPackageJsonStripScriptPorts } = require('./package-json-script-
 let msc_vpeIpcRegistered = false;
 /** Node-Launcher UI port; managed projects must avoid this port. */
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
-const MAX_THUMB_EDGE = 1280;
-const MAX_THUMB_BYTES = 900 * 1024;
+const MAX_THUMB_EDGE = 960;
+const MAX_THUMB_BYTES = 512 * 1024;
 
 function msc_formatProcessUptime(sec) {
   const s = Math.floor(Number(sec) || 0);
@@ -213,6 +213,48 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   };
 
   ipcMain.handle('vpe:getProjects', () => store.listProjectsAlphabetical());
+
+  ipcMain.handle('vpe:get-repair-runs', (_event, limit) => {
+    const n = Number(limit);
+    return typeof store.listRepairRunsDesc === 'function'
+      ? store.listRepairRunsDesc(Number.isFinite(n) && n > 0 ? n : 200)
+      : [];
+  });
+
+  ipcMain.handle('vpe:record-repair-run', (_event, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('VPE: Invalid repair payload');
+    }
+    const projectId = payload.projectId != null ? String(payload.projectId) : '';
+    if (!projectId) throw new Error('VPE: Missing project id');
+    const row = store.getProject(projectId);
+    if (!row) throw new Error('VPE: Project not found');
+    const name =
+      typeof payload.projectName === 'string' && payload.projectName.trim()
+        ? payload.projectName.trim()
+        : String(row.name);
+    const st = payload.status;
+    const status =
+      st === 'partial' || st === 'failed' || st === 'success' ? st : 'success';
+    const desc =
+      typeof payload.description === 'string' && payload.description.trim()
+        ? payload.description.trim()
+        : 'Repair apply';
+    let files = Number(payload.filesChanged);
+    if (!Number.isFinite(files) || files < 0) files = 0;
+    const id = randomUUID();
+    const created_at = new Date().toISOString();
+    store.insertRepairRun({
+      id,
+      project_id: projectId,
+      project_name: name,
+      created_at,
+      status,
+      description: desc,
+      files_changed: Math.round(files),
+    });
+    return { ok: true, id };
+  });
 
   ipcMain.handle('vpe:get-system-stats', async () => {
     try {

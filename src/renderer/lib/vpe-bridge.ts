@@ -74,8 +74,32 @@ export interface VpeSystemStats {
   projectsTotal: number
 }
 
+export type VpeRepairRunStatus = 'success' | 'partial' | 'failed'
+
+export interface VpeRepairRunRow {
+  id: string
+  project_id: string
+  project_name?: string | null
+  created_at: string
+  status: VpeRepairRunStatus
+  description: string
+  files_changed: number
+}
+
+export interface RecordRepairRunPayload {
+  projectId: string
+  projectName?: string
+  description: string
+  filesChanged: number
+  status?: VpeRepairRunStatus
+}
+
 export interface VpeApi {
   getProjects: () => Promise<VpeProjectRow[]>
+  getRepairRuns?: (limit?: number) => Promise<VpeRepairRunRow[]>
+  recordRepairRun?: (
+    payload: RecordRepairRunPayload,
+  ) => Promise<{ ok?: boolean; id?: string }>
   getSystemStats?: () => Promise<VpeSystemStats>
   getLogs: (projectId: string) => Promise<VpeLogRow[]>
   inspectProject: (projectPath: string) => Promise<{

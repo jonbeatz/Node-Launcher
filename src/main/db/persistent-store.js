@@ -178,12 +178,40 @@ class SqlitePersistence {
       )
       .run(projectId);
   }
+
+  insertRepairRun(row) {
+    this._db
+      .prepare(
+        `INSERT INTO repair_runs (id, project_id, project_name, created_at, status, description, files_changed)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        row.id,
+        row.project_id,
+        row.project_name,
+        row.created_at,
+        row.status,
+        row.description,
+        row.files_changed,
+      );
+  }
+
+  listRepairRunsDesc(limit = 200) {
+    const n = Number(limit);
+    const cap = Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 200;
+    return this._db
+      .prepare(
+        `SELECT id, project_id, project_name, created_at, status, description, files_changed
+         FROM repair_runs ORDER BY datetime(created_at) DESC LIMIT ?`,
+      )
+      .all(cap);
+  }
 }
 
 class JsonPersistence {
   constructor() {
-    /** @type {{ projects: Record<string, any>, logs: any[], logSeq: number }} */
-    this._data = { projects: {}, logs: [], logSeq: 0 };
+    /** @type {{ projects: Record<string, any>, logs: any[], logSeq: number, repairRuns: any[] }} */
+    this._data = { projects: {}, logs: [], logSeq: 0, repairRuns: [] };
   }
 
   load() {
@@ -194,10 +222,11 @@ class JsonPersistence {
           projects: raw.projects && typeof raw.projects === 'object' ? raw.projects : {},
           logs: Array.isArray(raw.logs) ? raw.logs : [],
           logSeq: typeof raw.logSeq === 'number' ? raw.logSeq : this._inferNextLogId(),
+          repairRuns: Array.isArray(raw.repairRuns) ? raw.repairRuns : [],
         };
       }
     } catch {
-      this._data = { projects: {}, logs: [], logSeq: 0 };
+      this._data = { projects: {}, logs: [], logSeq: 0, repairRuns: [] };
     }
     this._migrateJsonHealthAndPorts();
   }
@@ -402,6 +431,28 @@ class JsonPersistence {
     this.save();
   }
 
+  insertRepairRun(row) {
+    if (!Array.isArray(this._data.repairRuns)) this._data.repairRuns = [];
+    this._data.repairRuns.push({
+      id: row.id,
+      project_id: row.project_id,
+      project_name: row.project_name,
+      created_at: row.created_at,
+      status: row.status,
+      description: row.description,
+      files_changed: row.files_changed,
+    });
+    this.save();
+  }
+
+  listRepairRunsDesc(limit = 200) {
+    const n = Number(limit);
+    const cap = Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 200;
+    const list = Array.isArray(this._data.repairRuns) ? [...this._data.repairRuns] : [];
+    list.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    return list.slice(0, cap);
+  }
+
   /** Recent log lines across all projects (for unified feed). */
   logsRecentAll(limit = 200) {
     const slice = [...this._data.logs]
@@ -565,6 +616,17 @@ function msc_createPersistentStore() {
       );
 
       CREATE INDEX IF NOT EXISTS idx_logs_project_id ON logs(project_id);
+
+      CREATE TABLE IF NOT EXISTS repair_runs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        project_name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('success', 'partial', 'failed')),
+        description TEXT NOT NULL,
+        files_changed INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_repair_runs_created ON repair_runs(created_at DESC);
     `);
 
     msc_sqliteMigrateSchemaAndPorts(rawDb);
