@@ -10,11 +10,11 @@ Living notes for **problems we hit and how we fixed them**—mostly Windows pack
 
 **Cause:** `app-builder` invokes **rcedit** for the main `.exe`, which pulls the **winCodeSign** tool bundle; extraction uses **`7za … -snld`** (preserve symlinks). Creating those symlinks on Windows without **Administrator** or **Developer Mode** fails.
 
-**Fix in repo:** `package.json` → `build.win.signAndEditExecutable: false` so rcedit (and that extraction path) is skipped for local release builds.
+**Fix in repo:** Keep `package.json` → `build.win.signAndEditExecutable: false` so electron-builder does **not** extract **winCodeSign** (and that symlink path) during pack.
 
-**Trade-off:** The **file** icon in Explorer may stay the generic Electron icon; **window/taskbar** branding still comes from `BrowserWindow` + `extraResources` → `resources/icon.ico` and NSIS installer icons from `build/icon.ico`.
+**Follow-up (2026-05-06, verified):** Embed the **Explorer file icon** on the main app `.exe` without winCodeSign by wiring **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs), which runs the **`rcedit`** npm package against **`dist/win-unpacked/Vader Project Engine.exe`** using staged **`build/icon.ico`**. **`npm run build:main`** succeeds on a normal user session; installed and portable builds show the **custom icon**, and **NSIS uninstall works correctly** with the interactive installer settings below.
 
-**If you need full exe resource editing again:** Build from an elevated shell and/or enable **Windows Developer Mode** (symlinks), then consider setting `signAndEditExecutable` back to default and re-test.
+**If you want electron-builder’s built-in rcedit path only:** Enable **Windows Developer Mode** (or build from an elevated shell) and set **`signAndEditExecutable: true`**, then remove or no-op the **`afterPack`** hook to avoid double-patching the same binary.
 
 **Related env (runner):** `scripts/msc-run-electron-builder.cjs` sets `CSC_IDENTITY_AUTO_DISCOVERY=false` and clears stray `CSC_LINK` / `WIN_CSC_LINK` so signing does not pull unexpected cert/tool paths.
 
@@ -105,12 +105,20 @@ Living notes for **problems we hit and how we fixed them**—mostly Windows pack
 
 ---
 
-## NSIS install path / registry drift (per-user)
+## NSIS install path / interactive wizard + uninstall (per-user)
 
-**Symptom:** Desire predictable install location without **`Program Files`** elevation friction.
+**Symptom:** Desire predictable install location without **`Program Files`** elevation friction, plus a **guided installer** (Next / review destination) instead of a silent one-click flow; uninstaller must behave correctly.
 
-**Fix in repo:** **`build.nsis`**: **`perMachine: false`**, **`oneClick: true`**, **`allowToChangeInstallationDirectory: false`** → default install under **`%LocalAppData%\Programs\Vader Project Engine\`** (documented in [Custom-Commands](Custom-Commands.md#rebuild-exe)). **`build.appId`:** `com.vader.projectengine`; **`build.win.signAndEditExecutable: false`** avoids **winCodeSign** symlink extraction failures on Windows (see first section in this doc).
+**Fix in repo:** **`build.nsis`**: **`perMachine: false`** (per-user, no admin by default), **`oneClick: false`**, **`allowToChangeInstallationDirectory: true`** → multi-step NSIS wizard with a visible install directory; default remains under **`%LocalAppData%\Programs\Vader Project Engine\`** unless the user changes it. **`installerIcon`** / **`uninstallerIcon`** use **`build/icon.ico`**. **`build.appId`:** `com.vader.projectengine`. **Verified 2026-05-06:** custom **.exe** icon (via **`afterPack` + `rcedit`**, see winCodeSign section) and **uninstaller** behavior confirmed in production builds.
 
 ---
 
-*Last updated: 2026-05-05 — align with [Checkpoint](Checkpoint.md) and packaging on branch **`Node-Launcher-v4`**. Powered by the MSC Media Engine.*
+## Dev dependency: `rcedit` for post-pack icon embedding
+
+**Why:** Same as the winCodeSign section—embedding via **`signAndEditExecutable: true`** can fail on Windows when **7za** cannot create symlinks during **winCodeSign** extraction.
+
+**In repo:** **`rcedit`** is a **devDependency**; the hook runs only at build time and is **not** shipped in the packaged app’s `node_modules` artifact (build **`files`** excludes `scripts/`). Staging for release still uses **`node scripts/msc-copy-release-icon.cjs`** so **`build/icon.ico`** matches **`_design_references/VPE.ico`**.
+
+---
+
+*Last updated: 2026-05-06 — align with [Checkpoint](Checkpoint.md) and packaging on branch **`Node-Launcher-v4`**. Powered by the MSC Media Engine.*

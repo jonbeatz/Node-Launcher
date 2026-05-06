@@ -3,8 +3,10 @@
  * - CSC_IDENTITY_AUTO_DISCOVERY=false: do not auto-pick a signing cert.
  * - Strip CI_* so is-ci does not force signing paths.
  * - Optional: clear CSC_LINK / WIN_CSC_LINK so a stray global cert env cannot
- *   trigger signtool (still downloads winCodeSign). When signAndEditExecutable
- *   is false, rcedit is skipped and winCodeSign is not required for unpack.
+ *   trigger unexpected signing paths.
+ * - With signAndEditExecutable false, electron-builder skips winCodeSign (symlink
+ *   extraction can fail without Developer Mode). The app icon is embedded in
+ *   scripts/msc-after-pack-embed-icon.cjs via the rcedit npm package instead.
  */
 'use strict';
 

@@ -1,6 +1,6 @@
-# VPE Checkpoint (2026-05-05)
+# VPE Checkpoint (2026-05-06)
 
-**Last doc update:** 2026-05-05 — active dev branch: **`Node-Launcher-v4`** (`origin/Node-Launcher-v4`). Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** install under `%LocalAppData%\Programs\Vader Project Engine\` (see Custom-Commands).
+**Last doc update:** 2026-05-06 — active dev branch: **`Node-Launcher-v4`** (`origin/Node-Launcher-v4`). Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer (default under `%LocalAppData%\Programs\Vader Project Engine\`, user can change path); **custom `.exe` icon** via **`afterPack` + `rcedit`** because **`signAndEditExecutable: true`** hits winCodeSign symlink limits on some Windows setups (see backlog).
 
 ## Current project status (snapshot)
 
@@ -13,6 +13,7 @@
 | **Native modules** | **`npm run rebuild:natives`** = `electron-rebuild -f -o better-sqlite3` only (avoids Windows **node-pty** + Spectre MSVC trap). |
 | **Design assets** | Committed: [`_design_references/VPE.ico`](../../_design_references/VPE.ico), [`_design_references/msc-icon.png`](../../_design_references/msc-icon.png) (commit `e7bcdd3`). [`.cursorignore`](../../.cursorignore) still excludes `_design_references/` from **Cursor indexing** only — files **are** in git. |
 | **Git markers** | Empty restore-point commit before packaging: **`Clean restore-point about to make.exe`** (`1adddf9`). |
+| **Windows installer / icon** | NSIS **`oneClick: false`**, **`allowToChangeInstallationDirectory: true`** (interactive wizard); **`build.win.signAndEditExecutable: false`** + [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) embeds **`build/icon.ico`** into **`Vader Project Engine.exe`** (Explorer icon + uninstaller verified **2026-05-06**). |
 | **Next packaging step** | Tell the agent **rebuild exe** (see [Custom-Commands](Custom-Commands.md#rebuild-exe)): icon → **`build:renderer`** → **`rebuild:natives`** → lint → E2E (`CI=true`) → clean **`dist/`** → **`build:main`** → remove blockmap / `builder-debug.yml` / `latest.yml`. Icons: [`package.json`](../../package.json) `build` + `build/icon.ico` from **`VPE.ico`**. |
 
 **Context — health line on cards:** `GET /` probe does not follow redirects. **HTTP 307** on a project = server responded with redirect (e.g. Next middleware); browser **OPEN** still works. Green **“Active — HTTP 200”** only for **2xx** (see [`Msc_ProjectCard.tsx`](../../src/renderer/components/Msc_ProjectCard.tsx) `getHealthLine`).

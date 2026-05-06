@@ -96,12 +96,14 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "15.0.7",
     "postcss": "^8.5.14",
+    "rcedit": "^5.0.2",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.3.3"
   },
   "build": {
     "appId": "com.vader.projectengine",
     "productName": "Vader Project Engine",
+    "afterPack": "scripts/msc-after-pack-embed-icon.cjs",
     "copyright": "Copyright © MSC Media",
     "icon": "build/icon.ico",
     "forceCodeSigning": false,
@@ -159,9 +161,9 @@
     },
     "nsis": {
       "artifactName": "Vader Project Engine.${ext}",
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false,
+      "allowToChangeInstallationDirectory": true,
       "shortcutName": "Vader Project Engine",
       "uninstallDisplayName": "Vader Project Engine",
       "installerIcon": "build/icon.ico",

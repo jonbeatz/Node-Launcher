@@ -54,10 +54,11 @@ Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
 | Installer | `dist/Vader Project Engine.exe` |
 | Portable | `dist/win-unpacked/` (includes `Vader Project Engine.exe`) |
 
-**Installed application location (NSIS one-click, per-user):** after running the installer, the app is installed under **`%LocalAppData%\Programs\Vader Project Engine\`** (same as `C:\Users\<you>\AppData\Local\Programs\Vader Project Engine\`). This avoids `Program Files` elevation locks and keeps registry/install paths aligned with the fixed install directory.
+**Installed application location (NSIS multi-step wizard, per-user default):** after running the installer, the **default** directory is **`%LocalAppData%\Programs\Vader Project Engine\`** (same as `C:\Users\<you>\AppData\Local\Programs\Vader Project Engine\`). The user may change the destination in the wizard (**`allowToChangeInstallationDirectory: true`**). **`perMachine: false`** avoids requiring Administrator for the default path.
 
 ### Notes
 
+- **Custom `.exe` icon:** With **`build.win.signAndEditExecutable: false`** (avoids winCodeSign symlink failures on some Windows setups), **`npm run build:main`** runs **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) + **`rcedit`** to embed **`build/icon.ico`** into the main executable. See [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
 - **`src/renderer/out/`** is **gitignored**; always run **`build:renderer`** (or rely on **`prebuild:main`** inside **`build:main`**) before expecting a good packaged UI.
 - Do not run **`npm run build:main`** without a recent **`build:renderer`** if you disabled or skipped **`prebuild:main`**.
 - For a lighter loop (no installer, no E2E), use **start app** or **hardened setup** instead.
