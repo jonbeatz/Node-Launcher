@@ -185,3 +185,21 @@ Run from PowerShell:
 4. Brave MCP:
    - Ensure `BRAVE_API_KEY` is set in `C:\Users\<you>\.cursor\mcp.json`
    - `cmd /c npx -y @brave/brave-search-mcp-server --transport stdio`
+
+### Extended checks (added 2026-05-06 night)
+
+5. Postgres MCP (isolated Python 3.12 runtime):
+   - `C:\Users\JONBEATZ\.cursor\venvs\postgres-mcp312\Scripts\postgres-mcp.exe --help`
+   - Verify `DATABASE_URI` set under `postgres.env` in global `mcp.json`.
+6. Postman MCP:
+   - `cmd /c npx -y @postman/postman-mcp-server@latest --full`
+   - If it exits immediately with env validation, set `POSTMAN_API_KEY` and re-test.
+7. Resend MCP:
+   - `cmd /c npx -y resend-mcp --help`
+   - Set `RESEND_API_KEY` before live usage.
+8. Cursor Rules Generator MCP:
+   - `cmd /c npx -y cursor-rules-generator-mcp@latest`
+   - Expected behavior: starts and stays running on stdio until disconnected.
+9. Local `mcp-vercel` build:
+   - `node C:\Users\JONBEATZ\.cursor\tools\mcp-vercel\build\index.js`
+   - Requires `VERCEL_API_TOKEN` env; missing token error confirms binary is reachable.

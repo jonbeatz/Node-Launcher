@@ -1,5 +1,45 @@
 # VPE Checkpoint (2026-05-06)
 
+## MCP handoff checkpoint (2026-05-06 night)
+
+Global MCP config (`C:\Users\JONBEATZ\.cursor\mcp.json`) was expanded and normalized for Windows-safe execution. Postgres MCP is now running from an isolated Python 3.12 venv and set to **dev/unrestricted** by request.
+
+### New/updated MCP servers in this pass
+
+| Server key | Launch/config | Status |
+|------|--------|--------|
+| `postgres` | `C:\Users\JONBEATZ\.cursor\venvs\postgres-mcp312\Scripts\postgres-mcp.exe --access-mode=unrestricted` | Working (validated import + CLI). |
+| `postman` | `cmd /c npx -y @postman/postman-mcp-server@latest --full` | Package/entry works; requires `POSTMAN_API_KEY`. |
+| `neon-postgres` | `url=https://mcp.neon.tech/mcp` + `transport=streamableHttp` | Config applied (remote HTTP MCP). |
+| `cursor-rules-generator` | `cmd /c npx -y cursor-rules-generator-mcp@latest` | Starts correctly; long-running process intentionally stopped after smoke test. |
+| `resend` | `cmd /c npx -y resend-mcp` | CLI available; requires `RESEND_API_KEY`. |
+| `mcp-vercel` | local source build at `C:\Users\JONBEATZ\.cursor\tools\mcp-vercel\build\index.js` | Build works; requires `VERCEL_API_TOKEN`. |
+| `Neon` (existing entry) | converted from malformed `command` string to proper streamable HTTP config | Normalized/fixed. |
+
+### Runtime/tooling setup added
+
+- Installed **Python 3.12** (alongside existing 3.14).
+- Created dedicated venv: `C:\Users\JONBEATZ\.cursor\venvs\postgres-mcp312`.
+- Installed `postgres-mcp` in that venv (solves Python 3.14 `pglast` wheel/build failure).
+- Cloned and built `nganiet/mcp-vercel` locally under `C:\Users\JONBEATZ\.cursor\tools\mcp-vercel`.
+
+### Secrets/placeholders still required
+
+Update these in `C:\Users\JONBEATZ\.cursor\mcp.json` before full use:
+
+- `postgres.env.DATABASE_URI`
+- `postman.env.POSTMAN_API_KEY`
+- `resend.env.RESEND_API_KEY`
+- `mcp-vercel.env.VERCEL_API_TOKEN`
+- `payload` header token placeholder (if continuing Payload MCP usage)
+
+### Notes for tomorrow
+
+- `browser-tools-mcp` requires companion process in a separate terminal:
+  - `npx @agentdeskai/browser-tools-server@latest`
+- `mcp-validator` was intentionally not wired as a normal Cursor MCP server (it is a validator/test suite toolchain).
+- `crystaldba/postgres-mcp` now uses isolated Python runtime; do not switch it back to system Python 3.14.
+
 ## MCP configuration checkpoint (2026-05-06 late)
 
 Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified Windows-safe launch patterns (`cmd /c` where needed).
