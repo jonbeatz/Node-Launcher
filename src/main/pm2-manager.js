@@ -15,14 +15,143 @@ class MSC_PM2Manager {
     this.mainWindow = mainWindow;
     this.store = store;
     this._logBusStarted = false;
-    /** True after programmatic `pm2.connect` succeeds (used by telemetry IPC without calling `pm2.list`). */
+    /** PM2 programmatic client considered connected (see `msc_ensureConnected` + `pm2.list`). */
     this._pm2RpcConnected = false;
+    /** @type {Promise<boolean> | null} */
+    this._pm2ConnectInFlight = null;
+    /** @type {ReturnType<typeof setInterval> | null} */
+    this._telemetryInterval = null;
     this.init();
   }
 
-  /** @returns {boolean} */
+  /**
+   * @returns {boolean}
+   */
   msc_isPm2RpcConnected() {
-    return this._pm2RpcConnected === true;
+    return this._pm2RpcConnected === true && this._msc_hasActiveSpawnedProjects();
+  }
+
+  _msc_hasActiveSpawnedProjects() {
+    try {
+      const projects =
+        this.store && typeof this.store.getProjects === 'function'
+          ? this.store.getProjects()
+          : [];
+      return Array.isArray(projects) && projects.some((p) => p && p.status === 'running');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Idempotent connect; coalesces concurrent callers. Project launch errors must not call this.
+   * @returns {Promise<boolean>}
+   */
+  async msc_ensureConnected() {
+    if (this._pm2RpcConnected) return true;
+    if (this._pm2ConnectInFlight) return this._pm2ConnectInFlight;
+
+    const connectAttempt = new Promise((resolve) => {
+      let settled = false;
+      const finish = (ok) => {
+        if (settled) return;
+        settled = true;
+        resolve(Boolean(ok));
+      };
+      const timeout = setTimeout(() => {
+        console.warn('[VPE] PM2 connect timeout');
+        this._pm2RpcConnected = false;
+        finish(false);
+      }, 1500);
+      try {
+        pm2.connect((err) => {
+          clearTimeout(timeout);
+          if (err) {
+            console.warn('[VPE] PM2 connect failed:', err?.message ?? err);
+            this._pm2RpcConnected = false;
+            finish(false);
+            return;
+          }
+          this._pm2RpcConnected = true;
+          console.log('VPE: PM2 Connected');
+          finish(true);
+        });
+      } catch (e) {
+        clearTimeout(timeout);
+        this._pm2RpcConnected = false;
+        console.warn('[VPE] PM2 connect threw:', e?.message ?? e);
+        finish(false);
+      }
+    });
+    this._pm2ConnectInFlight = connectAttempt.finally(() => {
+      this._pm2ConnectInFlight = null;
+    });
+    return this._pm2ConnectInFlight;
+  }
+
+  _msc_stopTelemetryLoop() {
+    if (this._telemetryInterval != null) {
+      clearInterval(this._telemetryInterval);
+      this._telemetryInterval = null;
+    }
+  }
+
+  /** App shutdown: stop polling and drop client (does not affect project-runner / spawn state). */
+  msc_disconnectPm2Rpc() {
+    this._msc_stopTelemetryLoop();
+    this._pm2RpcConnected = false;
+    this._pm2ConnectInFlight = null;
+    try {
+      if (typeof pm2.disconnect === 'function') {
+        pm2.disconnect(() => {});
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  _msc_resetPm2ClientAfterListFailure() {
+    this._pm2RpcConnected = false;
+  }
+
+  async _msc_pm2TelemetryTickAsync() {
+    try {
+      // Always attempt reconnection on every tick while disconnected.
+      const connected = await this.msc_ensureConnected();
+      if (!connected) return;
+
+      if (!this._logBusStarted) {
+        this._ensurePm2LogBus();
+      }
+
+      pm2.list((err, list) => {
+        try {
+          if (err) {
+            console.warn('[VPE] pm2.list failed:', err?.message ?? err);
+            this._msc_resetPm2ClientAfterListFailure();
+            return;
+          }
+          this._pm2RpcConnected = true;
+
+          const w = this.mainWindow;
+          if (!w || w.isDestroyed() || !w.webContents || w.webContents.isDestroyed()) return;
+          const safeList = Array.isArray(list) ? list : [];
+          const telemetry = safeList.map((proc) => ({
+            id: proc?.name,
+            cpu: Number(proc?.monit?.cpu) || 0,
+            memory: Number(proc?.monit?.memory) || 0,
+            status: proc?.pm2_env?.status || 'unknown',
+          }));
+          w.webContents.send('msc_telemetryUpdate', telemetry);
+        } catch (callbackErr) {
+          console.warn('[VPE] PM2 telemetry callback failed:', callbackErr?.message ?? callbackErr);
+          this._msc_resetPm2ClientAfterListFailure();
+        }
+      });
+    } catch (e) {
+      console.warn('[VPE] PM2 telemetry tick:', e?.message ?? e);
+      this._pm2RpcConnected = false;
+    }
   }
 
   /** Remove or stop PM2 process named `projectId` so it won't fight dashboard spawns */
@@ -38,19 +167,9 @@ class MSC_PM2Manager {
 
   init() {
     try {
-      pm2.connect((err) => {
-        if (err) {
-          console.error('VPE: PM2 Connection Failed');
-          this._pm2RpcConnected = false;
-          return;
-        }
-        this._pm2RpcConnected = true;
-        console.log('VPE: PM2 Connected');
-        this.startTelemetryLoop();
-        this._ensurePm2LogBus();
-      });
-    } catch (err) {
-      console.error('VPE: PM2 Initialization Error');
+      this.startTelemetryLoop();
+    } catch (e) {
+      console.error('VPE: PM2 Manager init failed:', e?.message ?? e);
     }
   }
 
@@ -180,6 +299,11 @@ class MSC_PM2Manager {
 
     const scriptBin = this._pmScriptCandidates(pkg === 'pnpm' ? 'pnpm' : pkg === 'yarn' ? 'yarn' : 'npm');
 
+    const okConnect = await this.msc_ensureConnected();
+    if (!okConnect) {
+      throw new Error('VPE: PM2 daemon unreachable (connect failed).');
+    }
+
     return new Promise((resolve, reject) => {
       pm2.start(
         {
@@ -197,7 +321,10 @@ class MSC_PM2Manager {
         },
         (errStart, apps) => {
           if (errStart) reject(errStart);
-          else resolve(apps);
+          else {
+            this._pm2RpcConnected = true;
+            resolve(apps);
+          }
         },
       );
     });
@@ -350,19 +477,11 @@ class MSC_PM2Manager {
   }
 
   startTelemetryLoop() {
-    setInterval(() => {
-      pm2.list((err, list) => {
-        if (err) return;
-        const w = this.mainWindow;
-        if (!w || w.isDestroyed() || !w.webContents || w.webContents.isDestroyed()) return;
-        const telemetry = list.map((proc) => ({
-          id: proc.name,
-          cpu: proc.monit.cpu,
-          memory: proc.monit.memory,
-          status: proc.pm2_env.status,
-        }));
-        w.webContents.send('msc_telemetryUpdate', telemetry);
-      });
+    if (this._telemetryInterval != null) return;
+
+    void this._msc_pm2TelemetryTickAsync();
+    this._telemetryInterval = setInterval(() => {
+      void this._msc_pm2TelemetryTickAsync();
     }, 2000);
   }
 }

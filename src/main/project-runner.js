@@ -1,5 +1,5 @@
 const EventEmitter = require('events');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
@@ -10,6 +10,8 @@ const { msc_launcherRendererPort } = require('./launcher-port');
 const { msc_healthPollDelayMs, MSC_HEALTH_FIRST_MS } = require('./health-scheduler');
 
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
+const MSC_STARTUP_GRACE_MS = 15000;
+const MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS = 5;
 
 class MSC_ProjectRunner extends EventEmitter {
   /**
@@ -20,7 +22,7 @@ class MSC_ProjectRunner extends EventEmitter {
     super();
     this.mainWindow = mainWindow;
     this.store = store;
-    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess, healthPollTimer?: NodeJS.Timeout, healthStartedAt?: number }>} */
+    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess, healthPollTimer?: NodeJS.Timeout, healthStartedAt?: number, healthFailCount?: number }>} */
     this.children = new Map();
     /** Serialize HTTP health checks across projects (one in flight). */
     this._healthProbeChain = Promise.resolve();
@@ -96,6 +98,13 @@ class MSC_ProjectRunner extends EventEmitter {
       const code = typeof statusCode === 'number' ? statusCode : null;
       const ts = new Date().toISOString();
       this.store.setProjectHealth(projectId, code, ts, reachedServer);
+      const failedProbe = !reachedServer;
+      const activeRec = this.children.get(projectId);
+      if (activeRec) {
+        activeRec.healthFailCount = failedProbe
+          ? Number(activeRec.healthFailCount || 0) + 1
+          : 0;
+      }
       let msg;
       let lvl = 'info';
       if (!reachedServer) {
@@ -112,6 +121,26 @@ class MSC_ProjectRunner extends EventEmitter {
         lvl = 'warn';
       }
       this._persistAndBroadcastLog(projectId, lvl, msg);
+
+      // Safety guard: only terminate if startup grace has passed AND repeated health probes failed.
+      if (activeRec?.dev) {
+        const elapsed = Date.now() - (activeRec.healthStartedAt || Date.now());
+        const failCount = Number(activeRec.healthFailCount || 0);
+        if (
+          elapsed >= MSC_STARTUP_GRACE_MS &&
+          failCount >= MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS &&
+          activeRec.dev.pid
+        ) {
+          this._persistAndBroadcastLog(
+            projectId,
+            'warn',
+            `[vpe] safety stop: ${failCount} consecutive failed health probes after ${Math.round(elapsed / 1000)}s`,
+          );
+          treeKill(activeRec.dev.pid, 'SIGTERM', () => {});
+          return;
+        }
+      }
+
       this._emitProjectsRefresh();
     });
 
@@ -128,7 +157,14 @@ class MSC_ProjectRunner extends EventEmitter {
   _spawnScript(row, script, mode) {
     const cwd = msc_validateProjectPath(row.path);
     const pm = row.pkg_manager || 'npm';
-    const cmd = pm;
+    const cmd =
+      process.platform === 'win32'
+        ? pm === 'yarn'
+          ? 'yarn.cmd'
+          : pm === 'pnpm'
+            ? 'pnpm.cmd'
+            : 'npm.cmd'
+        : pm;
     let args = ['run', script];
     if (pm === 'yarn') {
       args = ['run', script];
@@ -144,7 +180,7 @@ class MSC_ProjectRunner extends EventEmitter {
 
     const child = spawn(cmd, args, {
       cwd,
-      shell: process.platform === 'win32',
+      shell: false,
       env,
     });
 
@@ -226,12 +262,64 @@ class MSC_ProjectRunner extends EventEmitter {
     });
   }
 
+  async _forceReleasePortWindows(port) {
+    if (process.platform !== 'win32') return;
+    const p = Number(port);
+    if (!Number.isFinite(p) || p <= 0) return;
+    try {
+      const stdout = execSync(`netstat -ano | findstr :${p}`, {
+        windowsHide: true,
+      }).toString();
+      const lines = stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const killed = new Set();
+      for (const line of lines) {
+        const parts = line.split(/\s+/);
+        const proto = parts[0] || '';
+        const localAddress = parts[1] || '';
+        const pid = parts[parts.length - 1];
+        // netstat shape:
+        // TCP 127.0.0.1:3006 0.0.0.0:0 LISTENING 9572
+        // TCP [::1]:3006 [::1]:51500 ESTABLISHED 9572
+        // Guard to only kill processes owning this exact local port.
+        if (!/^tcp/i.test(proto)) continue;
+        if (!new RegExp(`:${p}$`).test(localAddress)) continue;
+        if (!pid || pid === '0' || Number.isNaN(Number(pid)) || killed.has(pid)) continue;
+        try {
+          execSync(`taskkill /F /PID ${pid}`, { windowsHide: true, stdio: 'ignore' });
+          killed.add(pid);
+          console.log(`[VPE] Force-killed ghost process ${pid} on Port ${p}`);
+        } catch (_) {
+          // Kill failed silently; preflight will still re-check the port.
+        }
+      }
+    } catch (_) {
+      // Port clear or netstat/findstr did not match.
+    }
+    // Last-resort cleanup if the port is still occupied by a lingering node process.
+    const stillInUse = await this._isPortInUse(p);
+    if (stillInUse) {
+      try {
+        execSync('taskkill /F /IM node.exe', { windowsHide: true, stdio: 'ignore' });
+        console.warn(`[VPE] Last-resort cleanup: taskkill /F /IM node.exe (port ${p} still occupied)`);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
   async _runDevPreflight(row) {
     // Validates path/root and package.json before process spawn.
     const projectRoot = msc_validateProjectPath(row.path);
     const port = this._assertPortConfigured(row.port);
     this._assertScriptPortCompatibility(projectRoot, row, port);
-    const inUse = await this._isPortInUse(port);
+    let inUse = await this._isPortInUse(port);
+    if (inUse) {
+      await this._forceReleasePortWindows(port);
+      inUse = await this._isPortInUse(port);
+    }
     if (inUse) {
       throw new Error(
         [
@@ -297,6 +385,7 @@ class MSC_ProjectRunner extends EventEmitter {
 
     const child = this._spawnScript(row, row.start_script, 'dev');
     rec.dev = child;
+    rec.healthFailCount = 0;
 
     this.store.setProjectRunning(row.id);
     this.store.clearProjectHealth(row.id);
@@ -307,10 +396,12 @@ class MSC_ProjectRunner extends EventEmitter {
       void this._healthPollCycle(row.id);
     }, MSC_HEALTH_FIRST_MS);
 
-    child.on('close', () => {
+    child.on('close', (code, signal) => {
       const r = this.children.get(row.id);
+      if (!r || r.dev !== child) return;
       this._clearHealthPolling(row.id);
-      if (r) r.dev = undefined;
+      r.dev = undefined;
+      r.healthFailCount = 0;
       this.store.clearProjectHealth(row.id);
       this.store.setProjectStopped(row.id);
       this._emitProjectsRefresh();

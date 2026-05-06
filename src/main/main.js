@@ -279,6 +279,9 @@ app.on('before-quit', () => {
   if (pm2Manager && typeof pm2Manager.stopAll === 'function') {
     pm2Manager.stopAll().catch(() => {});
   }
+  if (pm2Manager && typeof pm2Manager.msc_disconnectPm2Rpc === 'function') {
+    pm2Manager.msc_disconnectPm2Rpc();
+  }
   if (projectRunner) {
     try {
       projectRunner.killAll();

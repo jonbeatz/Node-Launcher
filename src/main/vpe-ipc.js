@@ -91,17 +91,20 @@ function msc_bytesToGbNumber(bytes) {
 
 /**
  * Plain JSON-serializable snapshot for `vpe:get-system-stats` (structured clone / IPC safe).
+ * PM2 daemon line uses a live resolver when provided (never a one-shot boot flag).
  * @param {{
  *   cpuPercent: number | null
  *   totalMem: number
  *   freeMem: number
- *   pm2Online: boolean
+ *   pm2Online?: boolean
+ *   getPm2RpcConnected?: () => boolean
  *   pm2ProcessCount: number
  *   vpeUptimeSec: number
  *   vpeUptimeLabel: string
  *   projectsActive: number
  *   projectsTotal: number
  * }} p
+ * `getPm2RpcConnected` (when set) wins over legacy `pm2Online`.
  */
 function msc_buildSanitizedSystemStatsPayload(p) {
   const totalMem = Number(p.totalMem);
@@ -116,7 +119,17 @@ function msc_buildSanitizedSystemStatsPayload(p) {
       ? Math.max(0, Math.min(100, Math.round(Number(rawCpu))))
       : -1;
 
-  const pm2On = Boolean(p.pm2Online);
+  let pm2On = false;
+  try {
+    if (typeof p.getPm2RpcConnected === 'function') {
+      pm2On = Boolean(p.getPm2RpcConnected());
+    } else {
+      pm2On = Boolean(p.pm2Online);
+    }
+  } catch (_) {
+    pm2On = false;
+  }
+
   const pm2Count = Math.max(0, Math.floor(Number(p.pm2ProcessCount) || 0));
 
   return {
@@ -167,7 +180,7 @@ function msc_fallbackSystemStats(err) {
       cpuPercent: null,
       totalMem,
       freeMem,
-      pm2Online: false,
+      getPm2RpcConnected: () => false,
       pm2ProcessCount: 0,
       vpeUptimeSec,
       vpeUptimeLabel,
@@ -179,7 +192,7 @@ function msc_fallbackSystemStats(err) {
       cpuPercent: null,
       totalMem: 0,
       freeMem: 0,
-      pm2Online: false,
+      getPm2RpcConnected: () => false,
       pm2ProcessCount: 0,
       vpeUptimeSec: process.uptime(),
       vpeUptimeLabel: '—',
@@ -382,18 +395,23 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
         console.warn('[VPE get-system-stats] CPU ticks:', m || cpuErr);
       }
 
-      /** Avoid `pm2.list()` here — it lazy-loads optional deps that often break inside ASAR. */
       let pm2Online = false;
+      let pm2ProcessCount = 0;
       try {
         const pm = vpeRuntime?.pm2Manager;
-        if (pm && typeof pm.msc_isPm2RpcConnected === 'function') {
-          pm2Online = Boolean(pm.msc_isPm2RpcConnected());
-        }
-      } catch (_) {
+        pm2Online = Boolean(
+          pm && typeof pm.msc_isPm2RpcConnected === 'function' && pm.msc_isPm2RpcConnected(),
+        );
+        pm2ProcessCount = 0;
+      } catch (pm2Err) {
+        const m =
+          pm2Err && typeof pm2Err === 'object' && 'message' in pm2Err
+            ? String(pm2Err.message)
+            : String(pm2Err ?? '');
+        console.warn('[VPE get-system-stats] PM2 eval:', m || pm2Err);
         pm2Online = false;
+        pm2ProcessCount = 0;
       }
-
-      const pm2ProcessCount = 0;
 
       return msc_buildSanitizedSystemStatsPayload({
         cpuPercent,

@@ -105,6 +105,51 @@ Living notes for **problems we hit and how we fixed them**—mostly Windows pack
 
 ---
 
+## PM2 badge stayed Online when all cards were stopped
+
+**Symptom:** System Health `PM2 Daemon` remained **Online** even after `Stop All` and no active workspace projects.
+
+**Cause:** Badge logic only reflected global PM2 reachability, not workspace-managed runtime state.
+
+**Fix in repo:** [`pm2-manager.js`](../../src/main/pm2-manager.js) now returns true only when both are true:
+- PM2 RPC client is connected
+- At least one workspace project row is `status === 'running'`
+
+This aligns the badge to managed projects, not just machine-wide daemon presence.
+
+---
+
+## Windows ghost process held project port (self-stop after ~2s)
+
+**Symptom:** Projects (notably Next.js dev cards) exited with code 1 immediately because target port was already occupied by orphaned Node/Next processes.
+
+**Cause:** Prior preflight only detected in-use ports and errored; it did not automatically purge stale listeners.
+
+**Fix in repo:** [`project-runner.js`](../../src/main/project-runner.js) preflight now:
+- Checks configured project port
+- On Windows, runs native sweep (`netstat -ano | findstr :<port>`) and kills owning PID(s) via `taskkill /F /PID ...`
+- Rechecks the port before continuing
+- Uses last-resort `taskkill /F /IM node.exe` if the port still appears blocked
+
+Additional hardening:
+- Startup safety kill waits for both **15s grace** and **5 consecutive failed probes**
+- Windows spawn path uses direct `npm.cmd` / `pnpm.cmd` / `yarn.cmd` with `shell: false`
+
+---
+
+## Packaged boot crash: main-process parse error from `app.asar` (tray path)
+
+**Symptom:** `win-unpacked` app showed main-process syntax crash (`await is only valid...`) pointing at tray path even though source files were valid.
+
+**Cause:** Packaging/runtime issue around ASAR-loaded main files on this environment; source `src/main/*.js` syntax checked clean.
+
+**Fix in repo (current operational mode):**
+- `package.json` → `build.asar = false`
+
+This de-bricks startup and keeps packaging stable while preserving all runtime fixes.
+
+---
+
 ## NSIS install path / interactive wizard + uninstall (per-user)
 
 **Symptom:** Desire predictable install location without **`Program Files`** elevation friction, plus a **guided installer** (Next / review destination) instead of a silent one-click flow; uninstaller must behave correctly.
