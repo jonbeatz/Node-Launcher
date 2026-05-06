@@ -9,7 +9,7 @@
     "dev:main": "electron .",
     "dev:renderer": "next dev src/renderer -p 3000",
     "build": "npm run build:renderer && npm run build:main",
-    "prebuild:main": "node scripts/msc-copy-release-icon.cjs",
+    "prebuild:main": "node scripts/msc-copy-release-icon.cjs && npm run build:renderer",
     "build:main": "node scripts/msc-run-electron-builder.cjs",
     "build:renderer": "next build src/renderer",
     "lint": "next lint src/renderer",
@@ -111,7 +111,6 @@
     },
     "files": [
       "**/*",
-      "src/renderer/out/**/*",
       "!src/renderer/app{,/**/*}",
       "!src/renderer/components{,/**/*}",
       "!src/renderer/hooks{,/**/*}",
