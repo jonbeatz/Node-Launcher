@@ -48,14 +48,16 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
   }
 
   const cpuDisplay =
-    systemStats?.cpuPercent != null ? `${systemStats.cpuPercent}%` : '—'
+    systemStats != null && systemStats.cpu >= 0 ? `${systemStats.cpu}%` : '—'
   const projectsLine =
     systemStats != null
-      ? `${systemStats.projectsActive} of ${systemStats.projectsTotal} active`
+      ? `${systemStats.projects.active} of ${systemStats.projects.total} active`
       : '—'
+  const memFreeLabel =
+    systemStats != null ? `${systemStats.memory.free.toFixed(2)} GB` : '—'
   const resourcesLine =
     systemStats != null
-      ? `CPU: ${cpuDisplay} | RAM: ${systemStats.memoryFreeLabel} free (${systemStats.memoryUsedPercent}% used)`
+      ? `CPU: ${cpuDisplay} | RAM: ${memFreeLabel} free (${systemStats.memory.percentage}% used)`
       : '—'
 
   if (!isOpen) return null
@@ -82,7 +84,7 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
           <div className="flex items-center justify-between">
             <span className="font-sans text-xs text-[#A0A0A0]">VPE Uptime</span>
             <span className="font-sans text-sm text-white">
-              {systemStats?.vpeUptimeLabel ?? '—'}
+              {systemStats?.uptime.label ?? '—'}
             </span>
           </div>
 
@@ -94,19 +96,19 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
                 <>
                   <div
                     className={
-                      systemStats.pm2Online
+                      systemStats.pm2.status === 'online'
                         ? 'w-2 h-2 rounded-full bg-[#00cc66] animate-pulse-led'
                         : 'w-2 h-2 rounded-full bg-[#666666]'
                     }
                   />
                   <span
                     className={
-                      systemStats.pm2Online
+                      systemStats.pm2.status === 'online'
                         ? 'font-sans text-sm text-[#00cc66]'
                         : 'font-sans text-sm text-[#A0A0A0]'
                     }
                   >
-                    {systemStats.pm2Online ? 'Online' : 'Offline'}
+                    {systemStats.pm2.status === 'online' ? 'Online' : 'Offline'}
                   </span>
                 </>
               ) : (

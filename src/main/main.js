@@ -200,6 +200,9 @@ function msc_createWindow() {
     show: false,
   });
 
+  /** Register VPE IPC before navigation so production UI never polls missing handlers. */
+  msc_attachEngineAfterWindow(mainWindow);
+
   if (isDev) {
     mainWindow.loadURL(VPE_RENDERER_DEV_ORIGIN);
     mainWindow.webContents.openDevTools();
@@ -219,9 +222,6 @@ function msc_createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
-  
-  // Attach background services after window creation to prevent hangs
-  msc_attachEngineAfterWindow(mainWindow);
 
   mainWindow.on('closed', () => {
     mainWindow = null;

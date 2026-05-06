@@ -12,7 +12,7 @@ interface AppSettingsModalProps {
 export function AppSettingsModal({ isOpen, onClose, onSave }: AppSettingsModalProps) {
   const [launchOnStartup, setLaunchOnStartup] = useState(true)
   const [minimizeToTray, setMinimizeToTray] = useState(false)
-  const [defaultView, setDefaultView] = useState<'card' | 'list'>('list')
+  const [defaultView, setDefaultView] = useState<'card' | 'list'>('card')
   const [defaultPkgManager, setDefaultPkgManager] = useState('auto')
   const [portRangeStart, setPortRangeStart] = useState(3000)
   const [portRangeEnd, setPortRangeEnd] = useState(3020)

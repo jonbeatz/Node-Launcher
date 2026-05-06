@@ -1,19 +1,19 @@
 # VPE Checkpoint (2026-05-05)
 
-**Last doc update:** 2026-05-05 — active dev branch: **`Node-Launcher-v3`** (`origin/Node-Launcher-v3`).
+**Last doc update:** 2026-05-05 — active dev branch: **`Node-Launcher-v4`** (`origin/Node-Launcher-v4`). Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** install under `%LocalAppData%\Programs\Vader Project Engine\` (see Custom-Commands).
 
 ## Current project status (snapshot)
 
 | Area | Status |
 |------|--------|
-| **Branch** | **`Node-Launcher-v3`** — iteration after v2 (repair/CI/userData work landed on v2; v3 adds security + packaging prep). |
+| **Branch** | **`Node-Launcher-v4`** — packaging polish: `src/renderer/out/` gitignored; `prebuild:main` runs static export before **`build:main`**. |
 | **Renderer** | **Next.js `15.0.7`** + **React `19.0.0`** — patches **CVE-2025-66478** line (see [advisory](https://nextjs.org/blog/CVE-2025-66478)); `npm run build:renderer` → **4/4** static routes. |
 | **Quality gates** | **`npm run lint`** clean; CI: lint → build → AST stub → Playwright (Chromium `--with-deps`). |
 | **Persistence** | SQLite/JSON under **`app.getPath('userData')/vpe-db`**; thumbnails scratch under **`userData/media/thumbnails`**. |
 | **Native modules** | **`npm run rebuild:natives`** = `electron-rebuild -f -o better-sqlite3` only (avoids Windows **node-pty** + Spectre MSVC trap). |
 | **Design assets** | Committed: [`_design_references/VPE.ico`](../../_design_references/VPE.ico), [`_design_references/msc-icon.png`](../../_design_references/msc-icon.png) (commit `e7bcdd3`). [`.cursorignore`](../../.cursorignore) still excludes `_design_references/` from **Cursor indexing** only — files **are** in git. |
 | **Git markers** | Empty restore-point commit before packaging: **`Clean restore-point about to make.exe`** (`1adddf9`). |
-| **Next packaging step** | Run **`npm run build`** (renderer + `electron-builder`) when ready for **`.exe`**; confirm icons wired in [`package.json`](../../package.json) / electron-builder config if you switch from defaults. |
+| **Next packaging step** | Tell the agent **rebuild exe** (see [Custom-Commands](Custom-Commands.md#rebuild-exe)): icon → **`build:renderer`** → **`rebuild:natives`** → lint → E2E (`CI=true`) → clean **`dist/`** → **`build:main`** → remove blockmap / `builder-debug.yml` / `latest.yml`. Icons: [`package.json`](../../package.json) `build` + `build/icon.ico` from **`VPE.ico`**. |
 
 **Context — health line on cards:** `GET /` probe does not follow redirects. **HTTP 307** on a project = server responded with redirect (e.g. Next middleware); browser **OPEN** still works. Green **“Active — HTTP 200”** only for **2xx** (see [`Msc_ProjectCard.tsx`](../../src/renderer/components/Msc_ProjectCard.tsx) `getHealthLine`).
 
@@ -86,11 +86,15 @@
 5. Validate persistence mode in logs:
    - prefer `VPE persistence: SQLite (better-sqlite3)`.
 
-## Milestone — Boot reconcile, system stats, native CPU (completed)
+## Milestone — Boot reconcile, system stats, production telemetry (completed)
 
 - **Boot reconcile** ([`boot-running-reconcile.js`](../../src/main/boot-running-reconcile.js) + [`main.js`](../../src/main/main.js)): On engine start, rows with `status === 'running'` get a one-shot HTTP health probe ([`health-probe.js`](../../src/main/health-probe.js)); unreachable within probe timeout → stopped + health cleared; `_emitProjectsRefresh` updates UI.
-- **System Health IPC** ([`vpe-ipc.js`](../../src/main/vpe-ipc.js), [`preload.js`](../../src/preload/preload.js), [`vpe-bridge.ts`](../../src/renderer/lib/vpe-bridge.ts), [`system-health-panel.tsx`](../../src/renderer/components/system-health-panel.tsx), [`use-vpe-system-stats.ts`](../../src/renderer/hooks/use-vpe-system-stats.ts)): `vpe:get-system-stats` exposes uptime, memory, PM2 reachability, project counts; panel polls ~3s while open.
-- **Task D — Native CPU**: [`host-cpu-ticks.js`](../../src/main/host-cpu-ticks.js) replaces Windows PowerShell WMI polling; tick-delta `%` with first-call baseline (`—` until second sample). Handler wrapped in **try/catch** with `VpeSystemStats`-shaped fallback on failure.
+- **VPE IPC registration order** ([`main.js`](../../src/main/main.js)): **`msc_attachEngineAfterWindow`** runs **before** **`loadURL` / `loadFile`** so `vpe:get-system-stats` (and other handlers) exist before the renderer boots—avoids early polls against missing handlers.
+- **System Health IPC** ([`vpe-ipc.js`](../../src/main/vpe-ipc.js), [`preload.js`](../../src/preload/preload.js), [`vpe-bridge.ts`](../../src/renderer/lib/vpe-bridge.ts), [`system-health-panel.tsx`](../../src/renderer/components/system-health-panel.tsx), [`use-vpe-system-stats.ts`](../../src/renderer/hooks/use-vpe-system-stats.ts)): **`vpe:get-system-stats`** returns a **plain JSON-serializable** payload (`cpu`, `memory` {GB + `percentage`}, `pm2` {`status`, `activeCount`}, `uptime`, `projects`) so Electron **structured clone** never throws; renderer validates shape + uses placeholders on failure.
+- **Native CPU / RAM (telemetry path only):** Implemented **inline** in [`vpe-ipc.js`](../../src/main/vpe-ipc.js) using **`os.cpus()`** tick deltas and **`os.totalmem()` / `os.freemem()`**—no optional telemetry packages. First CPU sample returns sentinel **`cpu: -1`** (UI shows **—** until the next ~3s poll). Legacy [`host-cpu-ticks.js`](../../src/main/host-cpu-ticks.js) remains in tree but is **not** required by this IPC path.
+- **PM2 telemetry without `pm2.list`:** Calling **`pm2.list()`** from telemetry lazy-loads optional deps that can fail under **ASAR** (*Cannot find module* / unhandled rejections). Telemetry **`pm2.status`** is **`online`** only when [`pm2-manager.js`](../../src/main/pm2-manager.js) **`pm2.connect`** has succeeded (`msc_isPm2RpcConnected()`); **`pm2.activeCount`** stays **`0`** here (process list avoided on purpose). Operational PM2 features still use **`require('pm2')`** in **`pm2-manager.js`**.
+- **ASAR unpack:** [`package.json`](../../package.json) **`build.asarUnpack`** includes **`better-sqlite3`**, **`node-pty`**, and **`pm2`** trees for reliable resolution in production.
+- **Default view:** [`app-settings-modal.tsx`](../../src/renderer/components/app-settings-modal.tsx) **Default View** initial state matches dashboard **Card** / grid default ([`page.tsx`](../../src/renderer/app/page.tsx)).
 - **CI**: [`ci.yml`](../../.github/workflows/ci.yml) runs **`npm run lint`** (with `CI=true`) before **`npm run build:renderer`**. Root [`.npmrc`](../../.npmrc) sets **`legacy-peer-deps=true`** so **`npm ci`** succeeds with React 19 + Next **15.0.x** peer metadata (GitHub “lint-and-build failed in ~11s” was typically **`ERESOLVE`** on install). Renderer pins **Next `15.0.7`** for security patches.
 
 See also: [`health-scheduler.js`](../../src/main/health-scheduler.js), [`launcher-port.js`](../../src/main/launcher-port.js), [`package-json-script-patch.js`](../../src/main/package-json-script-patch.js) for related runner/IPC behavior.
@@ -118,6 +122,5 @@ See also: [`health-scheduler.js`](../../src/main/health-scheduler.js), [`launche
   - `npm run repair:ast`
   - `npm run test:e2e`
   - `npm run lint`
-- Production installer (after renderer build succeeds):
-  - `npm run build` (runs `build:renderer` then `electron-builder` / `build:main`)
+- Production installer (full gates + clean **`dist/`**): say **rebuild exe** or follow [Custom-Commands — rebuild exe](Custom-Commands.md#rebuild-exe). Minimal: `npm run build` (`build:renderer` + `build:main`).
 

@@ -57,21 +57,30 @@ export interface AddProjectPayload {
   thumbnail_url?: string | null
 }
 
-/** Live host + VPE metrics from `vpe:get-system-stats`. */
+/**
+ * Live host + VPE metrics from `vpe:get-system-stats`.
+ * IPC payload is plain JSON (numbers/strings only); `cpu === -1` means unavailable (first CPU poll).
+ */
 export interface VpeSystemStats {
-  vpeUptimeSec: number
-  vpeUptimeLabel: string
-  cpuPercent: number | null
-  cpuSource: 'loadavg' | 'win_ps' | 'cpu_ticks' | 'unavailable'
-  memoryTotalBytes: number
-  memoryFreeBytes: number
-  memoryUsedPercent: number
-  memoryFreeLabel: string
-  memoryUsedLabel: string
-  memoryTotalLabel: string
-  pm2Online: boolean
-  projectsActive: number
-  projectsTotal: number
+  cpu: number
+  memory: {
+    total: number
+    free: number
+    used: number
+    percentage: number
+  }
+  pm2: {
+    status: string
+    activeCount: number
+  }
+  uptime: {
+    seconds: number
+    label: string
+  }
+  projects: {
+    active: number
+    total: number
+  }
 }
 
 export type VpeRepairRunStatus = 'success' | 'partial' | 'failed'

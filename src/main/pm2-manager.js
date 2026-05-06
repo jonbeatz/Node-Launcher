@@ -15,7 +15,14 @@ class MSC_PM2Manager {
     this.mainWindow = mainWindow;
     this.store = store;
     this._logBusStarted = false;
+    /** True after programmatic `pm2.connect` succeeds (used by telemetry IPC without calling `pm2.list`). */
+    this._pm2RpcConnected = false;
     this.init();
+  }
+
+  /** @returns {boolean} */
+  msc_isPm2RpcConnected() {
+    return this._pm2RpcConnected === true;
   }
 
   /** Remove or stop PM2 process named `projectId` so it won't fight dashboard spawns */
@@ -34,8 +41,10 @@ class MSC_PM2Manager {
       pm2.connect((err) => {
         if (err) {
           console.error('VPE: PM2 Connection Failed');
+          this._pm2RpcConnected = false;
           return;
         }
+        this._pm2RpcConnected = true;
         console.log('VPE: PM2 Connected');
         this.startTelemetryLoop();
         this._ensurePm2LogBus();

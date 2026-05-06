@@ -1,39 +1,116 @@
-# Stability + Improvement Backlog
+# Stability & fix backlog (resolved)
 
-Updated: 2026-05-05
+Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md).
 
-## P0 (Fix Immediately)
+---
 
-1. Project registry contains reserved renderer port (`3001`) for managed app (`MSC_PROJECTZ v1`).
-   - Impact: project cannot ever start from VPE.
-   - Fix: move project port to a non-reserved value (e.g. `3010`) and save settings.
+## Windows: `winCodeSign` / 7-Zip symlink failure during pack
 
-2. `MSC_REDESIGN` code error blocks runtime (`duplicate default export` in `app/page.tsx`).
-   - Impact: process starts but serves 500 error page.
-   - Fix: keep only one `export default` and place Suspense wrapper in a valid component structure.
+**Symptom:** `electron-builder` fails while extracting `winCodeSign-2.6.0.7z`: *Cannot create symbolic link : A required privilege is not held by the client* (darwin `libcrypto.dylib` / `libssl.dylib` inside the archive). Retries do not help.
 
-3. Some managed projects hardcode dev port in script (ex: `next dev -p 3000`) while VPE project port differs.
-   - Impact: collisions and misleading status/URL in launcher.
-   - Fix: align script + VPE configured port OR remove hardcoded `-p` and let VPE env set port.
+**Cause:** `app-builder` invokes **rcedit** for the main `.exe`, which pulls the **winCodeSign** tool bundle; extraction uses **`7za … -snld`** (preserve symlinks). Creating those symlinks on Windows without **Administrator** or **Developer Mode** fails.
 
-## P1 (High Value)
+**Fix in repo:** `package.json` → `build.win.signAndEditExecutable: false` so rcedit (and that extraction path) is skipped for local release builds.
 
-4. Add one-click "Auto-fix port" action in Preflight toast/modal.
-   - If reserved or in-use, suggest/apply next free port and persist.
+**Trade-off:** The **file** icon in Explorer may stay the generic Electron icon; **window/taskbar** branding still comes from `BrowserWindow` + `extraResources` → `resources/icon.ico` and NSIS installer icons from `build/icon.ico`.
 
-5. Add first-run project audit panel.
-   - Validate per project: path, `package.json`, script exists, lockfile package manager, explicit script port mismatch.
+**If you need full exe resource editing again:** Build from an elevated shell and/or enable **Windows Developer Mode** (symlinks), then consider setting `signAndEditExecutable` back to default and re-test.
 
-6. Add active health checks per running project.
-   - Probe configured URL and show healthy/degraded badge instead of status only.
+**Related env (runner):** `scripts/msc-run-electron-builder.cjs` sets `CSC_IDENTITY_AUTO_DISCOVERY=false` and clears stray `CSC_LINK` / `WIN_CSC_LINK` so signing does not pull unexpected cert/tool paths.
 
-## P2 (Quality / UX)
+---
 
-7. Add richer add-project detection details to UI.
-   - Show detected package manager, start/build script, reserved port warning before submit.
+## Pack step: `node-gyp` / Visual Studio not found (`better-sqlite3`)
 
-8. Persist and expose last successful launch URL + timestamp.
-   - Helps debugging when process is "running" but URL mismatches.
+**Symptom:** `electron-builder` fails during “rebuilding native dependencies” with *Could not find any Visual Studio installation* when rebuilding `better-sqlite3`.
 
-9. Add optional startup profiles (single project vs multi-project boot sets).
-   - Reduces accidental port/script conflicts across many projects.
+**Cause:** Builder’s default **npm rebuild** for native modules runs **node-gyp** in a context that may not see VS Build Tools the same way as a manual `electron-rebuild`.
+
+**Fix in repo:** `package.json` → `build.npmRebuild: false`. Always run **`npm run rebuild:natives`** (`electron-rebuild -f -o better-sqlite3`) **before** `npm run build:main` so only **better-sqlite3** is aligned to Electron’s ABI (and **node-pty** is not dragged into a Spectre‑mitigated MSVC rebuild on Windows).
+
+---
+
+## Packaged app: blank window + generic UI
+
+**Symptom:** Installer runs but the window is blank; dev mode works.
+
+**Causes (stacked):**
+
+1. **No real static export** — `next build` without `output: 'export'` does not produce a loadable `index.html` tree under `src/renderer/out/`.
+2. **Wrong load API** — `loadURL('file://…')` on Windows is fragile vs **`loadFile()`** for paths with spaces and ASAR layout.
+3. **`assetPrefix` + `next/font/google`** — Static export for **Electron `file://`** needs **relative** asset URLs (`./_next/...`). `assetPrefix: './'` in the production build phase conflicts with **`next/font/google`** (build error: *assetPrefix must start with a leading slash or be absolute URL*).
+
+**Fixes in repo:**
+
+- `src/renderer/next.config.mjs` — `output: 'export'`, `images.unoptimized: true`, and `assetPrefix: './'` only in **`phase-production-build`** so `next dev` stays healthy.
+- `src/main/main.js` — `msc_getRendererIndexPath()`, production **`mainWindow.loadFile(msc_indexHtml)`**, log if bundle missing.
+- `src/renderer/app/layout.tsx` + `globals.css` — drop `next/font/google`; load **Montserrat** via **`@import`** + `--font-sans` so export + `./` prefix builds cleanly.
+
+---
+
+## Git / electron-builder: `src/renderer/out` missing from installs
+
+**Symptom:** Pack succeeds locally but UI still blank if export never ran—or GitHub Desktop shows hundreds of `out/` files.
+
+**Cause:** Root **`.gitignore`** had `out/`, which matches **`out`** directories in subpaths, so **`src/renderer/out/`** was ignored by git *and* cluttered the working tree when built.
+
+**Fix in repo:**
+
+- `.gitignore` — use **`/out/`** for repo-root only; add explicit **`src/renderer/out/`** so the static export is **not** tracked but is documented as generated.
+- `package.json` **`prebuild:main`** — `msc-copy-release-icon` **and** `npm run build:renderer` so **`npm run build:main`** always refreshes the export before `electron-builder` runs.
+
+---
+
+## electron-builder v26: invalid `win.sign`
+
+**Symptom:** Config validation error: *configuration.win has an unknown property 'sign'*.
+
+**Fix:** Remove deprecated `win.sign`; rely on `CSC_IDENTITY_AUTO_DISCOVERY=false` and no cert env for unsigned local builds (see runner script above).
+
+---
+
+## Playwright E2E: flaky or wrong server URL
+
+**Symptom:** `test:e2e` fails when port **3000** is in use or `localhost` resolves inconsistently.
+
+**Mitigation:** Run with **`CI=true`** so `playwright.config.ts` starts the dev server on **`127.0.0.1`** and uses a deterministic `baseURL` (see [Custom-Commands — rebuild exe](Custom-Commands.md#rebuild-exe)).
+
+---
+
+## Post-installer clutter in `dist/`
+
+**Symptom:** Extra files next to the installer (`*.blockmap`, `builder-debug.yml`, `latest.yml`) confuse “what to ship.”
+
+**Routine:** After a successful **`npm run build:main`**, delete those files and keep only **`dist/Vader Project Engine.exe`** and **`dist/win-unpacked/`** (automated in the **rebuild exe** pipeline in Custom-Commands).
+
+---
+
+## Telemetry IPC: structured clone / “object could not be cloned”
+
+**Symptom:** DevTools shows **`Error: An object could not be cloned`** when invoking **`vpe:get-system-stats`**.
+
+**Cause:** The main process returned a value that **Structured Clone** cannot serialize (e.g. non-plain objects attached to the payload).
+
+**Fix in repo:** [`src/main/vpe-ipc.js`](../../src/main/vpe-ipc.js) builds **`msc_buildSanitizedSystemStatsPayload`** with **only** numbers, strings, and plain nested objects. [`use-vpe-system-stats.ts`](../../src/renderer/hooks/use-vpe-system-stats.ts) validates the shape before `setState`; [`vpe-bridge.ts`](../../src/renderer/lib/vpe-bridge.ts) documents the contract.
+
+---
+
+## Telemetry / production: `Cannot find module` after `pm2.list()`
+
+**Symptom:** Unhandled promise rejection or console errors on **`vpe:get-system-stats`** in **`win-unpacked`** builds: **`Cannot find module`** for an optional PM2-related dependency.
+
+**Cause:** **`pm2.list()`** triggers **lazy** requires inside the PM2 dependency graph; some paths break when the app is packaged under **ASAR** or optional deps are missing.
+
+**Fix in repo:** Telemetry **does not** call **`pm2.list()`**. **Online/offline** reflects **`MSC_PM2Manager`** after successful **`pm2.connect`** ([`pm2-manager.js`](../../src/main/pm2-manager.js) **`msc_isPm2RpcConnected()`**). CPU/memory use Node’s built-in **`os`** only in the telemetry handler ([`vpe-ipc.js`](../../src/main/vpe-ipc.js)). **`build.asarUnpack`** includes **`**/node_modules/pm2/**/*`** so the rest of the PM2 integration still resolves reliably.
+
+---
+
+## NSIS install path / registry drift (per-user)
+
+**Symptom:** Desire predictable install location without **`Program Files`** elevation friction.
+
+**Fix in repo:** **`build.nsis`**: **`perMachine: false`**, **`oneClick: true`**, **`allowToChangeInstallationDirectory: false`** → default install under **`%LocalAppData%\Programs\Vader Project Engine\`** (documented in [Custom-Commands](Custom-Commands.md#rebuild-exe)). **`build.appId`:** `com.vader.projectengine`; **`build.win.signAndEditExecutable: false`** avoids **winCodeSign** symlink extraction failures on Windows (see first section in this doc).
+
+---
+
+*Last updated: 2026-05-05 — align with [Checkpoint](Checkpoint.md) and packaging on branch **`Node-Launcher-v4`**. Powered by the MSC Media Engine.*

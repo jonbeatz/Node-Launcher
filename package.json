@@ -100,9 +100,10 @@
     "typescript": "^5.3.3"
   },
   "build": {
-    "appId": "com.mscmedia.vaderprojectengine",
+    "appId": "com.vader.projectengine",
     "productName": "Vader Project Engine",
     "copyright": "Copyright © MSC Media",
+    "icon": "build/icon.ico",
     "forceCodeSigning": false,
     "npmRebuild": false,
     "directories": {
@@ -134,7 +135,8 @@
     "asar": true,
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*",
-      "**/node_modules/node-pty/**/*"
+      "**/node_modules/node-pty/**/*",
+      "**/node_modules/pm2/**/*"
     ],
     "extraResources": [
       {
@@ -157,12 +159,13 @@
     },
     "nsis": {
       "artifactName": "Vader Project Engine.${ext}",
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
       "shortcutName": "Vader Project Engine",
       "uninstallDisplayName": "Vader Project Engine",
-      "installerIcon": "icon.ico",
-      "uninstallerIcon": "icon.ico"
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   }
 }

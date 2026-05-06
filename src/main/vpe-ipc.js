@@ -4,8 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const net = require('net');
 const os = require('os');
-const pm2 = require('pm2');
-const { msc_hostCpuPercentSinceLastPoll } = require('./host-cpu-ticks');
 const { msc_launcherRendererPort } = require('./launcher-port');
 const { msc_detectProjectScripts } = require('./project-detection');
 const { msc_validateProjectPath } = require('./path-guard');
@@ -16,6 +14,59 @@ let msc_vpeIpcRegistered = false;
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 const MAX_THUMB_EDGE = 960;
 const MAX_THUMB_BYTES = 512 * 1024;
+
+/** Host CPU tick snapshot for `os.cpus()` delta math (ASAR-safe; no external packages). */
+/** @type {{ idle: number, total: number } | null} */
+let msc_vpeLastCpuSnapshot = null;
+/** @type {number | null} */
+let msc_vpeLastCpuPercent = null;
+
+function msc_vpeSumCpuTicks() {
+  let user = 0;
+  let nice = 0;
+  let sys = 0;
+  let idle = 0;
+  let irq = 0;
+  const cpus = os.cpus();
+  if (!cpus?.length) return { idle: 0, total: 0 };
+
+  for (const cpu of cpus) {
+    const t = cpu.times;
+    user += t.user;
+    nice += t.nice;
+    sys += t.sys;
+    idle += t.idle;
+    irq += t.irq || 0;
+  }
+  const total = user + nice + sys + idle + irq;
+  return { idle, total };
+}
+
+/** @returns {number | null} */
+function msc_vpeHostCpuPercentSinceLastPoll() {
+  const cur = msc_vpeSumCpuTicks();
+
+  if (!msc_vpeLastCpuSnapshot) {
+    msc_vpeLastCpuSnapshot = cur;
+    return null;
+  }
+
+  const idleDiff = cur.idle - msc_vpeLastCpuSnapshot.idle;
+  const totalDiff = cur.total - msc_vpeLastCpuSnapshot.total;
+  msc_vpeLastCpuSnapshot = cur;
+
+  if (totalDiff <= 0) {
+    return msc_vpeLastCpuPercent;
+  }
+
+  const busyRatio = 1 - idleDiff / totalDiff;
+  const pct = Math.round(busyRatio * 100);
+  if (!Number.isFinite(pct)) {
+    return msc_vpeLastCpuPercent;
+  }
+  msc_vpeLastCpuPercent = Math.max(0, Math.min(100, pct));
+  return msc_vpeLastCpuPercent;
+}
 
 function msc_formatProcessUptime(sec) {
   const s = Math.floor(Number(sec) || 0);
@@ -31,6 +82,66 @@ function msc_bytesToGbLabel(bytes) {
   return `${(Number(bytes) / (1024 ** 3)).toFixed(2)} GB`;
 }
 
+/** @param {number | string | null | undefined} bytes */
+function msc_bytesToGbNumber(bytes) {
+  const b = Number(bytes);
+  if (!Number.isFinite(b) || b < 0) return 0;
+  return Math.round((b / (1024 ** 3)) * 100) / 100;
+}
+
+/**
+ * Plain JSON-serializable snapshot for `vpe:get-system-stats` (structured clone / IPC safe).
+ * @param {{
+ *   cpuPercent: number | null
+ *   totalMem: number
+ *   freeMem: number
+ *   pm2Online: boolean
+ *   pm2ProcessCount: number
+ *   vpeUptimeSec: number
+ *   vpeUptimeLabel: string
+ *   projectsActive: number
+ *   projectsTotal: number
+ * }} p
+ */
+function msc_buildSanitizedSystemStatsPayload(p) {
+  const totalMem = Number(p.totalMem);
+  const freeMem = Number(p.freeMem);
+  const usedMem = Math.max(0, (Number.isFinite(totalMem) ? totalMem : 0) - (Number.isFinite(freeMem) ? freeMem : 0));
+  const memDenom = Number.isFinite(totalMem) && totalMem > 0 ? totalMem : 0;
+  const memPct = memDenom > 0 ? Math.min(100, Math.round((usedMem / memDenom) * 100)) : 0;
+
+  const rawCpu = p.cpuPercent;
+  const cpuNum =
+    rawCpu != null && Number.isFinite(Number(rawCpu))
+      ? Math.max(0, Math.min(100, Math.round(Number(rawCpu))))
+      : -1;
+
+  const pm2On = Boolean(p.pm2Online);
+  const pm2Count = Math.max(0, Math.floor(Number(p.pm2ProcessCount) || 0));
+
+  return {
+    cpu: cpuNum,
+    memory: {
+      total: msc_bytesToGbNumber(totalMem),
+      free: msc_bytesToGbNumber(freeMem),
+      used: msc_bytesToGbNumber(usedMem),
+      percentage: memPct,
+    },
+    pm2: {
+      status: pm2On ? 'online' : 'offline',
+      activeCount: pm2Count,
+    },
+    uptime: {
+      seconds: Math.max(0, Math.floor(Number(p.vpeUptimeSec) || 0)),
+      label: String(p.vpeUptimeLabel ?? '—'),
+    },
+    projects: {
+      active: Math.max(0, Math.floor(Number(p.projectsActive) || 0)),
+      total: Math.max(0, Math.floor(Number(p.projectsTotal) || 0)),
+    },
+  };
+}
+
 /** Writable thumbnail scratch dir (not inside read-only app.asar). */
 function msc_userDataMediaThumbnailsDir() {
   try {
@@ -43,58 +154,38 @@ function msc_userDataMediaThumbnailsDir() {
   return path.join(process.cwd(), 'media', 'thumbnails');
 }
 
-function msc_pm2DaemonReachable() {
-  return new Promise((resolve) => {
-    try {
-      pm2.list((err) => resolve(!err));
-    } catch (_) {
-      resolve(false);
-    }
-  });
-}
-
 /** @param {unknown} err */
 function msc_fallbackSystemStats(err) {
-  console.error('[VPE get-system-stats]:', err?.message ?? err);
+  const msg = err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err ?? '');
+  console.error('[VPE get-system-stats]:', msg || err);
   try {
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
-    const usedMem = Math.max(0, totalMem - freeMem);
-    const memoryUsedPercent =
-      totalMem > 0 ? Math.min(100, Math.round((usedMem / totalMem) * 100)) : 0;
     const vpeUptimeSec = process.uptime();
     const vpeUptimeLabel = msc_formatProcessUptime(vpeUptimeSec);
-    return {
+    return msc_buildSanitizedSystemStatsPayload({
+      cpuPercent: null,
+      totalMem,
+      freeMem,
+      pm2Online: false,
+      pm2ProcessCount: 0,
       vpeUptimeSec,
       vpeUptimeLabel,
-      cpuPercent: null,
-      cpuSource: 'unavailable',
-      memoryTotalBytes: totalMem,
-      memoryFreeBytes: freeMem,
-      memoryUsedPercent,
-      memoryFreeLabel: msc_bytesToGbLabel(freeMem),
-      memoryUsedLabel: msc_bytesToGbLabel(usedMem),
-      memoryTotalLabel: msc_bytesToGbLabel(totalMem),
-      pm2Online: false,
       projectsActive: 0,
       projectsTotal: 0,
-    };
+    });
   } catch {
-    return {
-      vpeUptimeSec: Math.round(process.uptime()),
-      vpeUptimeLabel: '—',
+    return msc_buildSanitizedSystemStatsPayload({
       cpuPercent: null,
-      cpuSource: 'unavailable',
-      memoryTotalBytes: 0,
-      memoryFreeBytes: 0,
-      memoryUsedPercent: 0,
-      memoryFreeLabel: '0.00 GB',
-      memoryUsedLabel: '0.00 GB',
-      memoryTotalLabel: '0.00 GB',
+      totalMem: 0,
+      freeMem: 0,
       pm2Online: false,
+      pm2ProcessCount: 0,
+      vpeUptimeSec: process.uptime(),
+      vpeUptimeLabel: '—',
       projectsActive: 0,
       projectsTotal: 0,
-    };
+    });
   }
 }
 
@@ -270,45 +361,53 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
 
   ipcMain.handle('vpe:get-system-stats', async () => {
     try {
+      const projects = store.listProjectsAlphabetical();
+      const projectsActive = projects.filter((p) => p && p.status === 'running').length;
+      const projectsTotal = projects.length;
+
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+
+      const vpeUptimeSec = process.uptime();
+      const vpeUptimeLabel = msc_formatProcessUptime(vpeUptimeSec);
+
+      let cpuPercent = null;
       try {
-        const projects = store.listProjectsAlphabetical();
-        const projectsActive = projects.filter((p) => p.status === 'running').length;
-        const projectsTotal = projects.length;
-
-        const totalMem = os.totalmem();
-        const freeMem = os.freemem();
-        const usedMem = Math.max(0, totalMem - freeMem);
-        const memoryUsedPercent =
-          totalMem > 0 ? Math.min(100, Math.round((usedMem / totalMem) * 100)) : 0;
-
-        const vpeUptimeSec = process.uptime();
-        const vpeUptimeLabel = msc_formatProcessUptime(vpeUptimeSec);
-
-        const cpuPercent = msc_hostCpuPercentSinceLastPoll();
-        const cpuSource = cpuPercent != null ? 'cpu_ticks' : 'unavailable';
-
-        const pm2Online = await msc_pm2DaemonReachable();
-
-        return {
-          vpeUptimeSec,
-          vpeUptimeLabel,
-          cpuPercent,
-          cpuSource,
-          memoryTotalBytes: totalMem,
-          memoryFreeBytes: freeMem,
-          memoryUsedPercent,
-          memoryFreeLabel: msc_bytesToGbLabel(freeMem),
-          memoryUsedLabel: msc_bytesToGbLabel(usedMem),
-          memoryTotalLabel: msc_bytesToGbLabel(totalMem),
-          pm2Online,
-          projectsActive,
-          projectsTotal,
-        };
-      } catch (innerErr) {
-        return msc_fallbackSystemStats(innerErr);
+        cpuPercent = msc_vpeHostCpuPercentSinceLastPoll();
+      } catch (cpuErr) {
+        const m =
+          cpuErr && typeof cpuErr === 'object' && 'message' in cpuErr
+            ? String(cpuErr.message)
+            : String(cpuErr ?? '');
+        console.warn('[VPE get-system-stats] CPU ticks:', m || cpuErr);
       }
-    } catch (outerErr) {
-      return msc_fallbackSystemStats(outerErr);
+
+      /** Avoid `pm2.list()` here — it lazy-loads optional deps that often break inside ASAR. */
+      let pm2Online = false;
+      try {
+        const pm = vpeRuntime?.pm2Manager;
+        if (pm && typeof pm.msc_isPm2RpcConnected === 'function') {
+          pm2Online = Boolean(pm.msc_isPm2RpcConnected());
+        }
+      } catch (_) {
+        pm2Online = false;
+      }
+
+      const pm2ProcessCount = 0;
+
+      return msc_buildSanitizedSystemStatsPayload({
+        cpuPercent,
+        totalMem,
+        freeMem,
+        pm2Online,
+        pm2ProcessCount,
+        vpeUptimeSec,
+        vpeUptimeLabel,
+        projectsActive,
+        projectsTotal,
+      });
+    } catch (err) {
+      return msc_fallbackSystemStats(err);
     }
   });
 
