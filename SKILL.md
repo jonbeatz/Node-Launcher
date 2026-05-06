@@ -1,308 +1,220 @@
-\---
-
+---
 name: vader-project-engine
+description: Technical and aesthetic authority for the Vader Project Engine (VPE). Use for Electron, Next.js static export, PM2, Studio Dark UI, Suspense repair, Windows packaging, and Vader workstation tuning.
+version: "2.1"
+---
 
-description: Ultimate technical and aesthetic authority for the Vader Project Engine (VPE). Combines Jedi Dashboard Magic, NovaMira precision, and Master UI/UX quality gates. Activate for Electron, Next.js, PM2, Studio Dark UI, Suspense repair, or Vader hardware optimization.
+# SKILL.md: Vader Project Engine (VPE)
 
-version: 2.0
+## Skill metadata
 
-\---
+- **Skill name:** Vader Project Engine (VPE)
+- **Version:** 2.1
+- **Author:** Jon Beatz (MSC)
+- **Primary sources:** `.cursor/docs/TRUTH.md`, `.cursorrules`, `README.md`, `Node-Launcher-PRD.md`, `Vader-Project-Engine.md`, `.cursor/docs/AGENT-BOOT-CHECKLIST.md`, `.cursor/docs/Checkpoint.md`, `.cursor/docs/Custom-Commands.md`, `.cursor/docs/Stability-Fix-Backlog.md`
 
+## Activation triggers
 
+Activate when the user:
 
-\# SKILL.md: Vader Project Engine (VPE) — Master Skill
+- Mentions **VPE**, **Vader Project Engine**, **Node-Launcher**, or **MSC**.
+- Works on Electron main/preload/renderer, IPC, PM2 lifecycle, ports, thumbnails, logs, repair, or packaging.
+- References **Vader Protocol**, **Studio Dark**, **Vader Shield**, or **MSC Media Engine**.
+- Asks about Next.js Suspense / `useSearchParams` patching, AST repair, or `vader-fix-suspense`-style workflows.
+- Needs UI review against the **Master Quality Gate** or parity with `Vader-Project-Engine.md`.
 
+## Agent guardrails
 
+When this skill applies, **always**:
 
-\## Skill Metadata
+- **Vader Shield:** `contextBridge` only; `nodeIntegration: false` in renderer; no `fs` / `path` / `child_process` in renderer—use preload-exposed IPC only.
+- **PM2:** Prefer the **bundled programmatic API** in main; do not assume a globally installed PM2 daemon is required for the product story.
+- **Termination:** Discuss and implement stops with **`tree-kill`** (and project-runner preflight / Windows port sweeps where already implemented).
+- **Repairs:** **`.vader-backup`** before writes; diff-first confirmation for AST changes; align with `scripts/repair` / PRD repair suite.
+- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"**.
+- **Naming:** Custom CSS/Tailwind-style classes prefixed with **`msc-`**; new main-process helpers follow existing **`msc_`** naming (match surrounding code).
+- **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**.
+- **Windows default:** Prefer Windows 11 25H2 and repo-documented pipelines (PowerShell, `CI=true` for E2E) unless the user scopes otherwise.
+- **UI completion:** Run the **Master Quality Gate** (§4) before calling UI work done.
 
-\- \*\*Skill Name:\*\* Vader Project Engine (VPE)
+---
 
-\- \*\*Version:\*\* 2.0
+## 1. Core competencies
 
-\- \*\*Author:\*\* Jon Beatz (MSC)
+### 1.1 Process orchestration (PM2 programmatic)
 
-\- \*\*Source Files:\*\* `Node-Launcher-PRD.md`, `Node-Launcher-Stitch-Prompt.md`, `.cursorrules`, `.cursor/docs/TRUTH.md`
+- **Persistent management:** Start/stop/restart managed dev servers via PM2 API owned by **Electron main**; closing the UI does **not** stop processes unless the user stops them (see `TRUTH.md`).
+- **State sync:** On startup, reconcile **persisted project rows** with **live PM2** and **health probes** (e.g. boot reconcile, `pm2.list()`-style sync in main—not in renderer).
+- **Zombie prevention:** Use **`tree-kill`** for controlled teardown; complement with **Windows port preflight** (stale listeners) where `project-runner` already implements it.
 
+### 1.2 Ports and launcher isolation
 
+- **Launcher URL:** `npm run dev` serves the **shell UI** at **`http://localhost:3000`** by default (overridable via launcher port env such as **`VPE_RENDERER_PORT` / `PORT`** per repo).
+- **Managed projects:** Must use **ports strictly above** the launcher port (e.g. **3001+** when the shell is on 3000). The app enforces a **reserved-port guard** so managed apps do not bind the launcher port.
+- **Conflicts:** Auto-increment (up to **10** attempts), **port lock** UX, and toasts on exhaustion—per PRD / `.cursorrules`.
 
-\## Activation Triggers
+### 1.3 Nuke suite
 
-Activate this skill when the user:
+Mandatory sequence (also in `TRUTH.md`):
 
-\- Mentions "VPE," "Vader Project Engine," or "Node-Launcher"
+1. **`tree-kill`** (terminate process tree).
+2. Delete **`node_modules`** and **`.next`**.
+3. Clean **`<detectedPackageManager> install`**.
+4. **Thumbnail** via Puppeteer only after **HTTP 200** health check on the project URL.
 
-\- Requests Next.js Suspense patching, PM2 process management, or Electron app development
+Never delete **`.next`** while **`next dev`** is actively running for that project unless the product flow explicitly stops it first.
 
-\- References "Vader Protocol," "Studio Dark," "Vader Shield," or "MSC Media Engine"
+### 1.4 Vader Repair (AST)
 
-\- Asks about Electron security (contextBridge), port conflict resolution, or AST-based code repair
+- Target **Next.js App Router** issues such as **`missing-suspense-with-csr-bailout`** around **`useSearchParams`** / **`useParams`** patterns.
+- **Backup + diff + undo**; log to **`vader-repair.log`** (and repair history in DB when wired).
+- CI / smoke: **`npm run repair:ast`** (stub or real pipeline per repo).
 
-\- Works on the Vader hardware (Ryzen 9700x / Gigabyte B650)
+### 1.5 Stack reference (current intent)
 
-\- Needs UI/UX review against the Master Quality Gate
+| Layer | Technology | Notes |
+| :--- | :--- | :--- |
+| Shell | Electron 28+ | Main: `src/main`; preload-only IPC |
+| UI | Next.js **15+** static **`output: 'export'`** | Built to **`src/renderer/out/`** for production `loadFile` |
+| Process | PM2 (programmatic) | In main; **asarUnpack** includes `pm2` tree when packaged |
+| Terminal | xterm.js + node-pty | Log drawer; ANSI |
+| Thumbs | puppeteer-core | Electron Chromium; WebP; caps per IPC |
+| Native | better-sqlite3 | **`npm run rebuild:natives`** = **`electron-rebuild -f -o better-sqlite3`** only on Windows |
 
-\- Performs deep architectural shifts or final quality-gate reviews
+### 1.6 Persistence (canonical store)
 
+- **Primary:** SQLite (and JSON fallback) under **`app.getPath('userData')/vpe-db`**—not renderer assumptions about cwd.
+- **Thumbnails:** Scratch/cache under **`userData/media/thumbnails`** (packaged-safe).
+- Legacy **`projects.json`** may be archived; **logical** project fields still match `.cursorrules` §11 / PRD schema for IDs, ports, scripts, and status.
 
+### 1.7 IPC and telemetry discipline
 
-\## Agent Guardrails (Behavioral Constraints)
+- Expose **`vpe:*`** (and related) only through **`src/preload`**; document contracts in **`vpe-bridge.ts`** / main handlers.
+- **Structured clone:** `webContents.invoke` payloads must be **plain JSON-serializable** (no non-cloneable class instances)—see sanitized **`vpe:get-system-stats`** pattern in repo.
+- **PM2 “online” in UI:** Align with product rules: daemon badge reflects **RPC connected** and **workspace has running projects** where implemented—do not infer from global machine processes alone.
 
-When this skill is active, ALWAYS:
+---
 
-\- Enforce Vader Shield security: `contextBridge` isolation, `nodeIntegration: false`, no direct Node access in renderer
+## 2. Vader Protocol (design)
 
-\- Prioritize the AST diff-and-backup workflow when suggesting code modifications
+### 2.1 Visual tokens
 
-\- Never suggest global PM2 installations; always reference the bundled programmatic API
+- **Background:** `#121212` · **Surface:** `#1c1c1c` · **Accent (Vader Red):** `#e02b20` · **Border:** `#333333`
+- **Text:** `#FFFFFF` primary · `#A0A0A0` muted
+- **Typography:** **JetBrains Mono** for terminal, code, and monospace data
+- **Glow:** `vader-glow` → `0 0 15px rgba(224, 43, 32, 0.4)`
+- **Focus:** `2px solid #e02b20` on focus-visible for interactive elements
 
-\- Use `tree-kill` for any process termination discussion
+### 2.2 Principles
 
-\- Apply the Vader Protocol color palette and design tokens verbatim
+- Layer surfaces (background → card → modal), thin **1px** borders, **sparse** use of Vader Red.
+- **Glass** + **backdrop-blur** for elevated panels (log drawer); optional **CRT scanline** overlay at **~2%** opacity.
 
-\- Include "Powered by the MSC Media Engine" in any footer implementation
+### 2.3 Key components
 
-\- Prefix custom CSS classes with `msc-` and custom functions with `msc\_`
+- **HUD:** 1px horizontal **#e02b20 @ 30%** at extreme top/bottom framing.
+- **Top bar:** **48px**; breadcrumb; settings affordance.
+- **Grid:** `repeat(auto-fill, minmax(320px, 1fr))`, **20px** gap; cards with **4:3 WebP**, status LED, sparkline strip, actions **Start/Stop**, **Repair**, **Nuke**.
+- **Log drawer:** **420px**; glass surface; tabs per project; terminal **#0a0a0a**; bottom status (PM2 id / runtime).
+- **Repair modal:** max **900px**; split diff (add **green**, remove **red**); **Apply** / **Undo** / **Cancel**.
+- **Destructive confirms (Nuke):** **2px** pulsing Vader Red border on confirm surface when specified.
 
-\- Default to Windows 11 25H2 paths and optimizations unless otherwise specified
+Detail-level UI spec: **`Vader-Project-Engine.md`** v2.1.
 
-\- Enforce the Master Quality Gate before marking any UI task as complete
+---
 
+## 3. Command center UX
 
+- Dashboard remains the **stable base**; details in **drawers** and **modals**.
+- Keyboard, pointer, and touch: targets **≥ 44px** on small breakpoints; log drawer may go **full-screen** on mobile.
+- Clear **escape** order: modal → drawer → grid.
 
-\---
+---
 
+## 4. Master UI/UX quality gate (ship-blocking)
 
+Before marking UI **done**:
 
-\## 1. Core Competencies \& Logic
+- States: default, hover, focus-visible, active, disabled, loading, error, empty.
+- **A11y:** Semantic HTML; visible **2px #e02b20** focus ring; redundant status (color + text/icon).
+- No hover layout shift; no accidental horizontal scroll on narrow viewports.
+- Prefer **design tokens** / shared classes—avoid stray hex outside the palette.
+- **WCAG AA** contrast for interactive elements.
 
+---
 
+## 5. Error handling and resilience
 
-The VPE is a specialized execution environment designed for high-performance Node.js management. It possesses the following primary capabilities:
+### 5.1 User feedback
 
+- **Toasts:** Top-right; dark surface; **red left accent**; **~4s** dismiss for start/stop/nuke/port failures.
+- **Card alerts:** Crash loops / port exhaustion surfaced on the card (border + icon + snippet).
+- **Global error boundary:** Fallback UI with recovery path for render failures.
 
+### 5.2 Product resilience
 
-\### 1.1 Process Orchestration (PM2 Programmatic)
+- **Process survival:** PM2 in main; UI reload does not implicitly kill dev servers.
+- **Stores:** Persist under **userData**; reconcile on boot with PM2 and health probes.
+- **Repairs:** No mutation without backup; one-click undo path.
 
-\- \*\*Persistent Management:\*\* Starts, stops, and restarts Node/Next.js processes using a bundled PM2 API that survives UI reloads.
+---
 
-\- \*\*State Reconciliation:\*\* On startup, performs a deep sync between `pm2.list()` and the `projects.json` registry to ensure UI status accuracy.
+## 6. Documentation and repo operations
 
-\- \*\*Zombie Prevention:\*\* Uses `tree-kill` to ensure all child processes are fully terminated, preventing orphaned background tasks.
+- **Authority order:** `.cursor/docs/TRUTH.md` → `.cursorrules` → this **SKILL.md** → **`Node-Launcher-PRD.md`** → **`package.json`** for scripts.
+- When changing ports, persistence paths, IPC contracts, or release steps, update **README**, **Checkpoint**, **Custom-Commands**, or **Stability-Fix-Backlog** as appropriate—keep **Checkpoint** truthful for handoffs.
 
+### Release-oriented phrases (see `Custom-Commands.md`)
 
+- **`rebuild exe`:** Icon staging → **`npm run build:renderer`** (verify **`src/renderer/out/index.html`**) → **`npm run rebuild:natives`** → **`npm run lint`** → **`CI=true npm run test:e2e`** → clean **`dist/`** → **`npm run build:main`** → trim blockmap / `builder-debug.yml` / `latest.yml`.
+- **`restart app`** / **`start app`:** Stop stray **node/electron** (per **`Custom-Commands`**), then **`npm run dev`**.
+- **`hardened setup`:** Install, **`rebuild:natives`**, optional Playwright browsers, **`repair:ast`**, E2E, lint.
 
-\### 1.2 Port \& Environment Intelligence
+- **Cursor Playwright MCP:** Global **`playwright`** uses **Chrome** (CI parity with **`npx playwright install chromium`**). Use **`playwright-electron`** with **CDP** `http://127.0.0.1:9222` when **`npm run dev`** has Electron remote debugging enabled—details in **`Custom-Commands.md`**.
 
-\- \*\*Conflict Resolution:\*\* Proactively scans OS ports before launch; if a conflict is detected, executes auto-increment logic (up to 10 attempts).
+Packaging caveats (summary): **`build.asar: false`** may be set for stability; **`signAndEditExecutable: false`** + **`afterPack`** **`rcedit`** icon embed avoids **winCodeSign** symlink issues on some Windows setups—details in **`Stability-Fix-Backlog.md`**.
 
-\- \*\*Dependency Automation (The "Nuke"):\*\* Deep-cleans project environments by deleting `node\_modules` and `.next` directories before triggering a clean install via the detected package manager.
+---
 
+## 7. Data architecture
 
+### Project record (logical schema)
 
-\### 1.3 Vader Repair Suite (AST Transformation)
+Align persisted rows and UI with:
 
-\- \*\*Suspense Patching:\*\* Scans project files using Abstract Syntax Tree (AST) analysis to identify missing `<Suspense>` boundaries required by Next.js 15 for `useSearchParams`.
-
-\- \*\*Safe Patching Lifecycle:\*\* Automatically generates `.vader-backup` files and provides a side-by-side diff view for user confirmation before applying fixes.
-
-
-
-\---
-
-
-
-\## 2. The Jedi Aesthetic (Vader Protocol Design Philosophy)
-
-
-
-Maintain a calm, premium, and dense command center feel using "Studio Dark" principles.
-
-
-
-\### 2.1 Visual Tokens (Absolute Truth)
-
-\- \*\*Palette:\*\* Background #121212 | Surface #1c1c1c | Accent (Vader Red) #e02b20 | Border #333333
-
-\- \*\*Text:\*\* High Contrast White (#FFFFFF) | Muted (#A0A0A0)
-
-\- \*\*Typography:\*\* JetBrains Mono for all terminal/code/monospace contexts
-
-\- \*\*Glow:\*\* `vader-glow`: `0 0 15px rgba(224, 43, 32, 0.4)`
-
-\- \*\*Focus Rings:\*\* 2px solid #e02b20 on all interactive elements
-
-
-
-\### 2.2 Design Principles
-
-\- \*\*Surface Layering:\*\* Avoid flat all-black stacks; use 2-4 neutral surface steps (Background #121212 → Surface #1c1c1c).
-
-\- \*\*Border Hierarchy:\*\* Prioritize subtle 1px borders (#333333) over heavy shadows to define structure.
-
-\- \*\*Accent Scarcity:\*\* Use Vader Red (#e02b20) strictly for active meaning, pulsing status, and primary actions; do not flood surfaces with accent colors.
-
-\- \*\*Glassmorphism:\*\* Use `backdrop-blur` selectively for elevated regions (Log Drawer) with a 1px CRT scanline overlay at 2% opacity.
-
-
-
-\### 2.3 Key UI Components
-
-\- \*\*HUD Framing:\*\* 1px horizontal Vader Red lines (#e02b20 at 30% opacity) at extreme top/bottom edges of the application window.
-
-\- \*\*Project Cards:\*\* 320px min-width, 4:3 WebP thumbnails, pulsing status LEDs (8px, #e02b20), 40px sparkline strip with hairline border (#333) and low-opacity Vader Red waveform.
-
-\- \*\*Log Drawer:\*\* 420px width, glassmorphic surface (bg #1c1c1c at 80% opacity), `backdrop-blur`, CRT scanline overlay, inner-vignette shadow.
-
-\- \*\*Interactive Terminal:\*\* Full ANSI color support via `xterm.js` and `node-pty`, allowing a native terminal experience within the dashboard.
-
-\- \*\*Vader Repair Suite (Modal):\*\* Centered modal (max-width 900px), diff viewer split pane with syntax highlighting (additions green, removals red).
-
-\- \*\*Privileged Actions:\*\* Confirmation modals for destructive operations display a 2px pulsing Vader Red border; action button turns solid #e02b20 with white text.
-
-
-
-\---
-
-
-
-\## 3. Command Center Interaction Model
-
-
-
-\- \*\*Stable Base:\*\* The Vader Grid dashboard must remain a stable base layer; use overlay-first focus workflows for project details.
-
-\- \*\*Modality Parity:\*\* All interactions must work across keyboard, pointer (hover/active), and touch (targets ≥ 44px).
-
-\- \*\*Predictable Escape:\*\* Dialogs must close back to drawers, and drawers must close back to the dashboard.
-
-\- \*\*Nested Actions:\*\* Use centered modal dialogs for high-impact confirmation (like "Nuke"), featuring a 2px pulsing Vader Red border.
-
-
-
-\---
-
-
-
-\## 4. Master UI/UX Quality Gate (Ship-Blocking)
-
-
-
-Before calling any UI task "Done," verify these criteria:
-
-
-
-\- \*\*State Completeness:\*\* Component must have `default`, `hover`, `focus-visible`, `active`, `disabled`, `loading`, `error`, and `empty` states.
-
-\- \*\*Accessibility Gate:\*\* Semantic HTML required; `:focus-visible` must be a 2px solid #e02b20 ring; screen reader labels must be present.
-
-\- \*\*Anti-Pattern Check:\*\* No layout shifts on hover; no horizontal scroll on mobile; no hardcoded hex values outside the Vader palette.
-
-\- \*\*Contrast Compliance:\*\* All interactive elements meet WCAG AA contrast ratios.
-
-\- \*\*Status Redundancy:\*\* Status conveyed through both color and text/iconography (e.g., "Running" label alongside LED).
-
-
-
-\---
-
-
-
-\## 5. Error Handling \& Resilience Philosophy
-
-
-
-VPE is designed to be a reliable command center. The following principles govern all error handling:
-
-
-
-\### 5.1 User Feedback
-
-\- \*\*Toasts:\*\* Top-right corner, dark background with red left accent border, auto-dismiss after 4 seconds (for start, stop, nuke, port-lock failures).
-
-\- \*\*Card Alerts:\*\* PM2 crash loops or exhausted port increments flagged directly on the project card (red border + warning icon + error snippet).
-
-\- \*\*Global Error Boundary:\*\* Top-level React fallback UI for uncaught render failures with a recovery option.
-
-
-
-\### 5.2 State Resilience
-
-\- \*\*Process Survival:\*\* UI restarts never kill running dev servers; PM2 daemon lives in Electron main process.
-
-\- \*\*Registry Integrity:\*\* `projects.json` is the single source of truth; reconciled against live PM2 state on every startup.
-
-\- \*\*Backup-First Repair:\*\* No code modification occurs without a `.vader-backup` snapshot; all repairs are one-click undoable.
-
-
-
-\---
-
-
-
-\## 6. Documentation Operations \& Constitutional Authority
-
-
-
-\- \*\*Hierarchy:\*\* `TRUTH.md` is the Constitution; `.cursorrules` is the Legal Code; `package.json` is Command Truth.
-
-\- \*\*Low-Drift Updates:\*\* If a command, path, or UI token changes, you \*\*must\*\* update all relevant documentation (README, TRUTH, START-HERE) in the same session.
-
-\- \*\*Milestone Discipline:\*\* Add snapshot entries to `Session-Snapshots.md` and restore points to `Restore-Points.md` for every meaningful milestone.
-
-
-
-\---
-
-
-
-\## 7. Data Architecture
-
-
-
-\### 7.1 Project Registry (`projects.json`)
-
-The canonical project data structure:
+| Field | Type | Notes |
+| :--- | :--- | :--- |
+| `id` | uuid | Stable identity |
+| `path` | string | Absolute project root |
+| `displayName` | string | Shown on cards |
+| `portLock` | boolean | Enforce preferred port |
+| `preferredPort` | number | Must not collide with launcher port |
+| `detectedPackageManager` | npm \| yarn \| pnpm | From lockfiles |
+| `detectedStartScript` | string | e.g. `dev` |
+| `status` | running \| stopped | Synced with PM2 + reconcile |
+| `lastThumbnail` / `thumbnail_url` | string | URL or path per implementation |
+| `createdAt`, `lastLaunched` | ISO8601 | Auditing |
 
 ```json
-
 {
-
-&#x20; "projects": \[
-
-&#x20;   {
-
-&#x20;     "id": "uuid-v4",
-
-&#x20;     "path": "string (absolute path)",
-
-&#x20;     "displayName": "string",
-
-&#x20;     "portLock": "boolean",
-
-&#x20;     "preferredPort": "number",
-
-&#x20;     "detectedPackageManager": "npm | yarn | pnpm",
-
-&#x20;     "detectedStartScript": "string (e.g., 'dev')",
-
-&#x20;     "status": "running | stopped",
-
-&#x20;     "lastThumbnail": "string (relative path)",
-
-&#x20;     "createdAt": "ISO8601",
-
-&#x20;     "lastLaunched": "ISO8601"
-
-&#x20;   }
-
-&#x20; ]
-
+  "projects": [
+    {
+      "id": "uuid-v4",
+      "path": "C:/Projects/example",
+      "displayName": "Example",
+      "portLock": true,
+      "preferredPort": 3001,
+      "detectedPackageManager": "npm",
+      "detectedStartScript": "dev",
+      "status": "stopped",
+      "lastThumbnail": "./cache/thumbnails/example.webp",
+      "createdAt": "2026-05-06T12:00:00.000Z",
+      "lastLaunched": "2026-05-06T12:00:00.000Z"
+    }
+  ]
 }
+```
 
+---
 
-
-
-
-
-
+*My Studio Channel (MSC). Powered by the MSC Media Engine.*

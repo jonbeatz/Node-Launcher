@@ -1,5 +1,7 @@
 # ⚡ START HERE: VPE Session Entry
 
+**Full cold start (read order, MCP, skills, tick list):** [AGENT-BOOT-CHECKLIST.md](AGENT-BOOT-CHECKLIST.md)
+
 ## 1. Project Mission
 Vader Project Engine (VPE) is a high-performance command center for Node.js management, optimized for **Vader** hardware (Ryzen 9700x) and the **Vader Protocol** aesthetic.
 

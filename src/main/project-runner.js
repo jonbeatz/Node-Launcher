@@ -10,8 +10,9 @@ const { msc_launcherRendererPort } = require('./launcher-port');
 const { msc_healthPollDelayMs, MSC_HEALTH_FIRST_MS } = require('./health-scheduler');
 
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
-const MSC_STARTUP_GRACE_MS = 15000;
-const MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS = 5;
+/** No TCP/connect failures persisted to SQLite until elapsed — avoids false red “Offline” while Next/boot compiles. */
+const MSC_STARTUP_GRACE_MS = 20000;
+const MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS = 6;
 
 class MSC_ProjectRunner extends EventEmitter {
   /**
@@ -97,7 +98,17 @@ class MSC_ProjectRunner extends EventEmitter {
       const { statusCode, reachedServer } = await msc_probeHttpHealth(row.port);
       const code = typeof statusCode === 'number' ? statusCode : null;
       const ts = new Date().toISOString();
-      this.store.setProjectHealth(projectId, code, ts, reachedServer);
+      const rActive = this.children.get(projectId);
+      const elapsedSinceStart =
+        Date.now() - (rActive?.healthStartedAt || Date.now());
+      const pastStartupGrace = elapsedSinceStart >= MSC_STARTUP_GRACE_MS;
+      // HTTP response (any code): always persist so redirects/503 show truthfully.
+      if (reachedServer) {
+        this.store.setProjectHealth(projectId, code, ts, true);
+      } else if (pastStartupGrace) {
+        this.store.setProjectHealth(projectId, null, ts, false);
+      }
+      // Before grace ends, TCP/connect failures-only: leave DB health cleared → UI stays “Booting…”
       const failedProbe = !reachedServer;
       const activeRec = this.children.get(projectId);
       if (activeRec) {
@@ -109,7 +120,7 @@ class MSC_ProjectRunner extends EventEmitter {
       let lvl = 'info';
       if (!reachedServer) {
         msg = `[vpe] health probe: no TCP/HTTP response on ${row.port} (offline or still compiling)`;
-        lvl = 'warn';
+        lvl = pastStartupGrace ? 'warn' : 'info';
       } else if (code != null && code >= 500) {
         msg = `[vpe] health probe: HTTP ${code} (server error)`;
         lvl = 'warn';

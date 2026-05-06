@@ -61,7 +61,7 @@ Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
 - **Custom `.exe` icon:** With **`build.win.signAndEditExecutable: false`** (avoids winCodeSign symlink failures on some Windows setups), **`npm run build:main`** runs **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) + **`rcedit`** to embed **`build/icon.ico`** into the main executable. See [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
 - **`src/renderer/out/`** is **gitignored**; always run **`build:renderer`** (or rely on **`prebuild:main`** inside **`build:main`**) before expecting a good packaged UI.
 - Do not run **`npm run build:main`** without a recent **`build:renderer`** if you disabled or skipped **`prebuild:main`**.
-- For a lighter loop (no installer, no E2E), use **start app** or **hardened setup** instead.
+- For a lighter loop (no installer, no E2E), use **restart app**, **start app**, or **hardened setup** instead.
 - **Smoke (unpacked):** after a build, **`dist\win-unpacked\Vader Project Engine.exe`** is the fastest way to validate static UI + main-process IPC; open DevTools and confirm **`vpe:get-system-stats`** completes without clone/module errors (see [Stability-Fix-Backlog](Stability-Fix-Backlog.md) telemetry entries).
 
 ## start app
@@ -77,6 +77,24 @@ Notes:
 - Run from repo root: `d:\Cursor_Projectz\Node-Launcher`.
 - This is a destructive stop for currently running Node/Electron processes on your machine session.
 - Launcher UI dev server defaults to `http://localhost:3000`; managed projects should use `3001+`.
+
+## restart app
+
+Intent: **restart** the VPE dev stack—same as **start app** after killing stray processes so a fresh **`npm run dev`** comes up (Next + Electron).
+
+### How to say it
+
+Use **restart app**, **restart the app**, or **restart dev** when you want the agent to stop existing **node/electron** then run **`npm run dev`** again.
+
+### Steps I will run when you say **restart app**
+
+1. `Get-Process -Name node,electron -ErrorAction SilentlyContinue | Stop-Process -Force`
+2. `npm run dev`
+
+Notes:
+
+- Run from repo root: `d:\Cursor_Projectz\Node-Launcher`.
+- Same destructive stop semantics as **start app**; prefer this phrase when you explicitly mean “kill and bring dev back” after code or MCP changes.
 
 ## hardened setup (lint, natives, e2e)
 
@@ -127,18 +145,27 @@ When you say **"new git branch"**, I will:
    - …always bump the trailing version number by **1**.
 4. Confirm branch is clean and ready as a new starting point.
 
-## connect app with puppeteer mcp
+## Playwright MCP (aligned with VPE)
 
-Intent: attach Cursor's Puppeteer/Playwright MCP to the **already running** Electron app for live UI diagnostics.
+Global Cursor config uses **`@playwright/mcp`** only (redundant **`@modelcontextprotocol/server-puppeteer`** removed). Two entries, same package, different jobs:
+
+| MCP name (in `mcp.json`) | When to use | How it works |
+| :--- | :--- | :--- |
+| **`playwright`** | Renderer / CI parity | Launches **Chrome** (Chromium channel), `--allowed-hosts` `127.0.0.1,localhost`, **`--caps devtools`**. Matches **CI** (`npx playwright install chromium --with-deps`) and **`playwright.config.ts`** (`baseURL` `http://127.0.0.1:3000`). Use with **`npm run dev:renderer`** or when the UI is already served on **3000** and you want a fresh browser the MCP controls. |
+| **`playwright-electron`** | Full Electron + IPC | **`--cdp-endpoint http://127.0.0.1:9222`** — attaches to the **running** Electron shell (no second standalone browser). Use when **`npm run dev`** or **`npm run start`** is up so **main + renderer + preload** behavior is under test. |
+
+Thumbnail capture inside the app remains **`puppeteer-core`** in main process; that is unrelated to Cursor MCP choice.
+
+## connect app with playwright-electron (CDP)
+
+Intent: attach Cursor’s **`playwright-electron`** MCP to the **already running** Electron app for live UI diagnostics (same role the old “Puppeteer MCP + 9222” flow described).
 
 ### Prerequisites
 
-1. Electron must expose remote debugging:
-   - `src/main/main.js` appends:
-     - `remote-debugging-port=9222`
-     - `remote-debugging-address=127.0.0.1`
-2. Start the app in dev:
-   - `npm run dev` (or `npm run start`)
+1. Electron must expose remote debugging (repo default):
+   - `package.json` **`dev:main`** / **`start`**: `electron . --remote-debugging-port=9222` (and main should bind **`127.0.0.1`** per your `main.js` flags).
+2. Start the full stack in dev:
+   - `npm run dev` (or `npm run start` for main only + ensure renderer is up as needed)
 
 ### Verify debug endpoint is live
 
@@ -148,23 +175,26 @@ Run:
 - `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9222/json/list`
 
 Expected:
-- A `Vader Project Engine` target with URL `http://localhost:3000/` and a `webSocketDebuggerUrl`.
+
+- A **Vader Project Engine** target with URL `http://localhost:3000/` (or similar) and a `webSocketDebuggerUrl`.
 
 ### MCP attach workflow
 
-When asking Cursor to test the running app:
+When asking Cursor to test the running **Electron** app:
 
-1. Do **not** launch a new browser.
-2. Use Puppeteer MCP against the existing target from `9222`.
-3. Navigate/attach to `http://localhost:3000/`.
-4. Evaluate dashboard state (e.g., `PM2 Daemon`, `Projects X of Y active`) and collect console output.
+1. Do **not** ask the generic **`playwright`** MCP to open a unrelated browser unless you intentionally want renderer-only.
+2. Use tools from the **`playwright-electron`** server (CDP connected to **`9222`**).
+3. Open / focus `http://localhost:3000/` (or `127.0.0.1:3000`) in that session.
+4. Evaluate dashboard state (e.g., `PM2 Daemon`, projects active) and collect console/network output (**`devtools`** cap enabled).
 
 ### Quick troubleshooting
 
-- `ERR_CONNECTION_REFUSED` on `9222`:
-  - App is not running with debug switches; restart via `npm run dev`.
-- MCP shows stale dashboard (`0 of 0 active`) while ports are active:
-  - Ensure you are attached to the `Vader Project Engine` target in `json/list`, not a DevTools page.
+- `ERR_CONNECTION_REFUSED` on **`9222`**: Electron not launched with **`--remote-debugging-port=9222`**; use **`npm run dev`** from repo root.
+- Stale dashboard while ports look busy: ensure CDP **`json/list`** target is **`Vader Project Engine`**, not a DevTools orphan page.
+
+### Duplicate Neon MCP
+
+If you still see **two** Neon HTTP entries in Cursor, keep a **single** `neon-postgres` (or one Neon) streamable-http server—duplicate Neon configs register the same remote twice.
 
 ## mcp sanity check
 
@@ -203,3 +233,8 @@ Run from PowerShell:
 9. Local `mcp-vercel` build:
    - `node C:\Users\JONBEATZ\.cursor\tools\mcp-vercel\build\index.js`
    - Requires `VERCEL_API_TOKEN` env; missing token error confirms binary is reachable.
+
+10. **Playwright MCP** (matches global `mcp.json` **`playwright`** + **`playwright-electron`**):
+   - `cmd /c npx -y @playwright/mcp@latest --help` — confirms the MCP package resolves and exits cleanly.
+   - **Browser install** (needed before first real MCP-driven session): from repo root, `npx playwright install chromium` — same Chromium family CI uses (**`npm run test:e2e`** via [`ci.yml`](../../.github/workflows/ci.yml)); on Windows without Linux deps use `chromium` or `chrome` per Playwright’s installer output if one fails.
+   - **CDP / Electron** (optional, for **`playwright-electron`**): run **`npm run dev`**, then `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9222/json/version` — expect JSON; failures mean Electron is not up with **`--remote-debugging-port=9222`**. Same flow as [**Playwright MCP (aligned)**](#playwright-mcp-aligned-with-vpe) above.

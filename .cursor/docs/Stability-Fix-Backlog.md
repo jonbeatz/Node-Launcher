@@ -4,6 +4,26 @@ Living notes for **problems we hit and how we fixed them**—mostly Windows pack
 
 ---
 
+## Dev: Electron window blank (#121212) while `http://localhost:3000` works in Chrome
+
+**Symptom:** `npm run dev` opens the shell, but the **Electron** window stays empty (Studio Dark background only). Browser at **3000** shows the dashboard. Main log may show `Failed to load URL: http://localhost:3000/ … ERR_CONNECTION_REFUSED`.
+
+**Cause:** `concurrently` starts **Electron** and **Next** together; **`BrowserWindow.loadURL`** ran before the Next dev server accepted connections, and the failed navigation was not retried.
+
+**Fix in repo:** [`src/main/main.js`](../../src/main/main.js) waits for TCP/HTTP readiness via [`src/main/wait-dev-server.js`](../../src/main/wait-dev-server.js) before `loadURL`, and uses **`did-fail-load`** retries (skipping benign **`ERR_ABORTED`**). Log should show **`Vader Shield: UI load URL`** after **`GET / 200`** from Next.
+
+---
+
+## Dev: Card shows red **Offline (no TCP/HTTP)** then green after **Start**
+
+**Symptom:** Project status **RUNNING** but card line flashes **Offline (no TCP/HTTP)** while Next/compilers warm up.
+
+**Cause:** [`project-runner.js`](../../src/main/project-runner.js) persisted **`health_reachable: false`** on the first failed HTTP probe (~3s), which sets **`health_checked_at`** and triggers the card’s red branch in [`Msc_ProjectCard.tsx`](../../src/renderer/components/Msc_ProjectCard.tsx) even though the dev server is still starting.
+
+**Fix in repo:** Do **not** persist TCP/connect failures to SQLite until **`MSC_STARTUP_GRACE_MS`** (20s after spawn). Any **`reachedServer: true`** (HTTP received, incl. redirects) still updates immediately. First probe fires at **`MSC_HEALTH_FIRST_MS`** (1800ms) per [`health-scheduler.js`](../../src/main/health-scheduler.js).
+
+---
+
 ## Windows: `winCodeSign` / 7-Zip symlink failure during pack
 
 **Symptom:** `electron-builder` fails while extracting `winCodeSign-2.6.0.7z`: *Cannot create symbolic link : A required privilege is not held by the client* (darwin `libcrypto.dylib` / `libssl.dylib` inside the archive). Retries do not help.

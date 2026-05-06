@@ -49,6 +49,7 @@ function msc_wireRunnerPm2Sync(runner, pm) {
  * Matches npm run dev:renderer -p 3000
  */
 const { msc_launcherRendererPort } = require('./launcher-port');
+const { msc_waitForDevServer } = require('./wait-dev-server');
 const VPE_RENDERER_DEV_PORT = msc_launcherRendererPort();
 const VPE_RENDERER_DEV_ORIGIN = `http://localhost:${VPE_RENDERER_DEV_PORT}`;
 
@@ -191,8 +192,10 @@ function msc_attachEngineAfterWindow(mainWin) {
 function msc_createWindow() {
   const msc_iconPath = msc_resolveAppIconPath();
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 850,
+    width: 1600,
+    height: 900,
+    minWidth: 1024,
+    minHeight: 720,
     backgroundColor: '#121212', // Studio Dark Base
     ...(msc_iconPath ? { icon: msc_iconPath } : {}),
     webPreferences: {
@@ -209,9 +212,54 @@ function msc_createWindow() {
   msc_attachEngineAfterWindow(mainWindow);
 
   if (isDev) {
-    mainWindow.loadURL(VPE_RENDERER_DEV_ORIGIN);
     mainWindow.webContents.openDevTools();
-    console.log(`Vader Shield: UI load URL ${VPE_RENDERER_DEV_ORIGIN}`);
+
+    let mscDevLoadRetries = 0;
+    const MSC_DEV_FAIL_RELOAD_MAX = 50;
+
+    async function msc_loadDevRenderer() {
+      await msc_waitForDevServer(VPE_RENDERER_DEV_ORIGIN);
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      try {
+        await mainWindow.loadURL(VPE_RENDERER_DEV_ORIGIN);
+        console.log(`Vader Shield: UI load URL ${VPE_RENDERER_DEV_ORIGIN}`);
+      } catch (err) {
+        console.error('VPE: loadURL failed:', err?.message ?? err);
+      }
+    }
+
+    mainWindow.webContents.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
+      if (!isMainFrame || !mainWindow || mainWindow.isDestroyed()) return;
+      if (!String(url).startsWith(VPE_RENDERER_DEV_ORIGIN)) return;
+      if (code === -3 || code === -2) return;
+      if (mscDevLoadRetries >= MSC_DEV_FAIL_RELOAD_MAX) {
+        console.error('VPE: Dev did-fail-load retries exhausted:', code, desc, url);
+        return;
+      }
+      mscDevLoadRetries += 1;
+      console.warn(
+        `[VPE Main] did-fail-load (${code}) ${desc}; retry ${mscDevLoadRetries}/${MSC_DEV_FAIL_RELOAD_MAX}`,
+      );
+      void (async () => {
+        await msc_waitForDevServer(VPE_RENDERER_DEV_ORIGIN, {
+          maxAttempts: 30,
+          intervalMs: 400,
+        });
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          try {
+            await mainWindow.loadURL(VPE_RENDERER_DEV_ORIGIN);
+          } catch (err) {
+            console.error('VPE: dev reload loadURL failed:', err?.message ?? err);
+          }
+        }
+      })();
+    });
+
+    mainWindow.webContents.on('did-finish-load', () => {
+      mscDevLoadRetries = 0;
+    });
+
+    void msc_loadDevRenderer();
   } else {
     const msc_indexHtml = msc_getRendererIndexPath();
     if (!fs.existsSync(msc_indexHtml)) {
@@ -225,6 +273,7 @@ function msc_createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
     mainWindow.show();
   });
 

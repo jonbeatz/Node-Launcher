@@ -137,7 +137,7 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 5. ~~**Repository cleanup pass**~~ — Partially addressed: key icons committed; optional later pass if non-essential binaries bloat the tree.
 
 ## Regain Context (Read This First Next Session)
-1. Read this file: `.cursor/docs/Checkpoint.md`.
+1. Read this file: `.cursor/docs/Checkpoint.md`. For a **full cold-start index** (authority order, MCP, skills, tick list): `.cursor/docs/AGENT-BOOT-CHECKLIST.md`.
 2. Read architecture + constraints:
    - `.cursorrules`
    - `Node-Launcher-PRD.md`

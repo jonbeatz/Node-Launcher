@@ -19,6 +19,8 @@ If documentation conflicts occur, follow this hierarchy strictly:
 4. `Node-Launcher-PRD.md` (Feature & Requirement Truth)
 5. `package.json` (Authority for executable scripts only)
 
+**Session bootstrap (cold start):** `.cursor/docs/AGENT-BOOT-CHECKLIST.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above; use it at the start of a session or when onboarding a new agent.
+
 ## 3. Tech Stack & Architecture Standards
 - **Frameworks:** Electron 28+ (Main) & Next.js 15+ Static Export (UI)
 - **Process Management:** Bundled PM2 Programmatic API (No global daemon reliance)
