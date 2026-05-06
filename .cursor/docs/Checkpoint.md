@@ -1,5 +1,33 @@
 # VPE Checkpoint (2026-05-06)
 
+## MCP configuration checkpoint (2026-05-06 late)
+
+Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified Windows-safe launch patterns (`cmd /c` where needed).
+
+### Added / updated MCP servers
+
+| Server key | Launch configuration | Status |
+|------|--------|
+| `secure-shell-terminal` | `cmd /c npx -y @mako10k/mcp-shell-server` | Starts correctly on this machine. |
+| `terminal-controller` | `python -m terminal_controller` | Installed and starts correctly. |
+| `task-master-ai` | `cmd /c npx -y task-master-ai` (+ `TASK_MASTER_TOOLS=core`) | Starts and registers tools. |
+| `sequential-thinking` | `cmd /c npx -y @zengwenliang/mcp-server-sequential-thinking` | Starts correctly. |
+| `local-wp` | `cmd /c npx -y @verygoodplugins/mcp-local-wp@latest` | Starts; on Windows logs `ps` probe warning, then falls back and continues. |
+| `mcp-wordpress` | `cmd /c node C:\Users\JONBEATZ\AppData\Roaming\npm\node_modules\mcp-wordpress\dist\index.js` | Works with env vars; direct packaged CLI path fails on Windows here. |
+| `brave-search` | `cmd /c npx -y @brave/brave-search-mcp-server --transport stdio` | Package runs; requires valid `BRAVE_API_KEY`. |
+
+### Non-MCP tools requested and installed
+
+- `plugship` CLI installed globally and verified (`1.0.6`).
+- `pm2` CLI installed globally and verified (`7.0.1`).
+
+### Known caveats (important)
+
+- `@modelcontextprotocol/server-shell` is not available on npm in this environment; use `@mako10k/mcp-shell-server`.
+- `mcp-wordpress` packaged CLI invocation fails on Windows (`ERR_UNSUPPORTED_ESM_URL_SCHEME`); direct `node ...\dist\index.js` launch is the working workaround.
+- `brave-search` will stay in error state until `BRAVE_API_KEY` is replaced with a real key.
+- Several MCP smoke tests show terminal `exit_code=4294967295` because processes were intentionally stopped after successful startup verification.
+
 **Last doc update:** 2026-05-06 — active dev branch: **`Node-Launcher-v4`** (`origin/Node-Launcher-v4`). Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer (default under `%LocalAppData%\Programs\Vader Project Engine\`, user can change path); **custom `.exe` icon** via **`afterPack` + `rcedit`** because **`signAndEditExecutable: true`** hits winCodeSign symlink limits on some Windows setups (see backlog). **Current emergency packaging mode:** `build.asar = false` to avoid a production main-process parse crash seen from `app.asar` (`tray-manager.js` corruption in `win-unpacked`).
 
 ## Current project status (snapshot)

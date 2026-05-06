@@ -126,3 +126,62 @@ When you say **"new git branch"**, I will:
    - `Node-Launcher-v5` ← *next increment*
    - …always bump the trailing version number by **1**.
 4. Confirm branch is clean and ready as a new starting point.
+
+## connect app with puppeteer mcp
+
+Intent: attach Cursor's Puppeteer/Playwright MCP to the **already running** Electron app for live UI diagnostics.
+
+### Prerequisites
+
+1. Electron must expose remote debugging:
+   - `src/main/main.js` appends:
+     - `remote-debugging-port=9222`
+     - `remote-debugging-address=127.0.0.1`
+2. Start the app in dev:
+   - `npm run dev` (or `npm run start`)
+
+### Verify debug endpoint is live
+
+Run:
+
+- `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9222/json/version`
+- `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9222/json/list`
+
+Expected:
+- A `Vader Project Engine` target with URL `http://localhost:3000/` and a `webSocketDebuggerUrl`.
+
+### MCP attach workflow
+
+When asking Cursor to test the running app:
+
+1. Do **not** launch a new browser.
+2. Use Puppeteer MCP against the existing target from `9222`.
+3. Navigate/attach to `http://localhost:3000/`.
+4. Evaluate dashboard state (e.g., `PM2 Daemon`, `Projects X of Y active`) and collect console output.
+
+### Quick troubleshooting
+
+- `ERR_CONNECTION_REFUSED` on `9222`:
+  - App is not running with debug switches; restart via `npm run dev`.
+- MCP shows stale dashboard (`0 of 0 active`) while ports are active:
+  - Ensure you are attached to the `Vader Project Engine` target in `json/list`, not a DevTools page.
+
+## mcp sanity check
+
+Intent: quickly verify global MCP server readiness after config/package changes.
+
+Run from PowerShell:
+
+1. Verify key CLIs:
+   - `cmd /c plugship --version`
+   - `cmd /c pm2 --version`
+2. Smoke-run MCP servers (start should print startup lines; then stop process):
+   - `cmd /c npx -y @zengwenliang/mcp-server-sequential-thinking`
+   - `cmd /c npx -y @verygoodplugins/mcp-local-wp@latest`
+   - `cmd /c npx -y task-master-ai`
+   - `cmd /c npx -y @mako10k/mcp-shell-server`
+3. WordPress MCP (Windows-safe direct entry):
+   - `cmd /c "set WORDPRESS_SITE_URL=<url> && set WORDPRESS_USERNAME=<user> && set WORDPRESS_APP_PASSWORD=<app-password> && node C:\Users\JONBEATZ\AppData\Roaming\npm\node_modules\mcp-wordpress\dist\index.js"`
+4. Brave MCP:
+   - Ensure `BRAVE_API_KEY` is set in `C:\Users\<you>\.cursor\mcp.json`
+   - `cmd /c npx -y @brave/brave-search-mcp-server --transport stdio`

@@ -10,6 +10,11 @@ const { msc_registerVpeIpc } = require('./vpe-ipc');
 const { msc_archiveLegacyProjectsJson } = require('./legacy-projects-archive');
 const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile');
 
+// Vader Protocol: Enable Remote Debugging Port for automated Cursor MCP testing.
+app.commandLine.appendSwitch('remote-debugging-port', '9222');
+app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
+console.log('[VPE Main] Remote debugging port enabled on http://127.0.0.1:9222');
+
 function msc_ipcLegacyProjectRows(store) {
   return store.getProjects().map((row) => ({
     id: row.id,
