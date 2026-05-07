@@ -1,11 +1,25 @@
 # VPE Checkpoint (2026-05-07)
 
+## Build v1.1.4 — Master Shield Stabilization
+
+- **LogDrawer calibration:** Removed scanline/overlay treatment from the live text viewport to eliminate left black bar artifacts; terminal pane now uses dedicated **`.vpe-terminal-scrollbar`** styling.
+- **Purge self-preservation:** `vpe:purge-launcher-ports` now protects current PID **and parent PID** before `taskkill /F /T`; tree kill still targets node/electron listeners on **3000/3001/9222**.
+- **Net LED logic:** footer remains **gold** while **9222** debug bridge is active (even if 3000/3001 are free); **green** requires forge-ready + 9222 idle.
+- **Thermal WMI syntax:** moved WMI reads to PowerShell **`-EncodedCommand`** multiline scripts (PS 5.1-safe), removing fragile one-line quoting that caused parse/token noise.
+
+## Build v1.1.3 — Thermal recovery, terminal repair, forge escape hatch
+
+- **System Log (`log-drawer.tsx`):** Strip ANSI / CSI for plain-text lines (no ESC “dark boxes”); scroll regions use **`overflow-y-auto`**, viewport **`max-height`**, **`min-h-0`** flex; append scrollback only trims when over cap.
+- **Thermal (WMI):** `Get-CimInstance` wrapped with exit **`2`** = access denied (**0x80041003**); one repair-log line *“Thermal Monitoring requires Admin Privileges. Alerts disabled.”*; **10 min** WMI backoff (no subprocess spam); high-temp **notifications disabled** for rest of session after deny.
+- **`npm run vader:force-forge`:** Same as post-dev forge tail — snapshot → syntax guard → **`build:win`** when **`vader:sync`** exit-code chain fails.
+- **Purge env:** **`taskkill /F /T /PID`** (tree kill) for node/electron listeners on **3000 / 3001 / 9222** (still excludes own PID).
+
 ## Build v1.1.2 — UI de-clutter
 
 - **System Health panel:** Default **closed** on load (`systemHealthOpen` initial **`false`**) — no auto-open splash; open from TopBar diagnostics control when needed.
 - **System Log / drawer:** Still defaults **collapsed** (`logDrawerExpanded` **`false`**); no mount **`useEffect`** expands it; **`terminal-prefs.ts`** only persists font + scrollback (not drawer visibility).
 - **Sidebar:** Removed **REGISTRY** section label above **Add New Project** for a tighter nav.
-- **Footer / preload:** **MSC Media Engine v1.1.2** (`package.json` **1.1.2**).
+- **Footer / preload:** **MSC Media Engine v1.1.2** (superseded by **v1.1.3** above; `package.json` **1.1.3**).
 
 ## Build v1.1.1 — Blocking validation gate (on top of v1.1.0)
 
@@ -16,11 +30,11 @@
 
 ## Build v1.1.0 — Advanced expansion (shipping line)
 
-App **`package.json`** / preload track **v1.1.x** (see **v1.1.2** at top for current label). Highlights:
+App **`package.json`** / preload track **v1.1.x** (see **v1.1.4** at top for current label). Highlights:
 
 - **Forge gate:** **`vader:sync`** / **`vader:clean-sync`** end with **`vader:post-dev-forge`**: **`vpe:take-state-snapshot`** (`user-data/auto-snapshots/…-AUTO-PRE-BUILD`) → **`vpe:check-readiness`** (forbidden TS-in-`.js` under **`src/main` + `src/renderer`**) → **`build:win`**. All **`&&`** sequential; **`vader:dev`** keeps **`concurrently -k --success first`** and sets **`VPE_LAUNCHER_FORGE=1`** (thermal watchdog during dev).
 - **UI:** Footer **Net** LED + **Purge env** (3000 / 3001 / 9222, node+electron only); **Maintenance** = Repair Logs + **Prompt Vault** (markdown templates + copy **+ version label**); **Sandbox** (react-live / Studio Dark preview).
-- **Docs:** Canonical detail — [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.2). Phrases — [Custom-Commands.md](Custom-Commands.md).
+- **Docs:** Canonical detail — [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.4). Phrases — [Custom-Commands.md](Custom-Commands.md).
 
 **Active git branch (recent work):** `Node-Launcher-v8` (confirm with `git status`).
 

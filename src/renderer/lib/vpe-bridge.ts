@@ -116,6 +116,8 @@ export interface CatalogImportResult {
 export interface VpeLauncherPortHealth {
   p3000: boolean
   p3001: boolean
+  /** CDP / remote debugging listener (e.g. `--remote-debugging-port=9222`). */
+  p9222: boolean
   /** No foreign process on either port (node/electron-only or free). */
   ok: boolean
   /** Both 3000 and 3001 have no TCP listener — safe to run pre-forge / packaging. */
@@ -127,6 +129,7 @@ export interface VpePurgeLauncherPortsResult {
   killed?: { pid: string; port: number; img: string }[]
   p3000?: boolean
   p3001?: boolean
+  p9222?: boolean
   healthy?: boolean
   forgeReady?: boolean
 }

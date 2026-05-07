@@ -83,7 +83,7 @@ Notes:
 
 Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **snapshot / syntax / build** until **all** dev children have exited — then **auto snapshot** (**`-AUTO-PRE-BUILD`**) → **syntax guard** → **`npm run build:win`**. If the guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.2: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, ASAR/native guidance).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.3: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, **`vader:force-forge`**, ASAR/native guidance).
 
 ### How **`vader:sync`** works
 
@@ -100,6 +100,7 @@ Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Elect
 | **`npm run vader:sync`** | **`vader:dev` with `--success last`**, then snapshot → syntax guard → pack. Waits for **full** dev teardown before forge. |
 | **`npm run vader:clean-sync`** | Same as **`vader:sync`**, but first deletes **`dist/`** (**`rimraf`**) so no stale installer/win-unpacked from an older patch. Recommended when bumping versions or nuking ghosts. |
 | **`npm run vader:post-dev-forge`** | Usually internal: snapshot + **`vpe:check-readiness`** + **`build:win`**. Same order as the tail of **`vader:sync`**. |
+| **`npm run vader:force-forge`** | Same as **`vader:post-dev-forge`** — run manually when **`vader:sync`** stopped early (dev exit code / window close) but you still want the gated forge. |
 | **`npm run vpe:take-state-snapshot`** | Headless pre-forge backup only (CLI **`userData`** path mirrors main process). |
 | **`npm run vpe:check-readiness`** | JS syntax guard only; exit **1** lists **`VPE_SYNTAX_GUARD:`** hits. |
 

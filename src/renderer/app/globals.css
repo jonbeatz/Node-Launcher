@@ -228,30 +228,26 @@
   background: var(--text-muted);
 }
 
-.vpe-log-container {
-  scrollbar-gutter: stable both-edges !important;
+.vpe-terminal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #333 #121212;
 }
 
-.vpe-log-container::-webkit-scrollbar {
-  display: block !important;
-  width: 10px !important;
+.vpe-terminal-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
 
-.vpe-log-container::-webkit-scrollbar-track {
-  display: block !important;
-  background: #1c1c1c !important;
+.vpe-terminal-scrollbar::-webkit-scrollbar-track {
+  background: #121212;
 }
 
-.vpe-log-container::-webkit-scrollbar-thumb {
-  display: block !important;
-  background: #ff0000 !important;
-  border-radius: 4px !important;
-  border: 2px solid #1c1c1c !important;
-  z-index: 9999 !important;
+.vpe-terminal-scrollbar::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 10px;
 }
 
-.vpe-log-container::-webkit-scrollbar-thumb:hover {
-  background: #ff3333 !important;
+.vpe-terminal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #e02b20;
 }
 
 /* boxBling Effect */

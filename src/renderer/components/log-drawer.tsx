@@ -32,6 +32,30 @@ interface LogEntry {
   message: string
 }
 
+/** Strip CSI/OSC and lone ESC; removes SGR fragments like `[32m` so logs don't show "dark boxes." */
+function msc_stripAnsiDisplay(input: string): string {
+  if (!input) return input
+  let s = input
+    .replace(/\u001b\[[\?]?[0-9;]*[A-Za-z]/g, '')
+    .replace(/\u001b\][\d;]*(?:;[^\u0007\u001b]*)?\u0007/g, '')
+    .replace(/\u001b\][\d;]*(?:;[^\u001b\\]*)?\\/g, '')
+    .replace(/[\u001b\u009b\u0090]/g, '')
+  s = s.replace(/\[[0-9;]*m/g, '')
+  return s
+}
+
+function msc_appendLogCapped(prev: LogEntry[], entry: LogEntry, cap: number): LogEntry[] {
+  const next = [...prev, entry]
+  if (next.length <= cap) return next
+  return next.slice(-cap)
+}
+
+function msc_appendLogsCapped(prev: LogEntry[], entries: LogEntry[], cap: number): LogEntry[] {
+  const next = [...prev, ...entries]
+  if (next.length <= cap) return next
+  return next.slice(-cap)
+}
+
 function mscBootstrapLogs(): LogEntry[] {
   if (typeof window !== 'undefined' && getVpeApi()) {
     return [
@@ -248,20 +272,21 @@ export function LogDrawer({
     const unsub = api.subscribeLogUpdate((payload) => {
       if (selectedProject === '__vpe_all__') {
         setLogs((prev) =>
-          [
-            ...prev,
+          msc_appendLogCapped(
+            prev,
             mscMapVpeUnifiedLog({
               project_id: payload.projectId,
               timestamp: payload.timestamp,
               level: payload.level,
               message: payload.message,
             }),
-          ].slice(-scrollCap),
+            scrollCap,
+          ),
         )
         return
       }
       if (payload.projectId !== selectedProject) return
-      setLogs((prev) => [...prev, mscMapVpeLog(payload)].slice(-scrollCap))
+      setLogs((prev) => msc_appendLogCapped(prev, mscMapVpeLog(payload), scrollCap))
     })
     return unsub
   }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog, scrollCap])
@@ -384,20 +409,26 @@ export function LogDrawer({
           time: getCurrentTime(),
           message: line
         }))
-        setLogs(([...newLogs, ...entries]).slice(-scrollCap))
+        setLogs(msc_appendLogsCapped(newLogs, entries, scrollCap))
       } else {
-        setLogs(([...newLogs, { type: 'error' as const, time: getCurrentTime(), message: 'Engine API unavailable.' }]).slice(-scrollCap))
+        setLogs(msc_appendLogCapped(newLogs, { type: 'error' as const, time: getCurrentTime(), message: 'Engine API unavailable.' }, scrollCap))
       }
     } else {
       const response = COMMAND_RESPONSES[trimmedCommand]
       if (response) {
-        setLogs(([...newLogs, ...response]).slice(-scrollCap))
+        setLogs(msc_appendLogsCapped(newLogs, response, scrollCap))
       } else {
         setLogs(
-          ([
-            ...newLogs,
-            { type: 'error' as const, time: '', label: '', message: `Command not recognized. Type 'help' for available commands.` },
-          ]).slice(-scrollCap),
+          msc_appendLogCapped(
+            newLogs,
+            {
+              type: 'error' as const,
+              time: '',
+              label: '',
+              message: `Command not recognized. Type 'help' for available commands.`,
+            },
+            scrollCap,
+          ),
         )
       }
     }
@@ -454,7 +485,7 @@ export function LogDrawer({
 
   if (!expandedProp && !isDetached) {
     return (
-      <div className="h-full flex flex-col bg-[#1c1c1c]/85 backdrop-blur-[16px] border-l border-[#333333] shrink-0 w-8">
+      <div className="h-full flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 w-8">
         <button
           type="button"
           onClick={() => onExpandedChange?.(true)}
@@ -508,18 +539,13 @@ export function LogDrawer({
         </div>
 
         {/* Floating Terminal Area */}
-        <div className="flex-1 min-h-[150px] overflow-hidden relative">
+        <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
           <div 
             ref={terminalRef}
-            className="absolute inset-0 bg-[#0a0a0a] overflow-y-scroll overscroll-y-contain p-4 vpe-log-container"
-            style={{ 
-              boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)',
-              scrollbarWidth: 'thin',
-              scrollbarColor: '#e02b20 #1c1c1c'
-            }}
+            className="absolute inset-0 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain p-4 vpe-terminal-scrollbar max-h-full"
             onClick={() => inputRef.current?.focus()}
           >
-            <div className="relative z-20 space-y-0.5" style={{ fontSize: logFontPx }}>
+            <div className="space-y-0.5" style={{ fontSize: logFontPx }}>
               {logs.map((log, index) => (
                 <div key={index} className="flex font-sans leading-relaxed">
                   {log.time && (
@@ -528,7 +554,9 @@ export function LogDrawer({
                   {log.label && (
                     <span className={`${getLogColor(log.type)} mr-1 shrink-0`}>{log.label}</span>
                   )}
-                  <span className={log.type === 'command' ? 'text-white' : getLogColor(log.type)}>{log.message}</span>
+                  <span className={log.type === 'command' ? 'text-white' : getLogColor(log.type)}>
+                    {msc_stripAnsiDisplay(log.message)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -593,7 +621,7 @@ export function LogDrawer({
 
   return (
     <div 
-      className="h-full min-h-0 flex flex-col bg-[#1c1c1c]/85 backdrop-blur-[16px] border-l border-[#333333] shrink-0 transition-all duration-200"
+      className="h-full min-h-0 flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 transition-all duration-200"
       style={{ width, borderRadius: '4px 0 0 4px' }}
     >
       {/* Resize Handle */}
@@ -687,17 +715,13 @@ export function LogDrawer({
           </div>
 
           {/* Terminal Area */}
-          <div className="flex-1 min-h-[200px] overflow-hidden relative">
+          <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
             <div 
               ref={terminalRef}
-              className="absolute inset-0 bg-[#0a0a0a] overflow-y-scroll overscroll-y-contain p-4 crt-scanlines vpe-log-container"
-              style={{ 
-                boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)',
-                scrollbarGutter: 'stable',
-              }}
+              className="absolute inset-0 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain p-4 vpe-terminal-scrollbar max-h-full"
               onClick={() => inputRef.current?.focus()}
             >
-              <div className="relative z-20 space-y-0.5" style={{ fontSize: logFontPx }}>
+              <div className="space-y-0.5" style={{ fontSize: logFontPx }}>
                 {logs.map((log, index) => (
                   <div
                     key={`${log.time}:${index}:${log.message.slice(0, 16)}`}
@@ -709,7 +733,9 @@ export function LogDrawer({
                     {log.label && (
                       <span className={`${getLogColor(log.type)} mr-1 shrink-0`}>{log.label}</span>
                     )}
-                    <span className={log.type === 'command' ? 'text-white' : getLogColor(log.type)}>{log.message}</span>
+                    <span className={log.type === 'command' ? 'text-white' : getLogColor(log.type)}>
+                    {msc_stripAnsiDisplay(log.message)}
+                  </span>
                   </div>
                 ))}
               </div>
