@@ -213,5 +213,5 @@ See also: [`health-scheduler.js`](../../src/main/health-scheduler.js), [`launche
   - `npm run repair:ast`
   - `npm run test:e2e`
   - `npm run lint`
-- Production installer (full gates + clean **`dist/`**): say **rebuild exe** or follow [Custom-Commands — rebuild exe](Custom-Commands.md#rebuild-exe). Minimal: `npm run build` (`build:renderer` + `build:main`).
+- Production installer (full gates + clean **`dist/`**): say **rebuild exe** or follow [Custom-Commands — rebuild exe](Custom-Commands.md#rebuild-exe). Minimal: **`npm run build`** / **`npm run build:win`** ( **`build:main`** → **`prebuild:main`** runs icon + **`build:renderer`** once). Dev-then-pack: [Vader Sync](Custom-Commands.md#vader-sync). Unified rules: [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md).
 

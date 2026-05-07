@@ -47,6 +47,7 @@ Read when you need **“where we are today”** or **exact command sequences**:
 | :--- | :--- |
 | [Checkpoint.md](Checkpoint.md) | Branch status, recent milestones, risky areas, files to reopen |
 | [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`restart app`**, **`start app`**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
+| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build & command sequencing** (`vader:dev` / **`vader:sync` / `vader:clean-sync`**, **`&&` gates**, **`concurrently -k`**, **`asar`** / **`npmRebuild`**, Windows outputs / **`prebuild:main`** single-pass) |
 | [API-SetUp-Master.md](API-SetUp-Master.md) | **LiteLLM + ngrok → Vertex AI**; Cursor Base URL + `master_key`; **post–Cursor-restart reconnect** checklist |
 | [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) | Packaging, ASAR, winCodeSign, native rebuild, telemetry—**resolved** symptoms |
 
@@ -108,6 +109,7 @@ Defined in [Custom-Commands.md](Custom-Commands.md):
 - **`rebuild exe`** — icon → export → natives → lint → E2E → package → trim `dist/`
 - **`restart app`** / **`start app`** — stop stray node/electron → **`npm run dev`** (prefer **restart app** when you mean kill-then-dev after changes)
 - **`hardened setup`** — clean install / rebuild / optional Playwright / **`repair:ast`** + E2E + lint  
+- **`Vader Sync`** — **`npm run vader:sync`** (or **`npm run vader:clean-sync`**) — full dev with Electron + Next (**`concurrently -k`** so closing Electron exits Next too), then **`build:win`** for installer + **`win-unpacked`**. **Rules + table:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md). **Phrase / examples:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync).  
 - **`new git branch`** — commit/push/version bump pattern (if still current)
 
 ---
@@ -120,8 +122,9 @@ Copy-paste template:
 You are working on Vader Project Engine (VPE) at <PATH>. Before coding:
 1. Read .cursor/docs/AGENT-BOOT-CHECKLIST.md and follow authority order (TRUTH → .cursorrules → SKILL.md → PRD → package.json).
 2. For current branch and recent decisions, read .cursor/docs/Checkpoint.md.
-3. Obey Vader Shield: no Node APIs in renderer; IPC via preload only.
-4. Scripts: only npm scripts defined in package.json.
+3. For build sequencing (vader:sync / hand-off builds / ASAR + natives), read .cursor/docs/VPE-BUILD-PROTOCOL.md.
+4. Obey Vader Shield: no Node APIs in renderer; IPC via preload only.
+5. Scripts: only npm scripts defined in package.json.
 My task: <DESCRIBE>.
 ```
 

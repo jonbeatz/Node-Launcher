@@ -2,6 +2,8 @@
 
 This file tracks shorthand commands you want me to execute in this repo.
 
+**Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [.cursor/docs/VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md).
+
 **Active branch:** `Node-Launcher-v4` (see [Checkpoint](Checkpoint.md) for full status).
 
 **Solved problems (symptoms → fixes):** [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
@@ -28,9 +30,7 @@ Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
 
 1. **Icon staging** — Ensure `build/` exists; copy **`_design_references/VPE.ico`** → **`build/icon.ico`** (source file untouched):  
    `node scripts/msc-copy-release-icon.cjs`
-2. **Static Next.js export** — Compile and export the renderer to **`src/renderer/out/`** (required for packaged `loadFile` UI):  
-   `npm run build:renderer`  
-   Confirm **`src/renderer/out/index.html`** exists after this step.
+2. **Optional fail-fast export** — If you want to catch a broken Next export *before* natives/E2E, run **`npm run build:renderer`** once and confirm **`src/renderer/out/index.html`**. Otherwise **`npm run build:main`** (step 7) runs **`prebuild:main`**, which already performs icon copy + **`build:renderer`** once—no duplicate full pipeline when you skip this optional step.
 3. **Native SQL alignment** — Rebuild **better-sqlite3** for Electron only (avoids Spectre MSVC / full-tree native rebuild traps on Windows):  
    `npm run rebuild:natives`
 4. **Lint** —  
@@ -39,8 +39,9 @@ Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
    `CI=true npm run test:e2e` (PowerShell: `$env:CI="true"; npm run test:e2e`)
 6. **Clean `dist/`** (recommended) — Remove the existing **`dist/`** folder so the next step does not leave stale installers next to the new one:  
    `Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue`
-7. **Package** — NSIS + unpacked app (**`prebuild:main`** will re-run icon copy + **`build:renderer`**; that is redundant but safe):  
-   `npm run build:main`
+7. **Package** — NSIS installer + **`win-unpacked`** tree. **`prebuild:main`** runs **once** (icon + **`build:renderer`**) then **`electron-builder`**:  
+   `npm run build:main`  
+   After it finishes, confirm **`src/renderer/out/index.html`** exists.
 8. **Trim `dist/` junk** — Delete updater/metadata clutter so only the deliverables remain:
    - `dist/*.blockmap` (e.g. `Vader Project Engine.exe.blockmap`)
    - `dist/builder-debug.yml`
@@ -59,8 +60,8 @@ Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
 ### Notes
 
 - **Custom `.exe` icon:** With **`build.win.signAndEditExecutable: false`** (avoids winCodeSign symlink failures on some Windows setups), **`npm run build:main`** runs **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) + **`rcedit`** to embed **`build/icon.ico`** into the main executable. See [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
-- **`src/renderer/out/`** is **gitignored**; always run **`build:renderer`** (or rely on **`prebuild:main`** inside **`build:main`**) before expecting a good packaged UI.
-- Do not run **`npm run build:main`** without a recent **`build:renderer`** if you disabled or skipped **`prebuild:main`**.
+- **`src/renderer/out/`** is **gitignored**; **`npm run build:main`** / **`npm run build:win`** always triggers **`prebuild:main`** (icon + **`build:renderer`**). **`npm run build`** is an alias that runs **`build:main` only**, so Next is not built twice unless you separately run **`build:renderer`** and then **`build:main`**.
+- Electron **`asar`** is **`true`** in **`package.json`** (archive app payload). Keep **`npmRebuild`** at **`false`** for faster packs when natives are already aligned via **`npm run rebuild:natives`**.
 - For a lighter loop (no installer, no E2E), use **restart app**, **start app**, or **hardened setup** instead.
 - **Smoke (unpacked):** after a build, **`dist\win-unpacked\Vader Project Engine.exe`** is the fastest way to validate static UI + main-process IPC; open DevTools and confirm **`vpe:get-system-stats`** completes without clone/module errors (see [Stability-Fix-Backlog](Stability-Fix-Backlog.md) telemetry entries).
 
@@ -78,13 +79,43 @@ Notes:
 - This is a destructive stop for currently running Node/Electron processes on your machine session.
 - Launcher UI dev server defaults to `http://localhost:3000`; managed projects should use `3001+`.
 
+## Vader Sync
+
+Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), **close Electron**, then **`npm run build:win`** runs automatically— **`dist/Vader Project Engine.exe`** (NSIS) + **`dist/win-unpacked/`** (portable **`Vader Project Engine.exe`**).
+
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (master command table, **`&&`** / exit-code semantics, **`concurrently -k`**, **`rimraf dist`**, ASAR/native guidance).
+
+### How **`vader:sync`** works
+
+- Runs **`npm run vader:dev`**: **`next dev`** and Electron together via **`concurrently -k`**.
+- **`--kill-others` semantics:** when **Electron exits** (you closed the window), **Next dev is terminated** too—so the shell reaches the **`&&`** gate (normal **`npm run dev`** leaves Next running and would block forever).
+- If either process crashes (e.g. syntax error), **`concurrently`** exits non‑zero and **`npm run build:win`** does not run.
+
+### Commands (repo root)
+
+| Command | When to use |
+| :--- | :--- |
+| **`npm run vader:sync`** | Standard flow: dev session → close Electron → one **`prebuild:main`** (icon + static export) + **`electron-builder`** (NSIS **`dir`** + **`nsis`**) → installer + **`win-unpacked`**. |
+| **`npm run vader:clean-sync`** | Same as **`vader:sync`**, but first deletes **`dist/`** (**`rimraf`**) so no stale installer/win-unpacked from an older patch. Recommended when bumping versions or nuking ghosts. |
+
+**Not parallel:** packaging runs **after** dev exits—you verify first, then the 9700x runs the forge.
+
+### Outputs
+
+Same as **[rebuild exe](#rebuild-exe)** deliverables:
+
+- **`dist/Vader Project Engine.exe`** (installer)
+- **`dist/win-unpacked/Vader Project Engine.exe`** (unpacked runnable)
+
+For a audited release (lint, E2E, natives, trim **`dist`**), say **[rebuild exe](#rebuild-exe)** instead of **Vader Sync**.
+
 ## restart app
 
 Intent: **restart** the VPE dev stack—same as **start app** after killing stray processes so a fresh **`npm run dev`** comes up (Next + Electron).
 
 ### How to say it
 
-Use **restart app**, **restart the app**, or **restart dev** when you want the agent to stop existing **node/electron** then run **`npm run dev`** again.
+Use **restart app**, **restart the app**, or **restart dev** when you want the agent to stop existing **node/electron** then run **`npm run dev`** again. Use **Vader Sync** (**`npm run vader:sync`** or **`npm run vader:clean-sync`**) when you want **dev**, then automatically **Windows package** after you close Electron (see **[Vader Sync](#vader-sync)**).
 
 ### Steps I will run when you say **restart app**
 
@@ -125,8 +156,7 @@ Intent: ship Electron installer after renderer is production-built.
 
 **Minimal (when you already ran quality gates):**
 
-1. `npm run build:renderer` (or rely on **`npm run build`** step 2).
-2. `npm run build` — runs **`build:renderer`** then **`build:main`** (`electron-builder`).  
+1. `npm run build` or **`npm run build:win`** — both run **`build:main`**. **`prebuild:main`** runs icon copy + **`build:renderer`**, then **`electron-builder`** (NSIS **`dir`** + **`nsis`**).  
    Ensure no stray **node/electron** holds locks; release icon source: [`_design_references/VPE.ico`](../../_design_references/VPE.ico) → **`build/icon.ico`** via **`msc-copy-release-icon`** (see **[rebuild exe](#rebuild-exe)**).
 
 ## new git branch

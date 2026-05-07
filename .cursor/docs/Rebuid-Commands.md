@@ -1,5 +1,6 @@
 \# Vader Protocol — REBUILD EXE Command
 
+**Canonical build sequencing + `vader:*` commands:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) · **Maintained steps:** [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe)
 
 
 Whenever the command "rebuild exe" (or aliases like "production build", 

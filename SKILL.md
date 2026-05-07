@@ -11,7 +11,7 @@ version: "2.1"
 - **Skill name:** Vader Project Engine (VPE)
 - **Version:** 2.1
 - **Author:** Jon Beatz (MSC)
-- **Primary sources:** `.cursor/docs/TRUTH.md`, `.cursorrules`, `README.md`, `Node-Launcher-PRD.md`, `Vader-Project-Engine.md`, `.cursor/docs/AGENT-BOOT-CHECKLIST.md`, `.cursor/docs/Checkpoint.md`, `.cursor/docs/Custom-Commands.md`, `.cursor/docs/Stability-Fix-Backlog.md`
+- **Primary sources:** `.cursor/docs/TRUTH.md`, `.cursorrules`, `README.md`, `Node-Launcher-PRD.md`, `Vader-Project-Engine.md`, `.cursor/docs/VPE-BUILD-PROTOCOL.md`, `.cursor/docs/AGENT-BOOT-CHECKLIST.md`, `.cursor/docs/Checkpoint.md`, `.cursor/docs/Custom-Commands.md`, `.cursor/docs/Stability-Fix-Backlog.md`
 
 ## Activation triggers
 
@@ -163,11 +163,12 @@ Before marking UI **done**:
 ## 6. Documentation and repo operations
 
 - **Authority order:** `.cursor/docs/TRUTH.md` → `.cursorrules` → this **SKILL.md** → **`Node-Launcher-PRD.md`** → **`package.json`** for scripts.
-- When changing ports, persistence paths, IPC contracts, or release steps, update **README**, **Checkpoint**, **Custom-Commands**, or **Stability-Fix-Backlog** as appropriate—keep **Checkpoint** truthful for handoffs.
+- When changing ports, persistence paths, IPC contracts, or release steps, update **README**, **Checkpoint**, **Custom-Commands**, **VPE-BUILD-PROTOCOL**, or **Stability-Fix-Backlog** as appropriate—keep **Checkpoint** truthful for handoffs.
 
 ### Release-oriented phrases (see `Custom-Commands.md`)
 
-- **`rebuild exe`:** Icon staging → **`npm run build:renderer`** (verify **`src/renderer/out/index.html`**) → **`npm run rebuild:natives`** → **`npm run lint`** → **`CI=true npm run test:e2e`** → clean **`dist/`** → **`npm run build:main`** → trim blockmap / `builder-debug.yml` / `latest.yml`.
+- **`rebuild exe`:** Icon staging → *(optional **`npm run build:renderer`** for fail-fast export)* → **`npm run rebuild:natives`** → **`npm run lint`** → **`CI=true npm run test:e2e`** → clean **`dist/`** → **`npm run build:main`** ( **`prebuild:main`** = icon + **`build:renderer`** once ) → trim blockmap / `builder-debug.yml` / `latest.yml`.
+- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — rules in **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**; phrases in **`Custom-Commands.md`** (**`concurrently -k`** dev, then **`build:win`** after Electron closes).
 - **`restart app`** / **`start app`:** Stop stray **node/electron** (per **`Custom-Commands`**), then **`npm run dev`**.
 - **`hardened setup`:** Install, **`rebuild:natives`**, optional Playwright browsers, **`repair:ast`**, E2E, lint.
 
