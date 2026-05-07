@@ -1,4 +1,4 @@
-/** Persisted System_Log typography + buffer (Settings modal + LogDrawer). */
+/** Persisted System_Log typography + buffer (Settings modal + LogDrawer). Drawer open/closed is not stored here. */
 
 export const VPE_TERM_FONT_KEY = 'vpe.term.fontSize'
 export const VPE_TERM_SCROLL_KEY = 'vpe.term.scrollback'

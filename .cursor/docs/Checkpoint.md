@@ -1,5 +1,12 @@
 # VPE Checkpoint (2026-05-07)
 
+## Build v1.1.2 — UI de-clutter
+
+- **System Health panel:** Default **closed** on load (`systemHealthOpen` initial **`false`**) — no auto-open splash; open from TopBar diagnostics control when needed.
+- **System Log / drawer:** Still defaults **collapsed** (`logDrawerExpanded` **`false`**); no mount **`useEffect`** expands it; **`terminal-prefs.ts`** only persists font + scrollback (not drawer visibility).
+- **Sidebar:** Removed **REGISTRY** section label above **Add New Project** for a tighter nav.
+- **Footer / preload:** **MSC Media Engine v1.1.2** (`package.json` **1.1.2**).
+
 ## Build v1.1.1 — Blocking validation gate (on top of v1.1.0)
 
 - **`vader:sync`:** `npm run vader:dev -- --success last && npm run vader:post-dev-forge` — **`concurrently`** waits for **all** dev processes to exit before snapshot / syntax guard / **`build:win`** (no early **`&&`** while **Next** still owns **3000**).
@@ -9,7 +16,7 @@
 
 ## Build v1.1.0 — Advanced expansion (shipping line)
 
-App **`package.json`** / preload label **v1.1.1** (v1.1.0 feature set below). Highlights:
+App **`package.json`** / preload track **v1.1.x** (see **v1.1.2** at top for current label). Highlights:
 
 - **Forge gate:** **`vader:sync`** / **`vader:clean-sync`** end with **`vader:post-dev-forge`**: **`vpe:take-state-snapshot`** (`user-data/auto-snapshots/…-AUTO-PRE-BUILD`) → **`vpe:check-readiness`** (forbidden TS-in-`.js` under **`src/main` + `src/renderer`**) → **`build:win`**. All **`&&`** sequential; **`vader:dev`** keeps **`concurrently -k --success first`** and sets **`VPE_LAUNCHER_FORGE=1`** (thermal watchdog during dev).
 - **UI:** Footer **Net** LED + **Purge env** (3000 / 3001 / 9222, node+electron only); **Maintenance** = Repair Logs + **Prompt Vault** (markdown templates + copy **+ version label**); **Sandbox** (react-live / Studio Dark preview).

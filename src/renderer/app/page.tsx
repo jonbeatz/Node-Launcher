@@ -145,7 +145,7 @@ function DashboardContent() {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [appSettingsModalOpen, setAppSettingsModalOpen] = useState(false)
-  const [systemHealthOpen, setSystemHealthOpen] = useState(true) // Show System Health Panel with warnings on load
+  const [systemHealthOpen, setSystemHealthOpen] = useState(false)
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [activeLogProject, setActiveLogProject] = useState('2')
   const [logDrawerExpanded, setLogDrawerExpanded] = useState(false)

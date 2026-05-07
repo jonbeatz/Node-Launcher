@@ -93,7 +93,7 @@ export function Footer() {
         </button>
       </div>
       <span className="font-sans text-[11px] text-[#A0A0A0]">
-        Powered by the MSC Media Engine v1.1.1
+        Powered by the MSC Media Engine v1.1.2
       </span>
     </footer>
   )

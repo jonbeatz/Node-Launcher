@@ -79,13 +79,6 @@ export function AppSidebar({
           </div>
 
           <div>
-            {!collapsed && (
-              <div className="px-2 mb-2">
-                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
-                  Registry
-                </span>
-              </div>
-            )}
             <button
               onClick={onAddProject}
               onMouseEnter={() => setHoveredItem('add-project')}
