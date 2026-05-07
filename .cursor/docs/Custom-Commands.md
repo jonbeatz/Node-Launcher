@@ -83,7 +83,7 @@ Notes:
 
 Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **snapshot / syntax / build** until **all** dev children have exited — then **auto snapshot** (**`-AUTO-PRE-BUILD`**) → **syntax guard** → **`npm run build:win`**. If the guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.1: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, ASAR/native guidance).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.2: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, ASAR/native guidance).
 
 ### How **`vader:sync`** works
 

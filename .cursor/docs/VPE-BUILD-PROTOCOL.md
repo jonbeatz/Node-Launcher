@@ -1,4 +1,4 @@
-# VPE Build & Command Protocol (v1.1.1)
+# VPE Build & Command Protocol (v1.1.2)
 
 **Purpose:** Source of truth for **build sequencing**, **terminal command logic**, and **Windows packaging posture** on Vader Project Engine — so dev sessions stay clean (no orphaned dev servers on **3000**), and release builds stay predictable.
 
@@ -53,10 +53,12 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ---
 
-## 4. In-app tooling (v1.1.0+ reference)
+## 4. In-app tooling (v1.1.0+ reference, UI refresh v1.1.2)
 
 These are **UX / ops** features in the packaged or dev UI; they do not replace **`package.json`** scripts:
 
+- **System Health / diagnostics:** **Closed** by default on load; open from TopBar. **System Log** drawer **collapsed** by default (`logDrawerExpanded` / user expand); **`terminal-prefs`** does not persist drawer open state.
+- **Sidebar:** **Add New Project** sits directly under **Dashboard** (no **REGISTRY** section label).
 - **Footer “Net” LED + Purge:** IPC reports **`p3000` / `p3001`**, whether listeners are **node/electron-only** (**`ok`**), and **`forgeReady`** (both ports free). **Green** = forge-ready (no listener); **amber** = dev stack still listening on **3000** and/or **3001** (e.g. **Next** still up); **red** = foreign process. **Purge env:** surgical **`taskkill`** for **node/electron** on **3000**, **3001**, **9222** (skips own PID), **`stdio: 'ignore'`** so already-dead PIDs never throw; **500ms** delay before port re-check for OS socket release.
 - **Maintenance → Prompt Vault:** Markdown templates with **version labels** stored under **`userData` / `prompt-vault.json`**.
 - **Sandbox:** **react-live** panel for pasting v0-style React snippets against **Studio Dark** (**`#121212`**) preview.

@@ -3,11 +3,11 @@ description:
 alwaysApply: true
 ---
 
-# Vader Project Engine (VPE) — Cursor Rules v1.5 (Master)
+# Vader Project Engine (VPE) — Cursor Rules v1.6 (Master)
 
 ## 1. Project Context & Identity
 - **Project Name:** Vader Project Engine (VPE)
-- **Current Version:** v1.0.7
+- **Current Version:** v1.1.2 (see root `package.json` if disputed)
 - **Target Hardware:** AMD Ryzen 9700x / Gigabyte B650 (Optimized for high-performance I/O)
 - **OS Focus:** Windows 11 25H2 (Native optimizations for Defender/Antivirus paths)
 - **Branding:** My Studio Channel (MSC) / Vader Protocol
@@ -57,14 +57,15 @@ If documentation conflicts occur, follow this hierarchy strictly:
 
 ### 5.2 UI Component Specs
 - **HUD Frame:** 1px horizontal framing lines at extreme top/bottom edges (#e02b20 at 30% opacity)
-- **Top Bar:** 48px height with dynamic breadcrumbs (`VPE > Projects > [ProjectName]`); left-aligned logomark + breadcrumb; right-aligned settings icon
+- **Top Bar:** 48px height with dynamic breadcrumbs (`VPE > Projects > [ProjectName]`); left-aligned logomark + breadcrumb; right-aligned settings icon; **diagnostics control** opens the **System Health** panel (panel default **closed** on app load — do not auto-open on mount).
 - **Project Cards:**
   - 320px minimum width; 4:3 WebP thumbnails (rounded top only); pulsing status LEDs (8px circle, #e02b20 pulse)
   - **boxBling Effect:** Subtle animated gradient border with `backdrop-filter: blur(10px)` and neon hover glow.
   - 40px sparkline strip at bottom with hairline border (#333) and low-opacity Vader Red waveform; no axes, minimal ticks
   - "9700x Tuned" pill badge in top-right corner (#A0A0A0 text, #1c1c1c bg, #333 border)
   - Hover: scale 1.02, shadow-vader-glow
-- **Log Drawer:** 420px width; glassmorphic surface (bg #1c1c1c at 80% opacity); backdrop-blur
+- **Side navigation:** **Dashboard** first; **Add New Project** is the high-contrast primary CTA directly below (no separate **REGISTRY** label). **Maintenance** (Repair Logs + Prompt Vault) and **Sandbox** per `src/renderer/components/app-sidebar.tsx`.
+- **Log Drawer:** 420px width; glassmorphic surface (bg #1c1c1c at 80% opacity); backdrop-blur; **default collapsed** on load (expand via **Logs** / **Ctrl+`**).
   - Terminal area: background #0a0a0a; JetBrains Mono font
   - **Force Scrollbar:** Width 10px, Thumb #ff0000 (Vader Red), `z-index: 9999`, `scrollbar-gutter: stable both-edges`.
   - CRT scanline overlay: repeating 1px horizontal lines, #000000 at 2% opacity, 3px spacing
@@ -106,7 +107,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Process Restoration:** On initialization, call `pm2.list()` to sync UI state with active projects
 - **Port Management:** Implement auto-increment logic (up to 10 attempts) for occupied ports; if exhausted, show toast notification
 - **Nuke Action:** Ensure `nuke` deletes `node_modules` and `.next` before executing the specific `<detectedPackageManager> install`
-- **Signature:** Every footer must include "Powered by the MSC Media Engine"
+- **Signature:** Every footer must include "Powered by the MSC Media Engine" with the **current** release version string (e.g. **v1.1.2** — match `package.json` / preload `vpeInfo.version`).
 
 ## 9. Error Handling & Feedback States
 - **Toasts:** Top-right corner, dark background with red left accent border, auto-dismiss after 4 seconds; used for start, stop, nuke, and port-lock failures

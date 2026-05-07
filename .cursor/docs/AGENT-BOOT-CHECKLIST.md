@@ -33,6 +33,7 @@ If sources disagree, follow this order (**highest wins first**):
 | **What VPE is** | Electron shell + Next.js **static-export** UI: register Node/Next projects, PM2 lifecycle, logs, repair/nuke, thumbnails (see [README.md](../../README.md)). |
 | **Main vs UI** | **`src/main`** (Node, PM2, FS), **`src/preload`** (IPC only), **`src/renderer`** (React/Next, **no** raw Node). **Vader Shield** always. |
 | **Launcher port / forge** | Dev UI: **`http://127.0.0.1:3000`** / `localhost:3000` (renderer). **Managed apps must use a higher port**—not the launcher port. **Vader Sync:** **`npm run vader:dev -- --success last`** then post-dev forge (see protocol). Footer **Net** LED: **green** = ports free (**`forgeReady`**), **amber** = node/electron still listening (**3000** active), **red** = foreign process. |
+| **Diagnostics / logs** | **System Health** panel **closed** by default on load (open from TopBar). **System Log** drawer **collapsed** by default (**Logs** / **Ctrl+`**). |
 | **Persistence** | Canonical store under **`app.getPath('userData')/vpe-db`** (SQLite/JSON); thumbnails under **`userData` media**. Legacy `projects.json` may be migrated/archived. |
 | **E2E / CI** | Playwright, Chromium; **`CI=true`** for deterministic bind—see [../../playwright.config.ts](../../playwright.config.ts) and [.github/workflows/ci.yml](../../.github/workflows/ci.yml). |
 | **Electron debug** | **`npm run dev:main`** uses **`--remote-debugging-port=9222`** — for MCP attach workflows. |
@@ -61,7 +62,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
 - [ ] Intended branch matches [Checkpoint.md](Checkpoint.md) (or `git status` is intentional).
-- [ ] VPE Version: **v1.1.1** (see root `package.json` if disputed)
+- [ ] VPE Version: **v1.1.2** (see root `package.json` if disputed)
 - [ ] Node matches team expectation (CI uses Node **20**; local may differ—note if so).
 - [ ] **`npm install`** already run after last `package.json` change (`legacy-peer-deps` via [../../.npmrc](../../.npmrc)).
 
