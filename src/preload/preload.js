@@ -50,11 +50,12 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   killProcessOnPort: (port) => ipcRenderer.invoke('vpe:kill-process-on-port', port),
   setProjectFavorite: (projectId, isFavorite) =>
     ipcRenderer.invoke('vpe:set-project-favorite', { projectId, isFavorite }),
+  clearRepairHistory: () => ipcRenderer.invoke('vpe:clear-repair-history'),
 });
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.0.7',
+  version: '1.0.8',
   hardware: '9700x Tuned',
 });
 

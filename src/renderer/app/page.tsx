@@ -144,7 +144,7 @@ function DashboardContent() {
   const [systemHealthOpen, setSystemHealthOpen] = useState(true) // Show System Health Panel with warnings on load
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [activeLogProject, setActiveLogProject] = useState('2')
-  const [logDrawerVisible, setLogDrawerVisible] = useState(true)
+  const [logDrawerVisible, setLogDrawerVisible] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [compactMode, setCompactMode] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -394,6 +394,19 @@ function DashboardContent() {
       setProjects((prev) =>
         prev.map((p) => (p.id === projectId ? { ...p, is_favorite: !p.is_favorite } : p))
       )
+    }
+  }
+
+  const handleClearRepairHistory = async () => {
+    const api = getVpeApi()
+    if (api?.clearRepairHistory) {
+      try {
+        await api.clearRepairHistory()
+        setRepairLogRev(n => n + 1)
+        addToast('Repair history cleared', 'success')
+      } catch (err: unknown) {
+        addToast('Failed to clear history', 'error', err instanceof Error ? err.message : 'Unknown error')
+      }
     }
   }
 
@@ -758,6 +771,7 @@ function DashboardContent() {
                   onUndo={() => {
                     addToast('Undo successful', 'success', 'Previous state restored from .vader-backup')
                   }}
+                  onClearHistory={handleClearRepairHistory}
                 />
               ) : (
                 <>

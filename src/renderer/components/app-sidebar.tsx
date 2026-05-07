@@ -25,7 +25,7 @@ interface AppSidebarProps {
 export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject, onStopAll, favorites = [] }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  const [maintenanceOpen, setMaintenanceOpen] = useState(true)
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false)
 
   const sidebarWidth = collapsed ? 'w-12' : 'w-[220px]'
 

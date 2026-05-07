@@ -1,4 +1,22 @@
-# VPE Checkpoint (2026-05-06)
+# VPE Checkpoint (2026-05-07)
+
+## Build v1.0.7 — Jedi Master Update (Current)
+
+The engine has been upgraded to **Build v1.0.7**, focusing on UI aesthetics ("boxBling"), favorites management, and production stabilization.
+
+### New Features & Logic
+- **UI Aesthetics:** Implemented `.box-bling` CSS with animated gradient borders and `backdrop-filter: blur(10px)`.
+- **Favorites System:** Added persistent `is_favorite` flag in SQLite. Integrated star icons on cards and pinned favorites in the side navigation.
+- **Maintenance Sub-nav:** Grouped Repair Logs and a new System Diagnostics shortcut under a collapsible "Maintenance" sidebar category.
+- **Terminal Enhancements:** Added functional slash commands: `/diag` (network/node), `/vader` (ASCII art + OS info), and `/repair` (npm cache purge per-project).
+- **Forced Scrollbar:** System Logs now use a high-visibility Vader Red (#ff0000) scrollbar with `scrollbar-gutter: stable` to prevent layout shift.
+- **Admin Shells:** "Open PowerShell Here" and "Open Command Prompt Here" now default to Administrator privileges via PowerShell `RunAs`.
+- **Snapshot Manager:** Refined to use `%TEMP%` for zipping and `Copy-Item`/`Remove-Item` to bypass file locks on rename.
+
+### Build Engine Optimizations
+- **Double-Build Removed:** `build:win` now only runs `next build` once (via `prebuild:main`), cutting renderer build times in half.
+- **ASAR Enabled:** Switched to `"asar": true` to speed up Windows packaging. Native modules (`better-sqlite3`, `node-pty`) remain unpacked.
+- **Version Iteration:** Global branding updated to **v1.0.7** across all modals, footers, and manifest files.
 
 ## MCP handoff checkpoint (2026-05-06 night)
 
@@ -68,7 +86,7 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 - `brave-search` will stay in error state until `BRAVE_API_KEY` is replaced with a real key.
 - Several MCP smoke tests show terminal `exit_code=4294967295` because processes were intentionally stopped after successful startup verification.
 
-**Last doc update:** 2026-05-06 — active dev branch: **`Node-Launcher-v4`** (`origin/Node-Launcher-v4`). Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer (default under `%LocalAppData%\Programs\Vader Project Engine\`, user can change path); **custom `.exe` icon** via **`afterPack` + `rcedit`** because **`signAndEditExecutable: true`** hits winCodeSign symlink limits on some Windows setups (see backlog). **Current emergency packaging mode:** `build.asar = false` to avoid a production main-process parse crash seen from `app.asar` (`tray-manager.js` corruption in `win-unpacked`).
+**Last doc update:** 2026-05-07 — active dev branch: **`Node-Launcher-v7`** (`origin/Node-Launcher-v7`). Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer (default under `%LocalAppData%\Programs\Vader Project Engine\`, user can change path); **custom `.exe` icon** via **`afterPack` + `rcedit`** because **`signAndEditExecutable: true`** hits winCodeSign symlink limits on some Windows setups (see backlog). **Current optimized packaging mode:** `build.asar = true`.
 
 ## Current project status (snapshot)
 

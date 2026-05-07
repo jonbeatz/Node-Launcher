@@ -21,6 +21,7 @@ interface RepairHistoryViewProps {
   refreshSignal?: number
   onViewDiff: (repair: RepairHistoryRow) => void
   onUndo: (repairId: string) => void
+  onClearHistory?: () => void
 }
 
 function formatRepairDate(iso: string): string {
@@ -37,6 +38,7 @@ export function RepairHistoryView({
   refreshSignal = 0,
   onViewDiff,
   onUndo,
+  onClearHistory,
 }: RepairHistoryViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState('all')
@@ -188,9 +190,22 @@ export function RepairHistoryView({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[#333333]">
-        <h2 className="font-sans font-bold text-white text-lg mb-4">REPAIR HISTORY</h2>
+      <div className="px-6 py-4 border-b border-[#333333] flex items-center justify-between">
+        <div>
+          <h2 className="font-sans font-bold text-white text-lg mb-1">REPAIR HISTORY</h2>
+          <p className="text-[11px] text-[#555555] uppercase tracking-wider font-medium">Maintenance Engine v1.0.8</p>
+        </div>
+        {onClearHistory && (
+          <button
+            onClick={onClearHistory}
+            className="flex items-center gap-2 px-3 py-1.5 rounded bg-transparent border border-[#e02b20]/30 text-[#e02b20] hover:bg-[#e02b20]/10 font-sans text-[11px] font-medium transition-all"
+          >
+            CLEAR HISTORY
+          </button>
+        )}
+      </div>
 
+      <div className="px-6 py-4 bg-[#0d0d0d] border-b border-[#333333]">
         {/* Filters */}
         <div className="flex items-center gap-3">
           <div className="flex-1 relative">

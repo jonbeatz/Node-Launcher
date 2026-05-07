@@ -868,6 +868,11 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     return { ok: true, id: projectId, skipped: 'pm2_unavailable' };
   });
 
+  ipcMain.handle('vpe:clear-repair-history', async () => {
+    store.clearRepairHistory();
+    return { ok: true };
+  });
+
   ipcMain.handle('vpe:set-project-favorite', async (_event, { projectId, isFavorite }) => {
     if (!projectId) throw new Error('VPE: Missing project id');
     store.setProjectFavorite(projectId, isFavorite);

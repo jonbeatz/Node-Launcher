@@ -175,6 +175,10 @@ class SqlitePersistence {
     })();
   }
 
+  clearRepairHistory() {
+    this._db.prepare(`DELETE FROM repair_runs`).run();
+  }
+
   insertLog(projectId, timestamp, level, message) {
     this._db
       .prepare(
@@ -469,6 +473,11 @@ class JsonPersistence {
     this._data.logs = [];
     this._data.repairRuns = [];
     this._data.logSeq = 0;
+    this.save();
+  }
+
+  clearRepairHistory() {
+    this._data.repairRuns = [];
     this.save();
   }
 

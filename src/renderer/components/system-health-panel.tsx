@@ -272,7 +272,7 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
           </button>
 
         <p className="font-sans text-[10px] text-[#555555] text-center pt-2">
-          Powered by the MSC Media Engine v1.0.7
+          Powered by the MSC Media Engine v1.0.8
         </p>
         </div>
       </div>

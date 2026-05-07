@@ -189,6 +189,7 @@ export interface VpeApi {
   openShell?: (path: string, type: 'powershell' | 'cmd') => Promise<{ ok: boolean; error?: string }>
   killProcessOnPort?: (port: number) => Promise<{ ok: boolean; message: string }>
   setProjectFavorite?: (projectId: string, isFavorite: boolean) => Promise<{ ok: boolean }>
+  clearRepairHistory?: () => Promise<{ ok: boolean }>
 }
 
 declare global {
