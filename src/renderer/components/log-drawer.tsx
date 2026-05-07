@@ -41,6 +41,8 @@ function msc_stripAnsiDisplay(input: string): string {
     .replace(/\u001b\][\d;]*(?:;[^\u001b\\]*)?\\/g, '')
     .replace(/[\u001b\u009b\u0090]/g, '')
   s = s.replace(/\[[0-9;]*m/g, '')
+  s = s.replace(/#< CLIXML[\s\S]*?<\/Objs>/gi, '')
+  s = s.replace(/<Objs[^>]*>[\s\S]*?<\/Objs>/gi, '')
   return s
 }
 
@@ -542,10 +544,10 @@ export function LogDrawer({
         <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
           <div 
             ref={terminalRef}
-            className="absolute inset-0 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain p-4 vpe-terminal-scrollbar max-h-full"
+            className="absolute inset-0 z-10 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain pl-8 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
             onClick={() => inputRef.current?.focus()}
           >
-            <div className="space-y-0.5" style={{ fontSize: logFontPx }}>
+            <div className="relative z-20 space-y-0.5" style={{ fontSize: logFontPx }}>
               {logs.map((log, index) => (
                 <div key={index} className="flex font-sans leading-relaxed">
                   {log.time && (
@@ -621,14 +623,14 @@ export function LogDrawer({
 
   return (
     <div 
-      className="h-full min-h-0 flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 transition-all duration-200"
+      className="relative h-full min-h-0 flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 transition-all duration-200"
       style={{ width, borderRadius: '4px 0 0 4px' }}
     >
-      {/* Resize Handle */}
+      {/* Resize Handle — above terminal hit target; terminal content inset with left-1 */}
       <div
         ref={resizeRef}
         onMouseDown={startResize}
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#4fde82]/20 transition-colors z-10"
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#4fde82]/20 transition-colors z-30"
       />
 
       {/* Tab Bar - SQUARED with 4px top radius only, dark grey active state */}
@@ -714,14 +716,14 @@ export function LogDrawer({
             </div>
           </div>
 
-          {/* Terminal Area */}
+          {/* Terminal Area — inset-y + left-1 clears the resize strip; scroll pane z-stacks above */}
           <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
             <div 
               ref={terminalRef}
-              className="absolute inset-0 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain p-4 vpe-terminal-scrollbar max-h-full"
+              className="absolute inset-y-0 right-0 left-1 z-10 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain pl-8 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
               onClick={() => inputRef.current?.focus()}
             >
-              <div className="space-y-0.5" style={{ fontSize: logFontPx }}>
+              <div className="relative z-20 space-y-0.5" style={{ fontSize: logFontPx }}>
                 {logs.map((log, index) => (
                   <div
                     key={`${log.time}:${index}:${log.message.slice(0, 16)}`}
@@ -734,8 +736,8 @@ export function LogDrawer({
                       <span className={`${getLogColor(log.type)} mr-1 shrink-0`}>{log.label}</span>
                     )}
                     <span className={log.type === 'command' ? 'text-white' : getLogColor(log.type)}>
-                    {msc_stripAnsiDisplay(log.message)}
-                  </span>
+                      {msc_stripAnsiDisplay(log.message)}
+                    </span>
                   </div>
                 ))}
               </div>

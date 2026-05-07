@@ -1,5 +1,14 @@
 # VPE Checkpoint (2026-05-07)
 
+## Build v1.1.5 — Gold Master (ghost purge & UI recalibration)
+
+- **PowerShell silence:** `msc_powershellEncodedExecSync` prepends **`$ProgressPreference`**, **`PSModuleAnalysisCachePath`**, UTF-8 output encoding, and strips **`#< CLIXML` … `</Objs>`** blobs from captured stdout; thermal stderr paths scrubbed for access-denied matching.
+- **Thermal WMI backoff:** access-denied / **0x80041003** now uses a **60-second** silent WMI backoff (reduced log spam vs long multi-minute windows).
+- **Port health:** `vpe:launcher-port-health` row probes are **time-boxed (500ms)** per port — on stall, treat as **free** so the Net LED can recover **green** instead of hanging **gold**.
+- **Purge:** optional **`taskkill`** of **`chrome.exe`** with **`WINDOWTITLE eq VPE*`**; second-pass **9222** sweep kills **any** remaining listener PID except **self + parent**; existing **node/electron** tree-kill on **3000/3001/9222** unchanged.
+- **LogDrawer:** terminal pane **`pl-8 pr-4 py-4`**, **`z-10` / `z-20`** layering, docked body **`left-1`** inset so the resize strip no longer paints over log text.
+- **Forge tail:** **`vader:post-dev-forge`** / **`vader:force-forge`** begin with **`timeout /t 3 /nobreak >nul`** (Windows) before snapshot → syntax → **`build:win`**.
+
 ## Build v1.1.4 — Master Shield Stabilization
 
 - **LogDrawer calibration:** Removed scanline/overlay treatment from the live text viewport to eliminate left black bar artifacts; terminal pane now uses dedicated **`.vpe-terminal-scrollbar`** styling.
@@ -19,24 +28,24 @@
 - **System Health panel:** Default **closed** on load (`systemHealthOpen` initial **`false`**) — no auto-open splash; open from TopBar diagnostics control when needed.
 - **System Log / drawer:** Still defaults **collapsed** (`logDrawerExpanded` **`false`**); no mount **`useEffect`** expands it; **`terminal-prefs.ts`** only persists font + scrollback (not drawer visibility).
 - **Sidebar:** Removed **REGISTRY** section label above **Add New Project** for a tighter nav.
-- **Footer / preload:** **MSC Media Engine v1.1.2** (historical; current label **v1.1.4** — see top of file / `package.json`).
+- **Footer / preload:** **MSC Media Engine v1.1.2** (historical; current label **v1.1.5** — see top of file / `package.json`).
 
 ## Build v1.1.1 — Blocking validation gate (on top of v1.1.0)
 
 - **`vader:sync`:** `npm run vader:dev -- --success last && npm run vader:post-dev-forge` — **`concurrently`** waits for **all** dev processes to exit before snapshot / syntax guard / **`build:win`** (no early **`&&`** while **Next** still owns **3000**).
 - **`vader:dev`:** unchanged **`--success first`** for normal sessions.
 - **Purge:** **500ms** settle after **`taskkill`** before port re-probe; **`stdio: 'ignore'`** so “process already gone” never surfaces as a thrown error.
-- **Footer Net LED:** **Green** = both **3000**/**3001** free (**`forgeReady`**); **Amber** = only node/electron listening (dev still active); **Red** = foreign listener.
+- **Footer Net LED:** Superseded by **v1.1.4+** semantics (**9222** + bounded probe); see **Build v1.1.5** / **v1.1.4** sections above.
 
 ## Build v1.1.0 — Advanced expansion (shipping line)
 
-App **`package.json`** / preload track **v1.1.x** (see **v1.1.4** at top for current label). Highlights:
+App **`package.json`** / preload track **v1.1.x** (see **v1.1.5** at top for current label). Highlights:
 
-- **Forge gate:** **`vader:sync`** / **`vader:clean-sync`** end with **`vader:post-dev-forge`**: **`vpe:take-state-snapshot`** (`user-data/auto-snapshots/…-AUTO-PRE-BUILD`) → **`vpe:check-readiness`** (forbidden TS-in-`.js` under **`src/main` + `src/renderer`**) → **`build:win`**. All **`&&`** sequential; **`vader:dev`** keeps **`concurrently -k --success first`** and sets **`VPE_LAUNCHER_FORGE=1`** (thermal watchdog during dev).
+- **Forge gate:** **`vader:sync`** / **`vader:clean-sync`** end with **`vader:post-dev-forge`**: on **Windows**, **`timeout /t 3 /nobreak >nul &&`** then **`vpe:take-state-snapshot`** (`user-data/auto-snapshots/…-AUTO-PRE-BUILD`) → **`vpe:check-readiness`** (forbidden TS-in-`.js` under **`src/main` + `src/renderer`**) → **`build:win`**. All **`&&`** sequential; **`vader:dev`** keeps **`concurrently -k --success first`** and sets **`VPE_LAUNCHER_FORGE=1`** (thermal watchdog during dev).
 - **UI:** Footer **Net** LED + **Purge env** (3000 / 3001 / 9222, node+electron only); **Maintenance** = Repair Logs + **Prompt Vault** (markdown templates + copy **+ version label**); **Sandbox** (react-live / Studio Dark preview).
-- **Docs:** Canonical detail — [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.4). Phrases — [Custom-Commands.md](Custom-Commands.md).
+- **Docs:** Canonical detail — [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.5). Phrases — [Custom-Commands.md](Custom-Commands.md).
 
-**Active git branch (recent work):** `Node-Launcher-v8` (confirm with `git status`).
+**Active git branch:** confirm with **`git status`** (branch name varies; milestones in this file are historical snapshots).
 
 ---
 

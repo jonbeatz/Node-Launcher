@@ -27,7 +27,7 @@ Use **Update Docs** (or **update docs**, **sync documentation**) when you want a
 7. **Checkpoint** — Update [Checkpoint.md](Checkpoint.md): add or extend a **Build vX.Y.Z** section for the release; fix downstream lines that still say an older “current” version.
 8. **Cross-links** — Align [README.md](../../README.md) (packaging line), [START-HERE.md](START-HERE.md), [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) protocol version string, and [TRUTH.md](TRUTH.md) only if architecture facts changed (do not churn TRUTH for pure marketing bumps).
 9. **Shipped UI strings** — If the user-facing version label changed: [`src/preload/preload.js`](../../src/preload/preload.js) **`vpeInfo.version`**, [`src/renderer/app/layout.tsx`](../../src/renderer/app/layout.tsx) **`metadata.description`**, and [`src/renderer/components/footer.tsx`](../../src/renderer/components/footer.tsx) fallback to match **`package.json`**.
-10. **Drift sweep** — `rg` (or editor search) for the **previous** patch version and fix stragglers (e.g. **`v1.1.3`** after bumping to **`v1.1.4`**).
+10. **Drift sweep** — `rg` (or editor search) for the **previous** patch version and fix stragglers (e.g. **`v1.1.5`** after bumping to **`v1.1.6`**).
 11. **Optional** — If **`layout.tsx`** / preload changed: **`npm run lint`** and **`npm run build:renderer`** from repo root.
 
 ### Rules
@@ -108,9 +108,9 @@ Notes:
 
 ## Vader Sync
 
-Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **snapshot / syntax / build** until **all** dev children have exited — then **auto snapshot** (**`-AUTO-PRE-BUILD`**) → **syntax guard** → **`npm run build:win`**. If the guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
+Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **snapshot / syntax / build** until **all** dev children have exited — then a **Windows** **`timeout /t 3 /nobreak`** pause → **auto snapshot** (**`-AUTO-PRE-BUILD`**) → **syntax guard** → **`npm run build:win`**. If the guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.4: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, **`vader:force-forge`**, ASAR/native guidance).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.5: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, **`timeout`** pre-forge pause, **`vader:force-forge`**, ASAR/native guidance).
 
 ### How **`vader:sync`** works
 
@@ -118,7 +118,7 @@ Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Elect
 - **`npm run vader:dev`** alone (no extra args) keeps **`--success first`** for day-to-day work: closing **Electron** still **`-k`** stops **Next** quickly.
 - **`--kill-others`:** when one child exits, others are signalled per **`concurrently`** rules; **`--success last`** still ties the **group** exit to the **last** process to finish.
 - If either process crashes (non-zero), **`concurrently`** exits non‑zero and **`vader:post-dev-forge`** does not run.
-- After dev exits **0**: **`vader:post-dev-forge`** = **`npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win`** — all **`&&`** gated.
+- After dev exits **0**: **`vader:post-dev-forge`** = **`timeout /t 3 /nobreak >nul && npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win`** — all **`&&`** gated (**`timeout`** is Windows **`cmd.exe`**; same prefix on **`vader:force-forge`**).
 
 ### Commands (repo root)
 
@@ -126,8 +126,8 @@ Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Elect
 | :--- | :--- |
 | **`npm run vader:sync`** | **`vader:dev` with `--success last`**, then snapshot → syntax guard → pack. Waits for **full** dev teardown before forge. |
 | **`npm run vader:clean-sync`** | Same as **`vader:sync`**, but first deletes **`dist/`** (**`rimraf`**) so no stale installer/win-unpacked from an older patch. Recommended when bumping versions or nuking ghosts. |
-| **`npm run vader:post-dev-forge`** | Usually internal: snapshot + **`vpe:check-readiness`** + **`build:win`**. Same order as the tail of **`vader:sync`**. |
-| **`npm run vader:force-forge`** | Same as **`vader:post-dev-forge`** — run manually when **`vader:sync`** stopped early (dev exit code / window close) but you still want the gated forge. |
+| **`npm run vader:post-dev-forge`** | Usually internal: **3s** **`timeout`** → snapshot + **`vpe:check-readiness`** + **`build:win`**. Same order as the tail of **`vader:sync`**. |
+| **`npm run vader:force-forge`** | Same as **`vader:post-dev-forge`** (including **`timeout`**) — run manually when **`vader:sync`** stopped early (dev exit code / window close) but you still want the gated forge. |
 | **`npm run vpe:take-state-snapshot`** | Headless pre-forge backup only (CLI **`userData`** path mirrors main process). |
 | **`npm run vpe:check-readiness`** | JS syntax guard only; exit **1** lists **`VPE_SYNTAX_GUARD:`** hits. |
 

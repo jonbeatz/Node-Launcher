@@ -1,14 +1,14 @@
 {
   "name": "vader-project-engine",
-  "version": "1.1.4",
-  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.1.4",
+  "version": "1.1.5",
+  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.1.5",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
     "vader:dev": "cross-env VPE_LAUNCHER_FORGE=1 concurrently -k --success first \"npm run dev:renderer\" \"npm run dev:main\"",
-    "vader:post-dev-forge": "npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win",
-    "vader:force-forge": "npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win",
+    "vader:post-dev-forge": "timeout /t 3 /nobreak >nul && npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win",
+    "vader:force-forge": "timeout /t 3 /nobreak >nul && npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win",
     "vader:sync": "npm run vader:dev -- --success last && npm run vader:post-dev-forge",
     "vader:clean-sync": "rimraf dist && npm run vader:sync",
     "vpe:take-state-snapshot": "node scripts/vpe-prebuild-snapshot.cjs",

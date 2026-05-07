@@ -1,4 +1,4 @@
-# VPE Build & Command Protocol (v1.1.4)
+# VPE Build & Command Protocol (v1.1.5)
 
 **Purpose:** Source of truth for **build sequencing**, **terminal command logic**, and **Windows packaging posture** on Vader Project Engine — so dev sessions stay clean (no orphaned dev servers on **3000**), and release builds stay predictable.
 
@@ -15,8 +15,8 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 | Command | Primary use case | What it does |
 | :--- | :--- | :--- |
 | **`npm run vader:dev`** | **Rapid prototyping** | **`cross-env VPE_LAUNCHER_FORGE=1 concurrently -k --success first "npm run dev:renderer" "npm run dev:main"`** (see **`package.json`**). Forge env enables main-process **thermal** watchdog during this session. **`--success first`** + **`-k`**: closing **Electron** ends the group and stops **Next** — for everyday dev. |
-| **`npm run vader:post-dev-forge`** | **Forge gate (usually implicit)** | Runs **in order** with **`&&`**: **`vpe:take-state-snapshot`** → **`vpe:check-readiness`** → **`npm run build:win`**. Invoked automatically after **`vader:dev`** succeeds inside **`vader:sync`** / **`vader:clean-sync`** — you rarely call it alone. |
-| **`npm run vader:force-forge`** | **Manual forge (escape hatch)** | Same **`&&`** chain as **`vader:post-dev-forge`** — use when **`vader:sync`** did not reach the tail (e.g. dev exit code / close-window timing) but you still want snapshot → syntax guard → **`build:win`**. |
+| **`npm run vader:post-dev-forge`** | **Forge gate (usually implicit)** | **Windows:** **`timeout /t 3 /nobreak >nul &&`** then **`vpe:take-state-snapshot`** → **`vpe:check-readiness`** → **`npm run build:win`** (3s pause lets the OS release ports/handles after dev teardown). Invoked after **`vader:dev`** inside **`vader:sync`** / **`vader:clean-sync`**. |
+| **`npm run vader:force-forge`** | **Manual forge (escape hatch)** | Same lead-in + **`&&`** chain as **`vader:post-dev-forge`** — use when **`vader:sync`** did not reach the tail but you still want snapshot → syntax guard → **`build:win`**. |
 | **`npm run vpe:take-state-snapshot`** | **Pre-forge backup** | Headless script: zips **`userData`** SQLite (+ repo root **`.env` / `.env.local`** when present) into **`%LOCALAPPDATA%\VaderProjectEngine\user-data\auto-snapshots\`** with a filename suffix **`-AUTO-PRE-BUILD`** before packaging. |
 | **`npm run vpe:check-readiness`** | **Syntax guard** | Scans **`src/main`** and **`src/renderer`** **`*.js`** for forbidden TypeScript-only tokens (e.g. **`as any`**, **`interface`** in **`.js`**). **Exit 1** aborts the chain and prints **`VPE_SYNTAX_GUARD:`** lines to **stderr** — **`build:win`** does not run until fixed. |
 | **`npm run vader:sync`** | **Validate + forge** | **`npm run vader:dev -- --success last && npm run vader:post-dev-forge`**. **`-- --success last`** is forwarded to **`concurrently`** (last **`--success`** wins) so the **`&&`** chain does **not** continue to **snapshot / syntax / build** until **all** dev processes have fully exited — manual close / full teardown before the forge. |
@@ -30,10 +30,11 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ## 2. Execution logic & rules
 
-- **Strict forge sequence:** **Clean `dist` (when using `vader:clean-sync`) → Dev (`vader:sync` uses `--success last`) → full process exit → Snapshot → Syntax guard → Build.** Snapshot and syntax guard stay mandatory inside **`vader:post-dev-forge`**.
+- **Strict forge sequence:** **Clean `dist` (when using `vader:clean-sync`) → Dev (`vader:sync` uses `--success last`) → full process exit → **Windows `timeout` (3s)** → Snapshot → Syntax guard → Build.** Snapshot and syntax guard stay mandatory inside **`vader:post-dev-forge`** (the **`timeout`** prefix lives in **`package.json`** scripts).
 - **Sequential `&&` chains:** **`vader:sync`**, **`vader:clean-sync`**, and **`vader:post-dev-forge`** rely on **`&&`**. **`build:win` / `build:main`** must **not** start until the **`vader:dev`** phase exited **without error**, the **snapshot** step succeeded, and the **syntax guard** passed.
 - **`concurrently` success modes:** **`npm run vader:dev`** keeps **`--success first`**. **`npm run vader:sync`** runs **`npm run vader:dev -- --success last`**, producing a final **`concurrently`** invocation where **`--success last`** overrides **`--success first`** so exit code / completion wait aligns with the **last** process to finish — blocking early **`&&`** continuation while **Next** might still release **3000**.
-- **Build Forge thermal (optional):** With **`VPE_LAUNCHER_FORGE=1`**, main process may poll WMI temperature during **`vader:dev`**; reads **> 90°C** can trigger a desktop **Notification** and a **Repair Log** row (**`__vpe_system__`**). WMI **access denied** (**0x80041003**) logs once, disables high-temp alerts for the session, and **backs off WMI** for **10 minutes** (no subprocess spam). Some Ryzen setups deny WMI — then no °C read.
+- **Build Forge thermal (optional):** With **`VPE_LAUNCHER_FORGE=1`**, main process may poll WMI temperature during **`vader:dev`**; reads **> 90°C** can trigger a desktop **Notification** and a **Repair Log** row (**`__vpe_system__`**). WMI **access denied** (**0x80041003**) logs once, disables high-temp alerts for the session, and **backs off WMI for 60 seconds** (silent; reduces CLIXML / permission spam). Encoded PowerShell runs with **`$ProgressPreference = 'SilentlyContinue'`**, module cache redirected, UTF-8 output, and **CLIXML blobs stripped** from captured stdout.
+- **Launcher port health (UI LED):** IPC probes **3000 / 3001 / 9222** with a **~500ms** ceiling per port — if a probe stalls (zombie stack), the handler treats the port as **free** so the footer can return **green** instead of wedging **gold**.
 - **Cleanup before big releases:** For version bumps or large UI/asset changes — especially anything that affects packaged static output — prefer **`npm run vader:clean-sync`** over **`vader:sync`** so **`dist/`** cannot carry ghosts from earlier builds.
 - **ASAR & native rebuild:**
   - Keep **`asar: true`** in **`package.json`** **`build`** config for normal packaged payloads.
@@ -54,13 +55,13 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ---
 
-## 4. In-app tooling (v1.1.0+ reference, UI refresh through v1.1.4)
+## 4. In-app tooling (v1.1.0+ reference, UI refresh through v1.1.5)
 
 These are **UX / ops** features in the packaged or dev UI; they do not replace **`package.json`** scripts:
 
 - **System Health / diagnostics:** **Closed** by default on load; open from TopBar. **System Log** drawer **collapsed** by default (`logDrawerExpanded` / user expand); **`terminal-prefs`** does not persist drawer open state. Log lines strip **ANSI / CSI** for plain HTML (not a full xterm).
 - **Sidebar:** **Add New Project** sits directly under **Dashboard** (no **REGISTRY** section label).
-- **Footer “Net” LED + Purge:** IPC reports **`p3000` / `p3001` / `p9222`**, whether listeners are **node/electron-only** (**`ok`**), and **`forgeReady`** (3000/3001 free). **Green** = forge-ready (**3000/3001 free + 9222 idle**); **amber** = dev/debug listener active (**3000/3001** and/or **9222**); **red** = foreign process on **3000/3001**. **Purge env:** **`taskkill /F /T /PID`** (tree kill) for **node/electron** on **3000**, **3001**, **9222** (skips own PID **and parent PID**), **`stdio: 'ignore'`** so already-dead PIDs never throw; **500ms** delay before port re-check for OS socket release.
+- **Footer “Net” LED + Purge:** IPC reports **`p3000` / `p3001` / `p9222`**, whether listeners are **node/electron-only** (**`ok`**), and **`forgeReady`** (3000/3001 free). **Green** = forge-ready (**3000/3001 free + 9222 idle**); **amber** = dev/debug listener active (**3000/3001** and/or **9222**); **red** = foreign process on **3000/3001**. **Purge env:** optional **`chrome.exe`** kill when window title matches **`VPE*`**; **`taskkill /F /T /PID`** for **node/electron** on **3000**, **3001**, **9222** (skips own PID **and parent PID**); **second-pass 9222** sweep removes **any** remaining listener PID on **9222** except self/parent (CDP ghosts); **`stdio: 'ignore'`**; **500ms** settle before port re-check.
 - **Maintenance → Prompt Vault:** Markdown templates with **version labels** stored under **`userData` / `prompt-vault.json`**.
 - **Sandbox:** **react-live** panel for pasting v0-style React snippets against **Studio Dark** (**`#121212`**) preview.
 

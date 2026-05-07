@@ -31,7 +31,7 @@ When this skill applies, **always**:
 - **PM2:** Prefer the **bundled programmatic API** in main; do not assume a globally installed PM2 daemon is required for the product story.
 - **Termination:** Discuss and implement stops with **`tree-kill`** (and project-runner preflight / Windows port sweeps where already implemented).
 - **Repairs:** **`.vader-backup`** before writes; diff-first confirmation for AST changes; align with `scripts/repair` / PRD repair suite.
-- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.1.4**).
+- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.1.5**).
 - **Naming:** Custom CSS/Tailwind-style classes prefixed with **`msc-`**; new main-process helpers follow existing **`msc_`** naming (match surrounding code).
 - **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. 
 - **API Bootstrap:** Always ensure the **"start API"** (LiteLLM) is running for any task requiring model orchestration. Confirmation: **"API is Live"**.
@@ -168,7 +168,7 @@ Before marking UI **done**:
 ### Release-oriented phrases (see `Custom-Commands.md`)
 
 - **`rebuild exe`:** Icon staging → *(optional **`npm run build:renderer`** for fail-fast export)* → **`npm run rebuild:natives`** → **`npm run lint`** → **`CI=true npm run test:e2e`** → clean **`dist/`** → **`npm run build:main`** ( **`prebuild:main`** = icon + **`build:renderer`** once ) → trim blockmap / `builder-debug.yml` / `latest.yml`.
-- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — runs **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**snapshot** → **`vpe:check-readiness`** → **`build:win`**). **`npm run vader:force-forge`** runs the same forge tail without **`vader:dev`** (manual escape hatch). Standalone **`vader:dev`** keeps **`--success first`**. Rules: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**; phrases: **`Custom-Commands.md`**.
+- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — runs **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**Windows `timeout /t 3`** → **snapshot** → **`vpe:check-readiness`** → **`build:win`**). **`npm run vader:force-forge`** runs the same forge tail without **`vader:dev`** (manual escape hatch). Standalone **`vader:dev`** keeps **`--success first`**. Rules: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**; phrases: **`Custom-Commands.md`**.
 - **`restart app`** / **`start app`:** Stop stray **node/electron** (per **`Custom-Commands`**), then **`npm run dev`**.
 - **`hardened setup`:** Install, **`rebuild:natives`**, optional Playwright browsers, **`repair:ast`**, E2E, lint.
 

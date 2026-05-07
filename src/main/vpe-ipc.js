@@ -17,7 +17,7 @@ const MAX_THUMB_BYTES = 512 * 1024;
 const VPE_CATALOG_VERSION = 1;
 const VPE_SYSTEM_REPAIR_PROJECT_ID = '__vpe_system__';
 
-/** Skip WMI thermal reads until this timestamp after permission failure (10 min backoff). */
+/** Skip WMI thermal reads until this timestamp after permission failure (60s silent backoff). */
 let msc_thermalWmiSilenceUntil = 0;
 /** After WMI access denied (e.g. 0x80041003): no high-temp notifications for rest of process. */
 let msc_thermalAlertsDisabledForSession = false;
@@ -79,15 +79,39 @@ function msc_tasklistImageName(pid) {
   }
 }
 
-/** UTF-16LE → Base64 for `powershell -EncodedCommand` (PS 5.1-safe; avoids -Command quoting / “Unexpected token”). */
+/** Strip PowerShell CLIXML / serialization blobs from captured stdout/stderr. */
+function msc_stripPowerShellClixml(text) {
+  if (text == null || typeof text !== 'string') return text;
+  return text
+    .replace(/#< CLIXML[\s\S]*?<\/Objs>/gi, '')
+    .replace(/<Objs[^>]*>[\s\S]*?<\/Objs>/gi, '')
+    .trim();
+}
+
+/**
+ * UTF-16LE → Base64 for `powershell -EncodedCommand` (PS 5.1-safe).
+ * Prepends module/progress silencing + UTF-8 output to reduce CLIXML / “Preparing modules” noise.
+ */
 function msc_powershellEncodedExecSync(script) {
   const { execSync } = require('child_process');
-  const b64 = Buffer.from(script.trim(), 'utf16le').toString('base64');
-  return execSync(`powershell.exe -NoProfile -EncodedCommand ${b64}`, {
-    windowsHide: true,
-    timeout: 8000,
-    encoding: 'utf8',
-  });
+  const preamble = [
+    '$env:PSModuleAnalysisCachePath = (Join-Path $env:TEMP "PSModuleAnalysisCache")',
+    '$ProgressPreference = "SilentlyContinue"',
+    '$ErrorActionPreference = "Stop"',
+    '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
+    '$OutputEncoding = [System.Text.Encoding]::UTF8',
+  ].join('\n');
+  const fullScript = `${preamble}\n\n${String(script).trim()}`;
+  const b64 = Buffer.from(fullScript, 'utf16le').toString('base64');
+  const raw = execSync(
+    `powershell.exe -NoProfile -NoLogo -NonInteractive -EncodedCommand ${b64}`,
+    {
+      windowsHide: true,
+      timeout: 8000,
+      encoding: 'utf8',
+    },
+  );
+  return msc_stripPowerShellClixml(String(raw));
 }
 
 /** @returns {{ ok: true, c: number } | { ok: false, denied?: boolean }} */
@@ -122,9 +146,9 @@ try {
 
   const runDenied = (e) => {
     const st = e && typeof e.status === 'number' ? e.status : null;
-    const stderr = e && e.stderr != null ? String(e.stderr) : '';
-    const stdout = e && e.stdout != null ? String(e.stdout) : '';
-    const blob = `${stderr}\n${stdout}\n${e && e.message ? e.message : ''}`;
+    const stderr = msc_stripPowerShellClixml(e && e.stderr != null ? String(e.stderr) : '');
+    const stdout = msc_stripPowerShellClixml(e && e.stdout != null ? String(e.stdout) : '');
+    const blob = `${stderr}\n${stdout}\n${e && e.message ? String(e.message) : ''}`;
     if (
       st === 2 ||
       /0x80041003|WBEM_E_ACCESS_DENIED|-2147217405|Access is denied|Required privilege is not held|denied by WMI/i.test(
@@ -168,14 +192,14 @@ try {
   }
 }
 
-/** Thermal read with 10 min WMI backoff on permission error; alerts disabled for session after deny. */
+/** Thermal read with 60s WMI backoff on permission error; alerts disabled for session after deny. */
 function msc_readCpuTempCelsiusWithMeta() {
   if (Date.now() < msc_thermalWmiSilenceUntil) {
     return { c: null };
   }
   const r = msc_execThermalWmiRead();
   if (r.denied) {
-    msc_thermalWmiSilenceUntil = Date.now() + 10 * 60 * 1000;
+    msc_thermalWmiSilenceUntil = Date.now() + 60 * 1000;
     msc_thermalAlertsDisabledForSession = true;
     if (msc_thermalPermissionLogHook) {
       try {
@@ -222,7 +246,7 @@ function msc_emitRepairRunsChanged() {
  * Port "healthy for VPE" if free, or only node/electron LISTEN (normal dev stack).
  * @returns {Promise<{ inUse: boolean, ok: boolean }>}
  */
-async function msc_launcherPortRowHealth(port) {
+async function msc_launcherPortRowHealthInner(port) {
   const inUse = await msc_tcpPortHasListener(port);
   if (!inUse) return { inUse: false, ok: true };
   const pids = msc_netstatListeningPidsOnPort(port);
@@ -234,6 +258,18 @@ async function msc_launcherPortRowHealth(port) {
     }
   }
   return { inUse: true, ok: true };
+}
+
+const MSC_PORT_HEALTH_RACE_MS = 500;
+
+/** Same as inner, but never hangs the UI: on timeout assume port free (forge-friendly). */
+async function msc_launcherPortRowHealth(port) {
+  return await Promise.race([
+    msc_launcherPortRowHealthInner(port),
+    new Promise((resolve) => {
+      setTimeout(() => resolve({ inUse: false, ok: true }), MSC_PORT_HEALTH_RACE_MS);
+    }),
+  ]);
 }
 
 function msc_rowToCatalogPayload(row) {
@@ -1431,8 +1467,20 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
     const protectedPids = new Set([myPid]);
     if (parentPid) protectedPids.add(parentPid);
 
-    const ports = [3000, 3001, 9222];
     const killed = [];
+
+    if (process.platform === 'win32') {
+      try {
+        execSync('taskkill /F /IM chrome.exe /FI "WINDOWTITLE eq VPE*"', {
+          windowsHide: true,
+          stdio: 'ignore',
+        });
+      } catch (_) {
+        /* No matching Chrome window */
+      }
+    }
+
+    const ports = [3000, 3001, 9222];
     for (const port of ports) {
       for (const pid of msc_netstatListeningPidsOnPort(port)) {
         if (protectedPids.has(pid)) continue;
@@ -1449,6 +1497,24 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
         }
       }
     }
+
+    /** Aggressive CDP sweep: any LISTEN PID on 9222 except launcher + parent (catches chrome/ghosts). */
+    if (process.platform === 'win32') {
+      for (const pid of msc_netstatListeningPidsOnPort(9222)) {
+        if (protectedPids.has(pid)) continue;
+        try {
+          execSync(`taskkill /F /T /PID ${pid}`, {
+            windowsHide: true,
+            stdio: 'ignore',
+          });
+          const img = msc_tasklistImageName(pid);
+          killed.push({ pid, port: 9222, img: img || 'aggressive-9222' });
+        } catch (_) {
+          /* */
+        }
+      }
+    }
+
     await delay(500);
     const ph3000 = await msc_launcherPortRowHealth(3000);
     const ph3001 = await msc_launcherPortRowHealth(3001);
