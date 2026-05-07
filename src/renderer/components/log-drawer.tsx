@@ -379,14 +379,14 @@ export function LogDrawer({
       const api = getVpeApi()
       if (api?.executeTerminalCommand) {
         const res = await api.executeTerminalCommand(trimmedCommand, selectedProject)
-        const entries: LogEntry[] = res.output.split('\n').filter(l => l.trim()).map(line => ({
-          type: res.ok ? 'output' : 'error',
+        const entries: LogEntry[] = res.output.split('\n').filter(l => l.trim()).map((line): LogEntry => ({
+          type: (res.ok ? 'output' : 'error') as LogEntry['type'],
           time: getCurrentTime(),
           message: line
         }))
         setLogs(([...newLogs, ...entries]).slice(-scrollCap))
       } else {
-        setLogs(([...newLogs, { type: 'error', time: getCurrentTime(), message: 'Engine API unavailable.' }]).slice(-scrollCap))
+        setLogs(([...newLogs, { type: 'error' as const, time: getCurrentTime(), message: 'Engine API unavailable.' }]).slice(-scrollCap))
       }
     } else {
       const response = COMMAND_RESPONSES[trimmedCommand]
