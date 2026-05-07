@@ -26,7 +26,7 @@ function msc_rowToCatalogPayload(row) {
     start_script: row.start_script,
     build_script: row.build_script,
     pkg_manager: row.pkg_manager,
-    node_modules_missing: (row as any).node_modules_missing,
+    node_modules_missing: row.node_modules_missing ?? null,
   };
 }
 
