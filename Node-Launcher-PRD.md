@@ -98,6 +98,12 @@ module.exports = {
 *   **Hardware Optimization:** Targets Ryzen 9700x[cite: 13]. Offloads heavy tasks to background worker threads to maintain 60 fps UI performance[cite: 13].
 *   **Windows 11 25H2 Tuning:** Batched file I/O and whitelisted paths to reduce antivirus scanning impact[cite: 13].
 *   **Zombie Prevention:** Uses `tree-kill` to guarantee termination of Next.js/Node processes on stop[cite: 13].
+
+### **5.1 API Orchestration (LiteLLM)**
+*   **Command:** `start API` (or `run litellm`).
+*   **Requirement:** Must set `$env:GOOGLE_APPLICATION_CREDENTIALS` to `D:\Cursor_Projectz\Node-Launcher\gcp_key.json`.
+*   **Startup:** `litellm --config litellm_config.yaml`.
+*   **Verification:** Provide feedback: **"API is Live"** once the server starts.
 *   **Feedback:** Includes Toasts for actions, Card Alerts for crash loops, and a Global Error Boundary for UI failures[cite: 13].
 
 ## 6. Testing & Deployment

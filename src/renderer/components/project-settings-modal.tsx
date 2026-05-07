@@ -420,7 +420,7 @@ export function ProjectSettingsModal({
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[#333333] flex flex-col gap-2 sticky bottom-0 bg-[#1c1c1c]">
           <span className="font-sans text-[10px] text-[#555555] text-center">
-            Powered by the MSC Media Engine
+            Powered by the MSC Media Engine v1.0
           </span>
           <div className="flex items-center justify-end gap-3">
             <button

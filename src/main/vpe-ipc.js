@@ -14,6 +14,47 @@ let msc_vpeIpcRegistered = false;
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 const MAX_THUMB_EDGE = 960;
 const MAX_THUMB_BYTES = 512 * 1024;
+const VPE_CATALOG_VERSION = 1;
+
+function msc_rowToCatalogPayload(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    path: row.path,
+    port: Number(row.port),
+    thumbnail_url: row.thumbnail_url ?? null,
+    start_script: row.start_script,
+    build_script: row.build_script,
+    pkg_manager: row.pkg_manager,
+  };
+}
+
+function msc_parseCatalogJson(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('VPE: Catalog file is not valid JSON.');
+  }
+  const ver = data.vpe_catalog_version;
+  if (ver != null && Number(ver) !== VPE_CATALOG_VERSION) {
+    throw new Error(
+      `VPE: Unsupported catalog version (expected ${VPE_CATALOG_VERSION}).`,
+    );
+  }
+  if (!Array.isArray(data.projects)) {
+    throw new Error('VPE: Catalog file has no projects array.');
+  }
+  return data.projects;
+}
+
+function msc_safeExportBasename(name) {
+  const s = String(name || 'project')
+    .replace(/[<>:"/\\|?*]+/g, '_')
+    .replace(/\s+/g, '_')
+    .slice(0, 80);
+  return s || 'project';
+}
 
 /** Host CPU tick snapshot for `os.cpus()` delta math (ASAR-safe; no external packages). */
 /** @type {{ idle: number, total: number } | null} */
@@ -328,6 +369,37 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     }
   };
 
+  const msc_vpeStopAllEngines = async () => {
+    const pm = vpeRuntime.pm2Manager;
+    try {
+      if (pm && typeof pm.stopAll === 'function') await pm.stopAll();
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      if (pm && typeof pm.msc_pm2CleanupRegistered === 'function') {
+        await pm.msc_pm2CleanupRegistered();
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      projectRunner.killAll();
+    } catch (_) {
+      /* ignore */
+    }
+    for (const p of store.listProjectsAlphabetical()) {
+      if (p.status === 'running') {
+        try {
+          store.clearProjectHealth(p.id);
+          store.setProjectStopped(p.id);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
+  };
+
   ipcMain.handle('vpe:getProjects', () => store.listProjectsAlphabetical());
 
   ipcMain.handle('vpe:get-repair-runs', (_event, limit) => {
@@ -498,34 +570,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
 
   /** Same engine path as tray "Stop all (PM2 + dashboard spawns)"; updates SQLite registry. */
   ipcMain.handle('vpe:stop-all', async () => {
-    const pm = vpeRuntime.pm2Manager;
-    try {
-      if (pm && typeof pm.stopAll === 'function') await pm.stopAll();
-    } catch (_) {
-      /* ignore */
-    }
-    try {
-      if (pm && typeof pm.msc_pm2CleanupRegistered === 'function') {
-        await pm.msc_pm2CleanupRegistered();
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    try {
-      projectRunner.killAll();
-    } catch (_) {
-      /* ignore */
-    }
-    for (const p of store.listProjectsAlphabetical()) {
-      if (p.status === 'running') {
-        try {
-          store.clearProjectHealth(p.id);
-          store.setProjectStopped(p.id);
-        } catch (_) {
-          /* ignore */
-        }
-      }
-    }
+    await msc_vpeStopAllEngines();
     msc_emitProjectsUpdated();
     return { ok: true };
   });
@@ -593,6 +638,130 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     if (!projectId) throw new Error('VPE: Missing project id');
     projectRunner.stopProject(projectId);
     store.deleteProject(projectId);
+    msc_emitProjectsUpdated();
+    return { ok: true };
+  });
+
+  ipcMain.handle('vpe:catalog-export', async (event, opts) => {
+    const scope = opts && opts.scope === 'single' ? 'single' : 'full';
+    const projectId = opts?.projectId != null ? String(opts.projectId) : '';
+    let rows;
+    if (scope === 'single') {
+      if (!projectId) throw new Error('VPE: Select a project to export.');
+      const row = store.getProject(projectId);
+      if (!row) throw new Error('VPE: Project not found.');
+      rows = [msc_rowToCatalogPayload(row)];
+    } else {
+      rows = store.listProjectsAlphabetical().map(msc_rowToCatalogPayload);
+    }
+    const payload = {
+      vpe_catalog_version: VPE_CATALOG_VERSION,
+      exported_at: new Date().toISOString(),
+      scope,
+      projects: rows,
+    };
+    const win =
+      BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+    const defaultName =
+      scope === 'single' && rows[0]
+        ? `vpe-project-${msc_safeExportBasename(rows[0].name)}.json`
+        : 'vpe-projects-catalog.json';
+    const { canceled, filePath } = await dialog.showSaveDialog(win || undefined, {
+      title: 'Export project catalog',
+      defaultPath: defaultName,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
+    return { ok: true, path: filePath };
+  });
+
+  ipcMain.handle('vpe:catalog-import', async (event, opts) => {
+    const mode = opts && opts.mode === 'replace' ? 'replace' : 'merge';
+    const win =
+      BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = await dialog.showOpenDialog(win || undefined, {
+      title: 'Import project catalog',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (canceled || !filePaths?.[0]) return { ok: false, canceled: true };
+
+    const text = fs.readFileSync(filePaths[0], 'utf8');
+    const catalogProjects = msc_parseCatalogJson(text);
+    if (mode === 'replace') {
+      await msc_vpeStopAllEngines();
+      if (typeof store.clearEntireRegistry !== 'function') {
+        throw new Error('VPE: Store does not support registry reset.');
+      }
+      store.clearEntireRegistry();
+    }
+
+    const errors = [];
+    let imported = 0;
+    for (const raw of catalogProjects) {
+      try {
+        const id = raw.id != null ? String(raw.id) : randomUUID();
+        const name = String(raw.name || 'Project').trim() || 'Project';
+        const root = msc_validateProjectPath(raw.path);
+        const det = msc_detectProjectScripts(root);
+        let portNum = Number(raw.port);
+        if (!Number.isFinite(portNum) || portNum <= 0) {
+          // eslint-disable-next-line no-await-in-loop
+          portNum = await msc_findAvailablePort(msc_managedPortFloor(), id);
+        }
+        portNum = msc_assertPortNotReserved(portNum);
+        const rawPm = String(raw.pkg_manager || '').toLowerCase();
+        const pkg_manager =
+          rawPm === 'yarn' || rawPm === 'pnpm' || rawPm === 'npm' ? rawPm : det.pkg_manager;
+        const start_script = String(raw.start_script || det.start_script || 'dev');
+        const build_script = String(raw.build_script || det.build_script || 'build');
+        const thumbnail_url =
+          raw.thumbnail_url === undefined || raw.thumbnail_url === null
+            ? null
+            : String(raw.thumbnail_url);
+
+        const existing = store.getProject(id);
+        if (mode === 'merge' && existing) {
+          store.updateProject({
+            id,
+            name,
+            path: root,
+            port: portNum,
+            thumbnail_url,
+            start_script,
+            build_script,
+            pkg_manager,
+          });
+        } else {
+          store.insertProject({
+            id,
+            name,
+            path: root,
+            port: portNum,
+            status: 'stopped',
+            thumbnail_url,
+            start_script,
+            build_script,
+            pkg_manager,
+          });
+        }
+        imported += 1;
+      } catch (e) {
+        const msg = e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e);
+        errors.push({ id: raw?.id, message: msg });
+      }
+    }
+    msc_emitProjectsUpdated();
+    return { ok: true, imported, errors };
+  });
+
+  ipcMain.handle('vpe:clear-all-projects', async () => {
+    await msc_vpeStopAllEngines();
+    if (typeof store.clearEntireRegistry !== 'function') {
+      throw new Error('VPE: Store does not support registry reset.');
+    }
+    store.clearEntireRegistry();
     msc_emitProjectsUpdated();
     return { ok: true };
   });

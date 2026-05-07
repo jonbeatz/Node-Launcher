@@ -715,9 +715,9 @@ function DashboardContent() {
           />
 
           {/* Content Area */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex min-h-0 overflow-hidden">
             {/* Main Content */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {activeNav === 'repair-logs' ? (
                 /* Repair History View */
                 <RepairHistoryView
@@ -1107,6 +1107,7 @@ function DashboardContent() {
         isOpen={appSettingsModalOpen}
         onClose={() => setAppSettingsModalOpen(false)}
         onSave={() => addToast('Settings saved', 'success')}
+        projects={projects.map((p) => ({ id: p.id, name: p.name }))}
       />
     </div>
   )

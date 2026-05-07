@@ -33,7 +33,8 @@ When this skill applies, **always**:
 - **Repairs:** **`.vader-backup`** before writes; diff-first confirmation for AST changes; align with `scripts/repair` / PRD repair suite.
 - **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"**.
 - **Naming:** Custom CSS/Tailwind-style classes prefixed with **`msc-`**; new main-process helpers follow existing **`msc_`** naming (match surrounding code).
-- **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**.
+- **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. 
+- **API Bootstrap:** Always ensure the **"start API"** (LiteLLM) is running for any task requiring model orchestration. Confirmation: **"API is Live"**.
 - **Windows default:** Prefer Windows 11 25H2 and repo-documented pipelines (PowerShell, `CI=true` for E2E) unless the user scopes otherwise.
 - **UI completion:** Run the **Master Quality Gate** (§4) before calling UI work done.
 

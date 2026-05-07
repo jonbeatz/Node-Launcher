@@ -161,6 +161,14 @@ class SqlitePersistence {
     this._db.prepare(`DELETE FROM projects WHERE id = ?`).run(projectId);
   }
 
+  /** Wipe all projects, logs (CASCADE), and repair history. */
+  clearEntireRegistry() {
+    this._db.transaction(() => {
+      this._db.prepare(`DELETE FROM repair_runs`).run();
+      this._db.prepare(`DELETE FROM projects`).run();
+    })();
+  }
+
   insertLog(projectId, timestamp, level, message) {
     this._db
       .prepare(
@@ -430,6 +438,14 @@ class JsonPersistence {
   deleteProject(projectId) {
     delete this._data.projects[projectId];
     this._data.logs = this._data.logs.filter((l) => l.project_id !== projectId);
+    this.save();
+  }
+
+  clearEntireRegistry() {
+    this._data.projects = {};
+    this._data.logs = [];
+    this._data.repairRuns = [];
+    this._data.logSeq = 0;
     this.save();
   }
 

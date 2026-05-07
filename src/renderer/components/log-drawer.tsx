@@ -469,10 +469,10 @@ export function LogDrawer({
         </div>
 
         {/* Floating Terminal Area */}
-        <div className="flex-1 overflow-hidden relative">
+        <div className="flex-1 min-h-0 overflow-hidden relative">
           <div 
             ref={terminalRef}
-            className="absolute inset-0 bg-[#0a0a0a] overflow-y-auto p-4"
+            className="absolute inset-0 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain p-4"
             style={{ boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)' }}
             onClick={() => inputRef.current?.focus()}
           >
@@ -549,7 +549,7 @@ export function LogDrawer({
 
   return (
     <div 
-      className="h-full flex flex-col bg-[#1c1c1c]/85 backdrop-blur-[16px] border-l border-[#333333] shrink-0 transition-all duration-200"
+      className="h-full min-h-0 flex flex-col bg-[#1c1c1c]/85 backdrop-blur-[16px] border-l border-[#333333] shrink-0 transition-all duration-200"
       style={{ width, borderRadius: '4px 0 0 4px' }}
     >
       {/* Resize Handle */}
@@ -638,10 +638,10 @@ export function LogDrawer({
           </div>
 
           {/* Terminal Area */}
-          <div className="flex-1 overflow-hidden relative">
+          <div className="flex-1 min-h-0 overflow-hidden relative">
             <div 
               ref={terminalRef}
-              className="absolute inset-0 bg-[#0a0a0a] overflow-y-auto p-4 crt-scanlines"
+              className="absolute inset-0 bg-[#0a0a0a] overflow-y-scroll overscroll-y-contain p-4 crt-scanlines"
               style={{ boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)' }}
               onClick={() => inputRef.current?.focus()}
             >
@@ -688,7 +688,7 @@ export function LogDrawer({
               <GripVertical size={12} className="text-[#555555]" />
             </div>
             <span className="font-sans text-[10px] text-[#555555] text-center">
-              Powered by the MSC Media Engine
+              Powered by the MSC Media Engine v1.0
             </span>
           </div>
         </>

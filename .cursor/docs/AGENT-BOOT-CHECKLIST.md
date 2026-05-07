@@ -69,6 +69,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 ### Quick smoke
 
 - [ ] **`npm run dev`** → shell loads at **3000**; no unexpected red in main/renderer consoles.
+- [ ] **"start API"** → LiteLLM is up with `gcp_key.json` and `litellm_config.yaml`. Confirmation: **"API is Live"**.
 - [ ] Optional: **`CI=true`** + **`npm run test:e2e`** before a big merge (see Custom-Commands).
 
 ### Docs honest?

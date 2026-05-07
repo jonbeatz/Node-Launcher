@@ -238,3 +238,9 @@ Run from PowerShell:
    - `cmd /c npx -y @playwright/mcp@latest --help` — confirms the MCP package resolves and exits cleanly.
    - **Browser install** (needed before first real MCP-driven session): from repo root, `npx playwright install chromium` — same Chromium family CI uses (**`npm run test:e2e`** via [`ci.yml`](../../.github/workflows/ci.yml)); on Windows without Linux deps use `chromium` or `chrome` per Playwright’s installer output if one fails.
    - **CDP / Electron** (optional, for **`playwright-electron`**): run **`npm run dev`**, then `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9222/json/version` — expect JSON; failures mean Electron is not up with **`--remote-debugging-port=9222`**. Same flow as [**Playwright MCP (aligned)**](#playwright-mcp-aligned-with-vpe) above.
+
+# Custom Command Shortcuts
+- If the user says "start API" (or any variation like "start server" or "run litellm"), you must immediately open a PowerShell terminal and run these two commands in order:
+  1. $env:GOOGLE_APPLICATION_CREDENTIALS="D:\\Cursor_Projectz\\Node-Launcher\\gcp_key.json"
+  2. litellm --config litellm_config.yaml
+

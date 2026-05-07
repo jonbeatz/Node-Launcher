@@ -103,6 +103,19 @@ export interface RecordRepairRunPayload {
   status?: VpeRepairRunStatus
 }
 
+export interface CatalogImportResult {
+  ok: boolean
+  canceled?: boolean
+  imported?: number
+  errors?: { id?: string; message: string }[]
+}
+
+export interface CatalogExportResult {
+  ok: boolean
+  canceled?: boolean
+  path?: string
+}
+
 export interface VpeApi {
   getProjects: () => Promise<VpeProjectRow[]>
   getRepairRuns?: (limit?: number) => Promise<VpeRepairRunRow[]>
@@ -127,6 +140,17 @@ export interface VpeApi {
   ) => Promise<{ ok?: boolean; status?: string }>
   /** PM2 stop-all + runner kill-all + SQLite all stopped */
   stopAllProjects?: () => Promise<{ ok?: boolean }>
+  /** Save full catalog or one project as JSON (native save dialog). */
+  catalogExport?: (opts: {
+    scope: 'full' | 'single'
+    projectId?: string
+  }) => Promise<CatalogExportResult>
+  /** Load catalog from JSON (native open dialog). `replace` wipes DB first. */
+  catalogImport?: (opts: {
+    mode: 'merge' | 'replace'
+  }) => Promise<CatalogImportResult>
+  /** Stop all engines and wipe every project row (+ logs / repair history). */
+  clearAllProjects?: () => Promise<{ ok?: boolean }>
   runBuild: (projectId: string) => Promise<{ ok?: boolean }>
   nukeProject: (projectId: string) => Promise<{ ok?: boolean; id?: string }>
   saveSettings: (payload: SaveSettingsPayload) => Promise<{ ok?: boolean }>

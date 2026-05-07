@@ -1,6 +1,6 @@
 const { Tray, Menu, nativeImage, app } = require('electron');
 
-const MSC_TRAY_BRAND = 'Powered by the MSC Media Engine';
+const MSC_TRAY_BRAND = 'Powered by the MSC Media Engine v1.0';
 
 class MSC_TrayManager {
   /**

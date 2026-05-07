@@ -55,3 +55,7 @@ src/main/db/vader.sqlite
 src/main/db/vader.sqlite-*
 
 .playwright-mcp/
+
+# GCP Key & LiteLLM Config Secrets
+gcp_key.json
+litellm_config.yaml
