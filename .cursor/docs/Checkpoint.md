@@ -1,8 +1,20 @@
 # VPE Checkpoint (2026-05-07)
 
-## Build v1.0.7 — Jedi Master Update (Current)
+## Build v1.1.0 — Advanced expansion (current shipping line)
 
-The engine has been upgraded to **Build v1.0.7**, focusing on UI aesthetics ("boxBling"), favorites management, and production stabilization.
+App **`package.json`** / preload label **v1.1.0**. Highlights:
+
+- **Forge gate:** **`vader:sync`** / **`vader:clean-sync`** end with **`vader:post-dev-forge`**: **`vpe:take-state-snapshot`** (`user-data/auto-snapshots/…-AUTO-PRE-BUILD`) → **`vpe:check-readiness`** (forbidden TS-in-`.js` under **`src/main` + `src/renderer`**) → **`build:win`**. All **`&&`** sequential; **`vader:dev`** keeps **`concurrently -k --success first`** and sets **`VPE_LAUNCHER_FORGE=1`** (thermal watchdog during dev).
+- **UI:** Footer **Net** LED + **Purge env** (3000 / 3001 / 9222, node+electron only); **Maintenance** = Repair Logs + **Prompt Vault** (markdown templates + copy **+ version label**); **Sandbox** (react-live / Studio Dark preview).
+- **Docs:** Canonical detail — [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.0). Phrases — [Custom-Commands.md](Custom-Commands.md).
+
+**Active git branch (recent work):** `Node-Launcher-v8` (confirm with `git status`).
+
+---
+
+## Build v1.0.7 — Jedi Master Update (archive summary)
+
+The engine was upgraded to **Build v1.0.7**, focusing on UI aesthetics ("boxBling"), favorites management, and production stabilization.
 
 ### New Features & Logic
 - **UI Aesthetics:** Implemented `.box-bling` CSS with animated gradient borders and `backdrop-filter: blur(10px)`.

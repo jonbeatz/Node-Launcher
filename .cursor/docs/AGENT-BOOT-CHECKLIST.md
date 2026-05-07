@@ -32,7 +32,7 @@ If sources disagree, follow this order (**highest wins first**):
 | :--- | :--- |
 | **What VPE is** | Electron shell + Next.js **static-export** UI: register Node/Next projects, PM2 lifecycle, logs, repair/nuke, thumbnails (see [README.md](../../README.md)). |
 | **Main vs UI** | **`src/main`** (Node, PM2, FS), **`src/preload`** (IPC only), **`src/renderer`** (React/Next, **no** raw Node). **Vader Shield** always. |
-| **Launcher port** | Dev UI: **`http://127.0.0.1:3000`** / `localhost:3000` (renderer). **Managed apps must use a higher port**—not the launcher port. |
+| **Launcher port / forge** | Dev UI: **`http://127.0.0.1:3000`** / `localhost:3000` (renderer). **Managed apps must use a higher port**—not the launcher port. **Vader Sync (v1.1.0+):** after dev, **snapshot → syntax guard → `build:win`** (see protocol). Footer **Net** LED + **Purge** + **Prompt Vault** / **Sandbox** are in-app ops—see **VPE-BUILD-PROTOCOL** §4. |
 | **Persistence** | Canonical store under **`app.getPath('userData')/vpe-db`** (SQLite/JSON); thumbnails under **`userData` media**. Legacy `projects.json` may be migrated/archived. |
 | **E2E / CI** | Playwright, Chromium; **`CI=true`** for deterministic bind—see [../../playwright.config.ts](../../playwright.config.ts) and [.github/workflows/ci.yml](../../.github/workflows/ci.yml). |
 | **Electron debug** | **`npm run dev:main`** uses **`--remote-debugging-port=9222`** — for MCP attach workflows. |
@@ -47,7 +47,7 @@ Read when you need **“where we are today”** or **exact command sequences**:
 | :--- | :--- |
 | [Checkpoint.md](Checkpoint.md) | Branch status, recent milestones, risky areas, files to reopen |
 | [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`restart app`**, **`start app`**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
-| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build & command sequencing** (`vader:dev` / **`vader:sync` / `vader:clean-sync`**, **`&&` gates**, **`concurrently -k`**, **`asar`** / **`npmRebuild`**, Windows outputs / **`prebuild:main`** single-pass) |
+| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build & command sequencing** (`vader:dev` + **`VPE_LAUNCHER_FORGE`**, **`vader:post-dev-forge`**, **`vpe:take-state-snapshot`**, **`vpe:check-readiness`**, **`vader:sync` / `vader:clean-sync`**, **`&&` gates**, **`concurrently -k`**, **`asar`** / **`npmRebuild`**, Windows outputs / **`prebuild:main`** single-pass) |
 | [API-SetUp-Master.md](API-SetUp-Master.md) | **LiteLLM + ngrok → Vertex AI**; Cursor Base URL + `master_key`; **post–Cursor-restart reconnect** checklist |
 | [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) | Packaging, ASAR, winCodeSign, native rebuild, telemetry—**resolved** symptoms |
 
@@ -61,7 +61,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
 - [ ] Intended branch matches [Checkpoint.md](Checkpoint.md) (or `git status` is intentional).
-- [ ] VPE Version: **v1.0.8** (see root `package.json` if disputed)
+- [ ] VPE Version: **v1.1.0** (see root `package.json` if disputed)
 - [ ] Node matches team expectation (CI uses Node **20**; local may differ—note if so).
 - [ ] **`npm install`** already run after last `package.json` change (`legacy-peer-deps` via [../../.npmrc](../../.npmrc)).
 
@@ -109,7 +109,7 @@ Defined in [Custom-Commands.md](Custom-Commands.md):
 - **`rebuild exe`** — icon → export → natives → lint → E2E → package → trim `dist/`
 - **`restart app`** / **`start app`** — stop stray node/electron → **`npm run dev`** (prefer **restart app** when you mean kill-then-dev after changes)
 - **`hardened setup`** — clean install / rebuild / optional Playwright / **`repair:ast`** + E2E + lint  
-- **`Vader Sync`** — **`npm run vader:sync`** (or **`npm run vader:clean-sync`**) — full dev with Electron + Next (**`concurrently -k`** so closing Electron exits Next too), then **`build:win`** for installer + **`win-unpacked`**. **Rules + table:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md). **Phrase / examples:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync).  
+- **`Vader Sync`** — **`npm run vader:sync`** (or **`npm run vader:clean-sync`**) — full dev with Electron + Next (**`concurrently -k --success first`** so closing Electron exits Next too), then **pre-forge snapshot**, **`vpe:check-readiness`**, then **`build:win`**. **Rules + table:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md). **Phrase / examples:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync).  
 - **`new git branch`** — commit/push/version bump pattern (if still current)
 
 ---

@@ -4,7 +4,7 @@
 
 **Cursor ↔ Google (Vertex AI) via LiteLLM + ngrok** (paths, ports, Cursor settings, post-restart checklist): [API-SetUp-Master.md](API-SetUp-Master.md)
 
-**Build & terminal command sequencing** (`vader:dev`, **`vader:sync`**, **`vader:clean-sync`**, `&&` gates, **`dist/`** artifacts): [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md)
+**Build & terminal command sequencing** (`vader:dev`, **`VPE_LAUNCHER_FORGE`**, **`vader:post-dev-forge`**, **`vader:sync`**, **`vader:clean-sync`**, `&&` gates, pre-forge snapshot, syntax guard, **`dist/`** artifacts): [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md)
 
 ## 1. Project Mission
 Vader Project Engine (VPE) is a high-performance command center for Node.js management, optimized for **Vader** hardware (Ryzen 9700x) and the **Vader Protocol** aesthetic.
@@ -13,7 +13,7 @@ Vader Project Engine (VPE) is a high-performance command center for Node.js mana
 When starting a new session, verify the local environment:
 1. **Check Hardware:** Ensure system identifies as Ryzen 9700x / Windows 11 25H2.
 2. **Verify Registry:** Check `projects.json` for data integrity.
-3. **Runtime Check:** Confirm no other processes are occupying the default Next.js port (3000). VPE's auto-increment logic will handle conflicts automatically.
+3. **Runtime / packaging:** Prefer launcher owning **3000** during **`npm run dev`** / Vader dev; use **`npm run vader:sync`** when you need **dev → snapshot → syntax guard → Windows pack** (see [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md)).
 
 ## 3. Communication Protocol
 - **Strict Prefixing:** All functions `msc_`, all classes `msc-`.

@@ -168,7 +168,7 @@ Before marking UI **done**:
 ### Release-oriented phrases (see `Custom-Commands.md`)
 
 - **`rebuild exe`:** Icon staging → *(optional **`npm run build:renderer`** for fail-fast export)* → **`npm run rebuild:natives`** → **`npm run lint`** → **`CI=true npm run test:e2e`** → clean **`dist/`** → **`npm run build:main`** ( **`prebuild:main`** = icon + **`build:renderer`** once ) → trim blockmap / `builder-debug.yml` / `latest.yml`.
-- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — rules in **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**; phrases in **`Custom-Commands.md`** (**`concurrently -k`** dev, then **`build:win`** after Electron closes).
+- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — after **`vader:dev`** exits **0**, **`vader:post-dev-forge`** runs **snapshot** (**`vpe:take-state-snapshot`**) → **syntax guard** (**`vpe:check-readiness`**) → **`build:win`**. Rules: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**; phrases: **`Custom-Commands.md`** (**`concurrently -k --success first`**, **`VPE_LAUNCHER_FORGE`** on **`vader:dev`** only).
 - **`restart app`** / **`start app`:** Stop stray **node/electron** (per **`Custom-Commands`**), then **`npm run dev`**.
 - **`hardened setup`:** Install, **`rebuild:natives`**, optional Playwright browsers, **`repair:ast`**, E2E, lint.
 

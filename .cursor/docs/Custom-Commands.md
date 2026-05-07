@@ -4,7 +4,7 @@ This file tracks shorthand commands you want me to execute in this repo.
 
 **Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [.cursor/docs/VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md).
 
-**Active branch:** `Node-Launcher-v4` (see [Checkpoint](Checkpoint.md) for full status).
+**Active branch:** `Node-Launcher-v8` (see [Checkpoint](Checkpoint.md) for full status).
 
 **Solved problems (symptoms → fixes):** [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
 
@@ -81,22 +81,26 @@ Notes:
 
 ## Vader Sync
 
-Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), **close Electron**, then **`npm run build:win`** runs automatically— **`dist/Vader Project Engine.exe`** (NSIS) + **`dist/win-unpacked/`** (portable **`Vader Project Engine.exe`**).
+Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), **close Electron**, then the **forge gate** runs automatically — **`vpe:take-state-snapshot`** (pre-build ZIP with **`-AUTO-PRE-BUILD`**) → **`vpe:check-readiness`** (syntax guard on **`src/main` / `src/renderer` `*.js`**) → **`npm run build:win`** — producing **`dist/Vader Project Engine.exe`** (NSIS) + **`dist/win-unpacked/`** (portable **`Vader Project Engine.exe`**). If the guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (master command table, **`&&`** / exit-code semantics, **`concurrently -k --success first`**, **`rimraf dist`**, ASAR/native guidance).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (master command table v1.1.0+, **`&&`** / exit-code semantics, **`concurrently -k --success first`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, ASAR/native guidance).
 
 ### How **`vader:sync`** works
 
-- Runs **`npm run vader:dev`**: **`next dev`** and Electron together via **`concurrently -k --success first`**.
+- Runs **`npm run vader:dev`**: **`next dev`** and Electron together via **`concurrently -k --success first`**. **`cross-env`** sets **`VPE_LAUNCHER_FORGE=1`** for this phase (Build Forge / thermal watchdog — see protocol doc).
 - **`--kill-others` semantics:** when **Electron exits** (you closed the window), **Next dev is terminated** too—so the shell reaches the **`&&`** gate (normal **`npm run dev`** leaves Next running and would block forever).
-- If either process crashes (e.g. syntax error), **`concurrently`** exits non‑zero and **`npm run build:win`** does not run.
+- If either process crashes (e.g. syntax error), **`concurrently`** exits non‑zero and **`vader:post-dev-forge`** (snapshot + guard + pack) does not run.
+- After dev exits **0**: **`vader:post-dev-forge`** = **`npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win`** — all **`&&`** gated; a failing step stops before **`electron-builder`**.
 
 ### Commands (repo root)
 
 | Command | When to use |
 | :--- | :--- |
-| **`npm run vader:sync`** | Standard flow: dev session → close Electron → one **`prebuild:main`** (icon + static export) + **`electron-builder`** (NSIS **`dir`** + **`nsis`**) → installer + **`win-unpacked`**. |
+| **`npm run vader:sync`** | Standard flow: dev session → close Electron → **auto snapshot** (**`-AUTO-PRE-BUILD`**) → **syntax guard** → **`prebuild:main`** (icon + static export) + **`electron-builder`** → installer + **`win-unpacked`**. |
 | **`npm run vader:clean-sync`** | Same as **`vader:sync`**, but first deletes **`dist/`** (**`rimraf`**) so no stale installer/win-unpacked from an older patch. Recommended when bumping versions or nuking ghosts. |
+| **`npm run vader:post-dev-forge`** | Usually internal: snapshot + **`vpe:check-readiness`** + **`build:win`**. Same order as the tail of **`vader:sync`**. |
+| **`npm run vpe:take-state-snapshot`** | Headless pre-forge backup only (CLI **`userData`** path mirrors main process). |
+| **`npm run vpe:check-readiness`** | JS syntax guard only; exit **1** lists **`VPE_SYNTAX_GUARD:`** hits. |
 
 **Not parallel:** packaging runs **after** dev exits—you verify first, then the 9700x runs the forge.
 

@@ -13,6 +13,8 @@ To maintain architectural integrity, all development must follow this strict hie
 4. **Node-Launcher-PRD.md**: Feature and requirement truth.
 5. **package.json**: Authority for executable scripts only.
 
+**Packaging pipeline (v1.1.0+):** **`npm run vader:sync`** runs **`vader:dev`**, then **automatic** **`vpe:take-state-snapshot`** (pre-build checkpoint), **`vpe:check-readiness`** (JS syntax guard), and **`build:win`**. Full command table: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**.
+
 ---
 
 ## 🛠 2. Technical Core & Architecture
