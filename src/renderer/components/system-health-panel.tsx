@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Activity, RefreshCw, AlertTriangle, XCircle, Loader2, Zap, Trash2 } from 'lucide-react'
 import { useVpeSystemStats } from '@/hooks/use-vpe-system-stats'
 import { getVpeApi } from '@/lib/vpe-bridge'
@@ -23,6 +23,41 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
     useVpeSystemStats(isOpen, 3000)
   /** Only real diagnostics; populated when wired to engine checks */
   const [warnings, setWarnings] = useState<Warning[]>([])
+
+  const handleKillPort = useCallback(async (port: number) => {
+    const api = getVpeApi()
+    if (!api?.killProcessOnPort) return
+    const res = await api.killProcessOnPort(port)
+    if (res.ok) {
+      setWarnings(prev => prev.filter(w => !w.message.includes(`Port ${port}`)))
+      await refetchSystemStats()
+    }
+  }, [refetchSystemStats])
+
+  // Detect orphaned ports from projects list
+  useEffect(() => {
+    if (!isOpen) return
+    const api = getVpeApi()
+    if (!api) return
+    api.getProjects().then(projects => {
+      const newWarnings: Warning[] = []
+      projects.forEach(p => {
+        // If the database says it's stopped, but the health check says something is listening
+        if (p.status === 'stopped' && p.health_reachable) {
+          newWarnings.push({
+            id: `port-${p.port}`,
+            severity: 'warning',
+            message: `Port ${p.port} (${p.name}) is occupied by an orphaned Node process.`,
+            action: { label: 'KILL PROCESS & CLAIM PORT', onClick: () => handleKillPort(p.port) }
+          })
+        }
+      })
+      setWarnings(prev => {
+        const others = prev.filter(w => !w.id.startsWith('port-'))
+        return [...others, ...newWarnings]
+      })
+    })
+  }, [isOpen, handleKillPort])
 
   const handleQuickCheck = async () => {
     setRunningCheck(true)
@@ -49,6 +84,8 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
 
   const cpuDisplay =
     systemStats != null && systemStats.cpu >= 0 ? `${systemStats.cpu}%` : '—'
+  const cpuTempDisplay = 
+    systemStats?.cpuTemp != null ? `${systemStats.cpuTemp}°C` : '—'
   const projectsLine =
     systemStats != null
       ? `${systemStats.projects.active} of ${systemStats.projects.total} active`
@@ -57,7 +94,7 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
     systemStats != null ? `${systemStats.memory.free.toFixed(2)} GB` : '—'
   const resourcesLine =
     systemStats != null
-      ? `CPU: ${cpuDisplay} | RAM: ${memFreeLabel} free (${systemStats.memory.percentage}% used)`
+      ? `CPU: ${cpuDisplay} (${cpuTempDisplay}) | RAM: ${memFreeLabel} free (${systemStats.memory.percentage}% used)`
       : '—'
 
   if (!isOpen) return null
@@ -234,9 +271,9 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
             )}
           </button>
 
-          <p className="font-sans text-[10px] text-[#555555] text-center pt-2">
-            Powered by the MSC Media Engine v1.0
-          </p>
+        <p className="font-sans text-[10px] text-[#555555] text-center pt-2">
+          Powered by the MSC Media Engine v1.0.7
+        </p>
         </div>
       </div>
     </>

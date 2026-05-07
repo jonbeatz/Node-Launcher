@@ -193,6 +193,7 @@ function msc_buildSanitizedSystemStatsPayload(p) {
       active: Math.max(0, Math.floor(Number(p.projectsActive) || 0)),
       total: Math.max(0, Math.floor(Number(p.projectsTotal) || 0)),
     },
+    cpuTemp: p.cpuTemp != null ? Math.round(p.cpuTemp) : null,
   };
 }
 
@@ -485,6 +486,27 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
         pm2ProcessCount = 0;
       }
 
+      let cpuTemp = null;
+      try {
+        const { execSync } = require('child_process');
+        // Primary: MSAcpi_ThermalZoneTemperature
+        let cmd = 'Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature | Select-Object -ExpandProperty CurrentTemperature';
+        let res = execSync(`powershell -Command "${cmd}"`, { windowsHide: true }).toString().trim();
+        
+        if (!res) {
+          // Fallback: Win32_TemperatureProbe (may return null on some boards)
+          cmd = 'Get-WmiObject -Class Win32_TemperatureProbe | Select-Object -ExpandProperty CurrentReading';
+          res = execSync(`powershell -Command "${cmd}"`, { windowsHide: true }).toString().trim();
+        }
+
+        if (res) {
+          // Convert decikelvins to Celsius: (dK / 10) - 273.15
+          cpuTemp = (Number(res) / 10) - 273.15;
+        }
+      } catch {
+        // Fallback or ignore if WMI fails
+      }
+
       return msc_buildSanitizedSystemStatsPayload({
         cpuPercent,
         totalMem,
@@ -495,6 +517,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
         vpeUptimeLabel,
         projectsActive,
         projectsTotal,
+        cpuTemp,
       });
     } catch (err) {
       return msc_fallbackSystemStats(err);
@@ -843,6 +866,271 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       return { ok: true, id: projectId };
     }
     return { ok: true, id: projectId, skipped: 'pm2_unavailable' };
+  });
+
+  ipcMain.handle('vpe:set-project-favorite', async (_event, { projectId, isFavorite }) => {
+    if (!projectId) throw new Error('VPE: Missing project id');
+    store.setProjectFavorite(projectId, isFavorite);
+    msc_emitProjectsUpdated();
+    return { ok: true };
+  });
+
+  ipcMain.handle('vpe:execute-terminal-command', async (_event, payload) => {
+    const { execSync } = require('child_process');
+    const command = typeof payload === 'string' ? payload : payload.command;
+    const trimmed = command.trim().toLowerCase();
+    
+    if (trimmed === '/clean') {
+      try {
+        const ports = [3000, 9222];
+        let output = 'Vader: Initiating port cleanup...\n';
+        for (const port of ports) {
+          try {
+            const netstat = execSync(`netstat -ano | findstr :${port}`).toString();
+            const pids = new Set(netstat.split('\n').map(l => l.trim().split(/\s+/).pop()).filter(p => p && !isNaN(p) && p !== '0'));
+            for (const pid of pids) {
+              const processInfo = execSync(`tasklist /FI "PID eq ${pid}" /NH`).toString().trim();
+              const isVpeProcess = /node\.exe|electron\.exe|Vader-Project-Engine\.exe/i.test(processInfo);
+              
+              if (!isVpeProcess) {
+                output += `Non-VPE process detected (${processInfo.split(/\s+/)[0]}) on port ${port}. Skipped. Use manual kill for external processes.\n`;
+                continue;
+              }
+
+              execSync(`taskkill /F /PID ${pid}`);
+              output += `Killed process ${pid} on port ${port}\n`;
+            }
+          } catch {
+            output += `Port ${port} already clear.\n`;
+          }
+        }
+        return { ok: true, output: output + 'Cleanup complete.' };
+      } catch (err) {
+        return { ok: false, output: `Cleanup failed: ${err.message}` };
+      }
+    }
+
+    if (trimmed === '/ports') {
+      try {
+        const output = execSync('netstat -ano | findstr LISTENING').toString();
+        return { ok: true, output };
+      } catch (err) {
+        return { ok: false, output: `Failed to list ports: ${err.message}` };
+      }
+    }
+
+    if (trimmed === '/vpe') {
+      try {
+        const output = execSync('tasklist /FI "IMAGENAME eq Vader-Project-Engine.exe"').toString();
+        return { ok: true, output };
+      } catch (err) {
+        return { ok: false, output: `Failed to check VPE: ${err.message}` };
+      }
+    }
+
+    if (trimmed === '/diag') {
+      try {
+        const ping = execSync('ping 8.8.8.8 -n 1').toString();
+        const nodeVer = execSync('node -v').toString().trim();
+        const output = `VPE Diagnostic:\n- Node Version: ${nodeVer}\n- Network: ${ping.includes('TTL=') ? 'ONLINE' : 'OFFLINE'}\n- Time: ${new Date().toLocaleString()}`;
+        return { ok: true, output };
+      } catch (err) {
+        return { ok: false, output: `Diagnostic failed: ${err.message}` };
+      }
+    }
+
+    if (trimmed === '/vader') {
+      const vaderAscii = `
+   _________________
+  < DARK SIDE ONLINE >
+   -----------------
+          \\
+           \\    ___
+               /   \\
+              |  O  |
+              \\ ___ /
+               |   |
+              /|   |\\
+             / |___| \\
+      `;
+      const stats = execSync('powershell -Command "Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty Caption"').toString().trim();
+      return { ok: true, output: `${vaderAscii}\nSystem: ${stats}` };
+    }
+
+    if (trimmed === '/repair') {
+      try {
+        const activeProjectId = payload?.activeProjectId;
+        const project = activeProjectId ? store.getProject(activeProjectId) : null;
+        if (project && project.path) {
+          execSync('npm cache clean --force', { cwd: project.path });
+          return { ok: true, output: `Vader: npm cache purged for ${project.name}. Deep repair initiated.` };
+        }
+        execSync('npm cache clean --force');
+        return { ok: true, output: 'Vader: global npm cache purged. Deep repair initiated.' };
+      } catch (err) {
+        return { ok: false, output: `Repair failed: ${err.message}` };
+      }
+    }
+
+    return { ok: false, output: 'Unknown slash command.' };
+  });
+
+  ipcMain.handle('vpe:take-state-snapshot', async (event) => {
+    const { execSync } = require('child_process');
+    const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+    const { canceled, filePath } = await dialog.showSaveDialog(win || undefined, {
+      title: 'Save VPE State Snapshot',
+      defaultPath: `vpe-snapshot-${new Date().toISOString().replace(/[:.]/g, '-')}.vader-checkpoint`,
+      filters: [{ name: 'Vader Checkpoint', extensions: ['vader-checkpoint'] }],
+    });
+
+    if (canceled || !filePath) return { ok: false };
+
+    try {
+      const userData = app.getPath('userData');
+      const dbPath = path.join(userData, 'vpe-db', 'database.sqlite');
+      const tempDir = path.join(os.tmpdir(), `vpe-snapshot-${randomUUID()}`);
+      fs.mkdirSync(tempDir, { recursive: true });
+
+      // Copy SQLite
+      if (fs.existsSync(dbPath)) {
+        fs.copyFileSync(dbPath, path.join(tempDir, 'database.sqlite'));
+      }
+
+      // Copy environment files from current project
+      // Note: This logic assumes we want the Node-Launcher's own env if present, 
+      // or we might want to iterate registered projects. For now, let's target root VPE env.
+      const rootEnv = path.join(process.cwd(), '.env');
+      const rootEnvLocal = path.join(process.cwd(), '.env.local');
+      if (fs.existsSync(rootEnv)) fs.copyFileSync(rootEnv, path.join(tempDir, '.env'));
+      if (fs.existsSync(rootEnvLocal)) fs.copyFileSync(rootEnvLocal, path.join(tempDir, '.env.local'));
+
+      // Use PowerShell to zip (standard on Windows 10+)
+      // Fix: Compress-Archive requires .zip extension. We'll zip then rename.
+      const zipPath = path.join(os.tmpdir(), `vpe-snapshot-${randomUUID()}.zip`);
+      const zipCmd = `powershell -Command "Compress-Archive -Path \\"\\"${tempDir}\\\\*\\"\\" -DestinationPath \\"\\"${zipPath}\\"\\" -Force"`;
+      execSync(zipCmd);
+
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      // Use PowerShell to copy/remove to bypass locks
+      const finalCmd = `powershell -Command "Copy-Item -Path \\"\\"${zipPath}\\"\\" -Destination \\"\\"${filePath}\\"\\" -Force; Remove-Item -Path \\"\\"${zipPath}\\"\\" -Force"`;
+      execSync(finalCmd);
+
+      // Cleanup temp
+      fs.rmSync(tempDir, { recursive: true, force: true });
+
+      return { ok: true, path: filePath };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('vpe:restore-state-snapshot', async (event) => {
+    const { execSync } = require('child_process');
+    const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = await dialog.showOpenDialog(win || undefined, {
+      title: 'Restore VPE State Snapshot',
+      filters: [{ name: 'Vader Checkpoint', extensions: ['vader-checkpoint'] }],
+      properties: ['openFile'],
+    });
+
+    if (canceled || !filePaths?.[0]) return { ok: false };
+
+    try {
+      // Confirmation dialog
+      const { response } = await dialog.showMessageBox(win || undefined, {
+        type: 'warning',
+        title: 'Restore Snapshot',
+        message: 'This will overwrite your current database and settings. Continue?',
+        buttons: ['Cancel', 'Restore'],
+        defaultId: 0,
+      });
+
+      if (response === 0) return { ok: false };
+
+      const filePath = filePaths[0];
+      const userData = app.getPath('userData');
+      const dbDir = path.join(userData, 'vpe-db');
+      const tempDir = path.join(os.tmpdir(), `vpe-restore-${randomUUID()}`);
+      fs.mkdirSync(tempDir, { recursive: true });
+
+      // Stop all engines first
+      await msc_vpeStopAllEngines();
+
+      // Unzip using PowerShell
+      const unzipCmd = `powershell -Command "Expand-Archive -Path """${filePath}""" -DestinationPath """${tempDir}""" -Force"`;
+      execSync(unzipCmd);
+
+      // Restore SQLite
+      const restoredDb = path.join(tempDir, 'database.sqlite');
+      if (fs.existsSync(restoredDb)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+        fs.copyFileSync(restoredDb, path.join(dbDir, 'database.sqlite'));
+      }
+
+      // Restore Envs (optional, risk of breaking local paths if restored on different machine)
+      const restoredEnv = path.join(tempDir, '.env');
+      if (fs.existsSync(restoredEnv)) fs.copyFileSync(restoredEnv, path.join(process.cwd(), '.env'));
+
+      // Cleanup temp
+      fs.rmSync(tempDir, { recursive: true, force: true });
+
+    // Signal reload
+    app.relaunch();
+    app.exit();
+
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('vpe:open-explorer', async (_event, folderPath) => {
+  if (!folderPath) throw new Error('VPE: Missing folder path');
+  try {
+    if (fs.existsSync(folderPath)) {
+      await shell.openPath(folderPath);
+      return { ok: true };
+    } else {
+      return { ok: false, error: `Path does not exist: ${folderPath}` };
+    }
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => {
+  if (!projectPath) throw new Error('VPE: Missing project path');
+  const { exec } = require('child_process');
+  try {
+    if (type === 'powershell') {
+      // Use PowerShell 7 (pwsh.exe) with RunAs Admin and explicit working directory
+      const pwshPath = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
+      const usePwsh = fs.existsSync(pwshPath);
+      const shellCmd = usePwsh ? pwshPath : 'powershell.exe';
+      
+      exec(`start powershell -Command "Start-Process \\"${shellCmd}\\" -ArgumentList \\"-WorkingDirectory \\"\\"${projectPath}\\"\\"\\" -Verb RunAs"`);
+    } else {
+      exec(`start powershell -Command "Start-Process cmd -ArgumentList \\"/K cd /d \\"\\"${projectPath}\\"\\"\\" -Verb RunAs"`);
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('vpe:kill-process-on-port', async (_event, port) => {
+    const { execSync } = require('child_process');
+    try {
+      const netstat = execSync(`netstat -ano | findstr :${port}`).toString();
+      const pids = new Set(netstat.split('\n').map(l => l.trim().split(/\s+/).pop()).filter(p => p && !isNaN(p) && p !== '0'));
+      for (const pid of pids) {
+        execSync(`taskkill /F /PID ${pid}`);
+      }
+      return { ok: true, message: `Killed all processes on port ${port}.` };
+    } catch (err) {
+      return { ok: false, message: `Failed to clear port ${port}: ${err.message}` };
+    }
   });
 }
 

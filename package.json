@@ -1,7 +1,7 @@
 {
   "name": "vader-project-engine",
-  "version": "1.0.0",
-  "description": "High-performance desktop command center for Node.js development",
+  "version": "1.0.7",
+  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.0.7",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "start": "electron . --remote-debugging-port=9222",
     "dev:renderer": "next dev src/renderer -p 3000",
     "build": "npm run build:renderer && npm run build:main",
+    "build:win": "npm run build:renderer && npm run build:main",
     "prebuild:main": "node scripts/msc-copy-release-icon.cjs && npm run build:renderer",
     "build:main": "node scripts/msc-run-electron-builder.cjs",
     "build:renderer": "next build src/renderer",
@@ -152,6 +153,12 @@
       "executableName": "Vader Project Engine",
       "signAndEditExecutable": false,
       "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        },
         {
           "target": "nsis",
           "arch": [

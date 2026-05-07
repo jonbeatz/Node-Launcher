@@ -342,7 +342,7 @@ export function LogDrawer({
     return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
   }
 
-  const handleCommand = (command: string) => {
+  const handleCommand = async (command: string) => {
     const trimmedCommand = command.trim().toLowerCase()
     
     const newLogs: LogEntry[] = [
@@ -350,19 +350,34 @@ export function LogDrawer({
       { type: 'command' as const, time: getCurrentTime(), label: 'root@vpe:~#', message: command }
     ]
 
-    if (trimmedCommand === 'clear') {
+    if (trimmedCommand === '/flush' || trimmedCommand === 'clear') {
       setLogs([])
       return
     }
 
-    const response = COMMAND_RESPONSES[trimmedCommand]
-    if (response) {
-      setLogs([...newLogs, ...response])
+    if (trimmedCommand.startsWith('/')) {
+      const api = getVpeApi()
+      if (api?.executeTerminalCommand) {
+        const res = await api.executeTerminalCommand(trimmedCommand, selectedProject)
+        const entries: LogEntry[] = res.output.split('\n').filter(l => l.trim()).map(line => ({
+          type: res.ok ? 'output' : 'error',
+          time: getCurrentTime(),
+          message: line
+        }))
+        setLogs([...newLogs, ...entries])
+      } else {
+        setLogs([...newLogs, { type: 'error', time: getCurrentTime(), message: 'Engine API unavailable.' }])
+      }
     } else {
-      setLogs([
-        ...newLogs,
-        { type: 'error' as const, time: '', label: '', message: `Command not recognized. Type 'help' for available commands.` }
-      ])
+      const response = COMMAND_RESPONSES[trimmedCommand]
+      if (response) {
+        setLogs([...newLogs, ...response])
+      } else {
+        setLogs([
+          ...newLogs,
+          { type: 'error' as const, time: '', label: '', message: `Command not recognized. Type 'help' for available commands.` }
+        ])
+      }
     }
 
     setCommandHistory(prev => [...prev, command])
@@ -469,11 +484,15 @@ export function LogDrawer({
         </div>
 
         {/* Floating Terminal Area */}
-        <div className="flex-1 min-h-0 overflow-hidden relative">
+        <div className="flex-1 min-h-[150px] overflow-hidden relative">
           <div 
             ref={terminalRef}
-            className="absolute inset-0 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain p-4"
-            style={{ boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)' }}
+            className="absolute inset-0 bg-[#0a0a0a] overflow-y-scroll overscroll-y-contain p-4 vpe-log-container"
+            style={{ 
+              boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)',
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#e02b20 #1c1c1c'
+            }}
             onClick={() => inputRef.current?.focus()}
           >
             <div className="relative z-20 space-y-0.5">
@@ -638,11 +657,15 @@ export function LogDrawer({
           </div>
 
           {/* Terminal Area */}
-          <div className="flex-1 min-h-0 overflow-hidden relative">
+          <div className="flex-1 min-h-[200px] overflow-hidden relative">
             <div 
               ref={terminalRef}
-              className="absolute inset-0 bg-[#0a0a0a] overflow-y-scroll overscroll-y-contain p-4 crt-scanlines"
-              style={{ boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)' }}
+              className="absolute inset-0 bg-[#0a0a0a] overflow-y-scroll overscroll-y-contain p-4 crt-scanlines vpe-log-container"
+              style={{ 
+                boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)',
+                scrollbarWidth: 'thin',
+                scrollbarColor: '#e02b20 #1c1c1c'
+              }}
               onClick={() => inputRef.current?.focus()}
             >
               <div className="relative z-20 space-y-0.5">
@@ -688,7 +711,7 @@ export function LogDrawer({
               <GripVertical size={12} className="text-[#555555]" />
             </div>
             <span className="font-sans text-[10px] text-[#555555] text-center">
-              Powered by the MSC Media Engine v1.0
+              Powered by the MSC Media Engine v1.0.7
             </span>
           </div>
         </>

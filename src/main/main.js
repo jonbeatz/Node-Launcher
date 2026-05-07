@@ -277,6 +277,22 @@ function msc_createWindow() {
     mainWindow.show();
   });
 
+  mainWindow.on('minimize', (event) => {
+    try {
+      const db = msc_getDatabase();
+      const settings = db.getSettings?.();
+      // Ensure we explicitly check the toggle from the persistent store
+      const minimizeToTray = settings?.minimize_to_tray === true || settings?.minimize_to_tray === 1;
+      
+      if (minimizeToTray) {
+        event.preventDefault();
+        mainWindow.hide();
+      }
+    } catch (_) {
+      /* ignore - fallback to default minimize */
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
     if (projectRunner) {

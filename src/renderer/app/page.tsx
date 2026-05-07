@@ -44,6 +44,7 @@ interface Project {
   health_http_code?: number | null
   health_checked_at?: string | null
   health_reachable?: boolean | null
+  is_favorite?: boolean
 }
 
 /** Browser fallback when `window.vpeAPI` is unavailable (Next standalone). */
@@ -378,6 +379,24 @@ function DashboardContent() {
     }
   }
 
+  const handleToggleFavorite = async (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId)
+    if (!project) return
+    const api = getVpeApi()
+    if (api?.setProjectFavorite) {
+      try {
+        await api.setProjectFavorite(projectId, !project.is_favorite)
+        // refreshProjects is called via IPC subscription update
+      } catch (err: unknown) {
+        addToast('Favorite toggle failed', 'error', err instanceof Error ? err.message : 'Unknown error')
+      }
+    } else {
+      setProjects((prev) =>
+        prev.map((p) => (p.id === projectId ? { ...p, is_favorite: !p.is_favorite } : p))
+      )
+    }
+  }
+
   const handlePatchStartScript = useCallback(
     async (projectId: string) => {
       const api = getVpeApi()
@@ -621,8 +640,16 @@ function DashboardContent() {
     addToast('Refreshing statuses...', 'info', 'Syncing with PM2 daemon')
   }
 
-  const handleOpenExplorer = () => {
-    addToast('Opening Explorer...', 'info')
+  const handleOpenExplorer = async () => {
+    const api = getVpeApi()
+    if (api?.openExplorer) {
+      const res = await api.openExplorer('D:/Cursor_Projectz/Node-Launcher')
+      if (!res.ok) {
+        addToast('Explorer failed', 'error', res.error)
+      }
+    } else {
+      addToast('Opening Explorer...', 'info')
+    }
   }
 
   const handleNavigation = (nav: string) => {
@@ -657,6 +684,7 @@ function DashboardContent() {
 
   // Projects for log drawer (only show projects with logs open)
   const logProjects = projects.filter(p => p.status === 'running' || p.status === 'building' || p.id === activeLogProject)
+  const favorites = useMemo(() => projects.filter(p => p.is_favorite), [projects])
 
   const logDrawerTabs = useMemo(() => {
     const tail = logProjects.map((p) => ({
@@ -696,6 +724,7 @@ function DashboardContent() {
           onNavigate={handleNavigation}
           onAddProject={() => setAddProjectModalOpen(true)}
           onStopAll={handleStopAll}
+          favorites={favorites}
         />
 
         {/* Main Area */}
@@ -834,6 +863,7 @@ function DashboardContent() {
                         {filteredProjects.map((project) => (
                           <Msc_ProjectCard
                             key={project.id}
+                            id={project.id}
                             name={project.name}
                             port={project.port}
                             uptime={project.uptime}
@@ -841,6 +871,8 @@ function DashboardContent() {
                             health_http_code={project.health_http_code}
                             health_checked_at={project.health_checked_at}
                             health_reachable={project.health_reachable}
+                            isFavorite={project.is_favorite}
+                            onToggleFavorite={() => handleToggleFavorite(project.id)}
                             thumbnailUrl={
                               project.thumbnail_url ?? undefined
                             }
@@ -932,9 +964,31 @@ function DashboardContent() {
           y={contextMenu.y}
           isOpen={true}
           onClose={() => setContextMenu(null)}
-          onOpenExplorer={() => addToast('Opening Explorer...', 'info')}
+          onOpenExplorer={async () => {
+            const project = projects.find(p => p.id === contextMenu.projectId)
+            if (project?.path) {
+              const api = getVpeApi()
+              if (api?.openExplorer) {
+                const res = await api.openExplorer(project.path)
+                if (!res.ok) addToast('Explorer failed', 'error', res.error)
+              } else {
+                addToast('Opening Explorer...', 'info')
+              }
+            }
+          }}
           onOpenVSCode={() => addToast('Opening VS Code...', 'info')}
-          onOpenTerminal={() => addToast('Opening Terminal...', 'info')}
+          onOpenTerminal={async () => {
+            const project = projects.find(p => p.id === contextMenu.projectId)
+            if (project?.path) {
+              const api = getVpeApi()
+              if (api?.openShell) {
+                const res = await api.openShell(project.path, 'powershell')
+                if (!res.ok) addToast('Shell failed', 'error', res.error)
+              } else {
+                addToast('Opening Terminal...', 'info')
+              }
+            }
+          }}
           onRecaptureThumbnail={() => addToast('Recapturing thumbnail...', 'info')}
           onRunBuild={() => {
             const id = contextMenu?.projectId

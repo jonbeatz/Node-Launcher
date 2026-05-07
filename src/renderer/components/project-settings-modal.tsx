@@ -388,11 +388,17 @@ export function ProjectSettingsModal({
           <section>
             <h3 className="font-sans text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">ADVANCED</h3>
             <div className="flex flex-col gap-2">
-              <button className="h-9 rounded border border-[#333333] font-sans text-sm text-white hover:border-[#4fde82] transition-all vader-focus flex items-center justify-center gap-2">
+              <button 
+                onClick={() => window.vpeAPI?.openShell?.(path, 'powershell')}
+                className="h-9 rounded border border-[#333333] font-sans text-sm text-white hover:border-[#4fde82] transition-all vader-focus flex items-center justify-center gap-2"
+              >
                 <Terminal size={14} />
                 OPEN POWERSHELL HERE
               </button>
-              <button className="h-9 rounded border border-[#333333] font-sans text-sm text-white hover:border-[#4fde82] transition-all vader-focus flex items-center justify-center gap-2">
+              <button 
+                onClick={() => window.vpeAPI?.openShell?.(path, 'cmd')}
+                className="h-9 rounded border border-[#333333] font-sans text-sm text-white hover:border-[#4fde82] transition-all vader-focus flex items-center justify-center gap-2"
+              >
                 <Terminal size={14} />
                 OPEN COMMAND PROMPT HERE
               </button>
@@ -419,9 +425,9 @@ export function ProjectSettingsModal({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[#333333] flex flex-col gap-2 sticky bottom-0 bg-[#1c1c1c]">
-          <span className="font-sans text-[10px] text-[#555555] text-center">
-            Powered by the MSC Media Engine v1.0
-          </span>
+        <span className="font-sans text-[10px] text-[#555555] text-center">
+          Powered by the MSC Media Engine v1.0.7
+        </span>
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={onClose}

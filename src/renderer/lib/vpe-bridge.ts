@@ -15,6 +15,7 @@ export interface VpeProjectRow {
   health_checked_at?: string | null
   /** Whether TCP/HTTP reply was received (vs connection error). SQLite may return 0/1. */
   health_reachable?: boolean | number | null
+  is_favorite?: number | boolean | null
 }
 
 export interface VpeUnifiedLogRow {
@@ -81,6 +82,7 @@ export interface VpeSystemStats {
     active: number
     total: number
   }
+  cpuTemp?: number | null
 }
 
 export type VpeRepairRunStatus = 'success' | 'partial' | 'failed'
@@ -180,6 +182,13 @@ export interface VpeApi {
     backupPath?: string
     scriptName?: string
   }>
+  takeStateSnapshot?: () => Promise<{ ok: boolean; path?: string; error?: string }>
+  restoreStateSnapshot?: () => Promise<{ ok: boolean; error?: string }>
+  executeTerminalCommand?: (command: string, activeProjectId?: string) => Promise<{ ok: boolean; output: string }>
+  openExplorer?: (folderPath: string) => Promise<{ ok: boolean; error?: string }>
+  openShell?: (path: string, type: 'powershell' | 'cmd') => Promise<{ ok: boolean; error?: string }>
+  killProcessOnPort?: (port: number) => Promise<{ ok: boolean; message: string }>
+  setProjectFavorite?: (projectId: string, isFavorite: boolean) => Promise<{ ok: boolean }>
 }
 
 declare global {
@@ -209,6 +218,7 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   health_http_code?: number | null
   health_checked_at?: string | null
   health_reachable?: boolean | null
+  is_favorite?: boolean | null
 } {
   const pm =
     row.pkg_manager === 'yarn' || row.pkg_manager === 'pnpm'
@@ -240,5 +250,6 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
         : row.health_reachable === false || row.health_reachable === 0
           ? false
           : null,
+    is_favorite: row.is_favorite === true || row.is_favorite === 1,
   }
 }

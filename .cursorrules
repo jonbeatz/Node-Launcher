@@ -7,6 +7,7 @@ alwaysApply: true
 
 ## 1. Project Context & Identity
 - **Project Name:** Vader Project Engine (VPE)
+- **Current Version:** v1.0.7
 - **Target Hardware:** AMD Ryzen 9700x / Gigabyte B650 (Optimized for high-performance I/O)
 - **OS Focus:** Windows 11 25H2 (Native optimizations for Defender/Antivirus paths)
 - **Branding:** My Studio Channel (MSC) / Vader Protocol
@@ -55,11 +56,13 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Top Bar:** 48px height with dynamic breadcrumbs (`VPE > Projects > [ProjectName]`); left-aligned logomark + breadcrumb; right-aligned settings icon
 - **Project Cards:**
   - 320px minimum width; 4:3 WebP thumbnails (rounded top only); pulsing status LEDs (8px circle, #e02b20 pulse)
+  - **boxBling Effect:** Subtle animated gradient border with `backdrop-filter: blur(10px)` and neon hover glow.
   - 40px sparkline strip at bottom with hairline border (#333) and low-opacity Vader Red waveform; no axes, minimal ticks
   - "9700x Tuned" pill badge in top-right corner (#A0A0A0 text, #1c1c1c bg, #333 border)
   - Hover: scale 1.02, shadow-vader-glow
 - **Log Drawer:** 420px width; glassmorphic surface (bg #1c1c1c at 80% opacity); backdrop-blur
   - Terminal area: background #0a0a0a; JetBrains Mono font
+  - **Force Scrollbar:** Width 10px, Thumb #ff0000 (Vader Red), `z-index: 9999`, `scrollbar-gutter: stable both-edges`.
   - CRT scanline overlay: repeating 1px horizontal lines, #000000 at 2% opacity, 3px spacing
   - Vignette: inner box-shadow `inset 0 0 100px rgba(0,0,0,0.6)`
   - Bottom status bar showing PM2 process ID and runtime

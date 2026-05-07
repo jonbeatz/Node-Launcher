@@ -39,6 +39,38 @@ export function AppSettingsModal({
   const [fontSize, setFontSize] = useState(13)
   const [scrollbackLines, setScrollbackLines] = useState(1000)
 
+  const handleTakeSnapshot = async () => {
+    const api = getVpeApi()
+    if (!api?.takeStateSnapshot) return
+    setDbBusy(true)
+    try {
+      const res = await api.takeStateSnapshot()
+      if (res.ok && res.path) {
+        addToast('Snapshot saved', 'success', res.path)
+      } else if (res.error) {
+        addToast('Snapshot failed', 'error', res.error)
+      }
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  const handleRestoreSnapshot = async () => {
+    const api = getVpeApi()
+    if (!api?.restoreStateSnapshot) return
+    setDbBusy(true)
+    try {
+      const res = await api.restoreStateSnapshot()
+      if (res.ok) {
+        addToast('Restoring snapshot...', 'info', 'System will relaunch.')
+      } else if (res.error) {
+        addToast('Restore failed', 'error', res.error)
+      }
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
   useEffect(() => {
     if (!isOpen) {
       setClearAllOpen(false)
@@ -361,7 +393,36 @@ export function AppSettingsModal({
           {/* Database Actions */}
           <section className="border-t border-[#333333] pt-6">
             <h3 className="font-sans text-[10px] text-[#4fde82] uppercase tracking-[0.1em] mb-2">
-              DATABASE ACTIONS
+              DATABASE & STATE ACTIONS
+            </h3>
+          <p className="font-sans text-[11px] text-[#555555] mb-4">
+            Snapshot management for database and environment state. Powered by the MSC Media Engine v1.0.7
+          </p>
+            <div className="space-y-3 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={dbBusy}
+                  onClick={handleTakeSnapshot}
+                  className="h-9 rounded bg-[#252525] border border-[#333333] font-sans text-xs text-white hover:border-[#4fde82] transition-all vader-focus flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Download size={14} />
+                  TAKE STATE SNAPSHOT
+                </button>
+                <button
+                  type="button"
+                  disabled={dbBusy}
+                  onClick={handleRestoreSnapshot}
+                  className="h-9 rounded bg-[#252525] border border-[#333333] font-sans text-xs text-white hover:border-[#e02b20] transition-all vader-focus flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Upload size={14} />
+                  RESTORE STATE SNAPSHOT
+                </button>
+              </div>
+            </div>
+
+            <h3 className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] mb-2">
+              CATALOG PORTABILITY
             </h3>
             <p className="font-sans text-[11px] text-[#555555] mb-4">
               Backup or restore the project registry (SQLite). Import merge keeps existing IDs; replace wipes the catalog first.
@@ -480,7 +541,7 @@ export function AppSettingsModal({
             </button>
           </div>
           <span className="font-sans text-[10px] text-[#555555]">
-            Powered by the MSC Media Engine v1.0
+            Powered by the MSC Media Engine v1.0.7
           </span>
         </div>
       </div>

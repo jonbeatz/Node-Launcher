@@ -41,11 +41,20 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     ipcRenderer.invoke('vpe:get-unified-logs', limit),
   patchStartScript: (projectId) =>
     ipcRenderer.invoke('vpe:patch-start-script', projectId),
+  takeStateSnapshot: () => ipcRenderer.invoke('vpe:take-state-snapshot'),
+  restoreStateSnapshot: () => ipcRenderer.invoke('vpe:restore-state-snapshot'),
+  executeTerminalCommand: (command, activeProjectId) =>
+    ipcRenderer.invoke('vpe:execute-terminal-command', { command, activeProjectId }),
+  openExplorer: (folderPath) => ipcRenderer.invoke('vpe:open-explorer', folderPath),
+  openShell: (path, type) => ipcRenderer.invoke('vpe:open-shell', { path, type }),
+  killProcessOnPort: (port) => ipcRenderer.invoke('vpe:kill-process-on-port', port),
+  setProjectFavorite: (projectId, isFavorite) =>
+    ipcRenderer.invoke('vpe:set-project-favorite', { projectId, isFavorite }),
 });
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.0.0',
+  version: '1.0.7',
   hardware: '9700x Tuned',
 });
 

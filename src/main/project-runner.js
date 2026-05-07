@@ -1,5 +1,5 @@
 const EventEmitter = require('events');
-const { spawn, execSync } = require('child_process');
+const { spawn, execSync, exec } = require('child_process');
 const fs = require('fs');
 const net = require('net');
 const path = require('path');

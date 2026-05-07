@@ -8,7 +8,10 @@ import {
   ChevronRight,
   Plus,
   FileText,
-  Square
+  Square,
+  Star,
+  Activity,
+  ChevronDown
 } from 'lucide-react'
 
 interface AppSidebarProps {
@@ -16,11 +19,13 @@ interface AppSidebarProps {
   onNavigate?: (id: string) => void
   onAddProject?: () => void
   onStopAll?: () => void
+  favorites?: { id: string; name: string }[]
 }
 
-export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject, onStopAll }: AppSidebarProps) {
+export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject, onStopAll, favorites = [] }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const [maintenanceOpen, setMaintenanceOpen] = useState(true)
 
   const sidebarWidth = collapsed ? 'w-12' : 'w-[220px]'
 
@@ -38,8 +43,32 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 overflow-y-auto">
+      <nav className="flex-1 p-2 overflow-y-auto custom-scrollbar">
         <div className="space-y-4">
+          {/* Favorites Section */}
+          {!collapsed && favorites.length > 0 && (
+            <div>
+              <div className="px-2 mb-2 flex items-center gap-2">
+                <Star size={10} className="text-[#ffcc00] fill-[#ffcc00]" />
+                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+                  Favorites
+                </span>
+              </div>
+              <div className="space-y-1">
+                {favorites.map((fav) => (
+                  <button
+                    key={fav.id}
+                    onClick={() => onNavigate?.(`project:${fav.id}`)}
+                    className="w-full flex items-center gap-3 p-2 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all vader-focus group"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#333333] group-hover:bg-[#ffcc00]" />
+                    <span className="font-sans text-xs truncate">{fav.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Dashboard */}
           <div>
             <button
@@ -61,9 +90,6 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
               {!collapsed && <span className="font-sans text-sm font-medium">Dashboard</span>}
             </button>
           </div>
-
-          {/* Divider */}
-          <div className="mx-2 border-t border-[#333333]" />
 
           {/* Registry Section */}
           <div>
@@ -91,29 +117,59 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
             </button>
           </div>
 
-          {/* Divider */}
-          <div className="mx-2 border-t border-[#333333]" />
-
-          {/* Repair Logs */}
+          {/* Maintenance / Logs Section */}
           <div>
-            <button
-              onClick={() => onNavigate?.('repair-logs')}
-              onMouseEnter={() => setHoveredItem('repair-logs')}
-              onMouseLeave={() => setHoveredItem(null)}
-              className={`
-                w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
-                ${activeItem === 'repair-logs' 
-                  ? 'bg-[#252525] text-white' 
-                  : hoveredItem === 'repair-logs'
-                    ? 'bg-[#252525] text-white' 
-                    : 'text-[#A0A0A0]'
-                }
-              `}
-              title={collapsed ? 'Repair Logs' : undefined}
-            >
-              <FileText size={18} />
-              {!collapsed && <span className="font-sans text-sm font-medium">Repair Logs</span>}
-            </button>
+            {!collapsed && (
+              <button 
+                onClick={() => setMaintenanceOpen(!maintenanceOpen)}
+                className="w-full px-2 mb-2 flex items-center justify-between group"
+              >
+                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors">
+                  Maintenance
+                </span>
+                <ChevronDown size={10} className={`text-[#A0A0A0] transition-transform ${maintenanceOpen ? '' : '-rotate-90'}`} />
+              </button>
+            )}
+            {maintenanceOpen && (
+              <div className="space-y-1">
+                <button
+                  onClick={() => onNavigate?.('repair-logs')}
+                  onMouseEnter={() => setHoveredItem('repair-logs')}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  className={`
+                    w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
+                    ${activeItem === 'repair-logs' 
+                      ? 'bg-[#252525] text-white' 
+                      : hoveredItem === 'repair-logs'
+                        ? 'bg-[#252525] text-white' 
+                        : 'text-[#A0A0A0]'
+                    }
+                  `}
+                  title={collapsed ? 'Repair Logs' : undefined}
+                >
+                  <FileText size={18} />
+                  {!collapsed && <span className="font-sans text-sm font-medium">Repair Logs</span>}
+                </button>
+                <button
+                  onClick={() => onNavigate?.('system-diagnostics')}
+                  onMouseEnter={() => setHoveredItem('system-diagnostics')}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  className={`
+                    w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
+                    ${activeItem === 'system-diagnostics' 
+                      ? 'bg-[#252525] text-white' 
+                      : hoveredItem === 'system-diagnostics'
+                        ? 'bg-[#252525] text-white' 
+                        : 'text-[#A0A0A0]'
+                    }
+                  `}
+                  title={collapsed ? 'System Diagnostics' : undefined}
+                >
+                  <Activity size={18} />
+                  {!collapsed && <span className="font-sans text-sm font-medium">Diagnostics</span>}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </nav>

@@ -1,8 +1,8 @@
-# Node-Launcher-PRD.md: Vader Project Engine (VPE) — v2.0 Final
+# Node-Launcher-PRD.md: Vader Project Engine (VPE) — v2.1 Final
 
 | Version | Date       | Author    | Status           |
 | :------ | :--------- | :-------- | :--------------- |
-| 2.0     | 2026-05-04 | Jon Beatz | Approved / Final |
+| 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
 ---
 
@@ -29,6 +29,7 @@ The **Vader Project Engine (VPE)** is a high-performance desktop command center 
 
 ### 3.1 Smart Project Registry & Detection
 *   **Smart Folder Picker:** Native Electron dialog scans for `package.json`, `.next`, and lock files[cite: 15].
+*   **Favorites System:** Persistent `is_favorite` flag in SQLite allows pinning projects to the top-nav sidebar.
 *   **Auto-Detection Logic:**
     *   Identifies package manager (`npm`, `yarn`, `pnpm`) from lock files[cite: 15].
     *   Detects available start scripts (`dev`, `start`, `develop`), prioritizing `dev` in `detectedStartScript`[cite: 15].
@@ -56,6 +57,7 @@ The **Vader Project Engine (VPE)** is a high-performance desktop command center 
 ### 3.4 Visual Dashboard & Logs
 *   **Vader Grid:** High-contrast cards featuring dynamic thumbnails, Vader Red pulsing status LEDs, name, port, and uptime[cite: 15].
 *   **Log Drawer:** Per-project terminal panel (xterm.js) with full ANSI color, search, copy, and clear view functionality[cite: 15].
+*   **Terminal Slash Commands:** Support for `/clean`, `/ports`, `/flush`, `/vpe`, `/diag`, `/vader`, and `/repair`.
 *   **Auto-Thumbnailer:**
     *   Captures thumbnail via Puppeteer once dev server returns HTTP 200[cite: 15].
     *   Reuses a single headless browser instance and cached thumbnails[cite: 15].
@@ -98,6 +100,7 @@ module.exports = {
 *   **Hardware Optimization:** Targets Ryzen 9700x[cite: 13]. Offloads heavy tasks to background worker threads to maintain 60 fps UI performance[cite: 13].
 *   **Windows 11 25H2 Tuning:** Batched file I/O and whitelisted paths to reduce antivirus scanning impact[cite: 13].
 *   **Zombie Prevention:** Uses `tree-kill` to guarantee termination of Next.js/Node processes on stop[cite: 13].
+*   **Snapshot Engine:** Backs up SQLite and `.env` files to `.vader-checkpoint` via `%TEMP%` staging and copy-on-write logic to bypass file locks.
 
 ### **5.1 API Orchestration (LiteLLM)**
 *   **Command:** `start API` (or `run litellm`).

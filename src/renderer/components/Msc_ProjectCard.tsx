@@ -12,9 +12,11 @@ import {
   AlertTriangle,
   Hammer,
   ExternalLink,
+  Star,
 } from 'lucide-react'
 
 interface Msc_ProjectCardProps {
+  id: string
   name: string
   port: number
   uptime: string
@@ -22,6 +24,8 @@ interface Msc_ProjectCardProps {
   errorMessage?: string
   thumbnailUrl?: string
   hasBuilt?: boolean
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
   onStart?: () => void
   onStop?: () => void
   onBuild?: () => void
@@ -49,6 +53,8 @@ export function Msc_ProjectCard({
   errorMessage,
   thumbnailUrl,
   hasBuilt = true,
+  isFavorite,
+  onToggleFavorite,
   onStart,
   onStop,
   onBuild,
@@ -139,7 +145,7 @@ export function Msc_ProjectCard({
 
   return (
     <div
-      className={`vader-card overflow-hidden relative ${isError ? 'border-[#e02b20]' : ''}`}
+      className={`vader-card box-bling overflow-hidden relative ${isError ? 'border-[#e02b20]' : ''}`}
       onContextMenu={onContextMenu}
     >
       <div className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]" style={{ borderRadius: '4px 4px 0 0' }}>
@@ -166,6 +172,18 @@ export function Msc_ProjectCard({
             9700x Tuned
           </div>
           <div className="flex items-center gap-1 pointer-events-auto">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleFavorite?.()
+              }}
+              className={`w-7 h-7 rounded bg-[#0a0a0a]/70 backdrop-blur-sm flex items-center justify-center transition-colors ${
+                isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
+              }`}
+              title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+            >
+              <Star size={14} fill={isFavorite ? '#ffcc00' : 'none'} />
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation()

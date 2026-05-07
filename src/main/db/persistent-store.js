@@ -110,6 +110,12 @@ class SqlitePersistence {
     this._db.prepare(`UPDATE projects SET status = 'stopped' WHERE id = ?`).run(projectId);
   }
 
+  setProjectFavorite(projectId, isFavorite) {
+    this._db
+      .prepare(`UPDATE projects SET is_favorite = ? WHERE id = ?`)
+      .run(isFavorite ? 1 : 0, projectId);
+  }
+
   updateProject(payload) {
     const found = this._db
       .prepare(`SELECT id FROM projects WHERE id = ?`)
@@ -194,6 +200,23 @@ class SqlitePersistence {
       )
       .all(limit)
       .reverse();
+  }
+
+  getSettings() {
+    try {
+      const row = this._db.prepare(`SELECT * FROM settings WHERE id = 1`).get();
+      if (!row) {
+        this._db.prepare(`INSERT INTO settings (id) VALUES (1)`).run();
+        return { id: 1, minimize_to_tray: 0, theme_accent: '#4fde82' };
+      }
+      return {
+        ...row,
+        minimize_to_tray: row.minimize_to_tray === 1,
+      };
+    } catch (e) {
+      console.error('VPE: getSettings failed', e);
+      return {};
+    }
   }
 
   _trimLogs(projectId) {
@@ -615,6 +638,25 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
     ver = 3;
   }
 
+  if (ver < 4) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('is_favorite')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0`);
+    }
+    ver = 4;
+  }
+  
+  if (ver < 5) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        minimize_to_tray INTEGER DEFAULT 0,
+        theme_accent TEXT DEFAULT '#4fde82'
+      )
+    `);
+    ver = 5;
+  }
+
   db.pragma(`user_version = ${ver}`);
 }
 
@@ -670,7 +712,8 @@ function msc_createPersistentStore() {
         thumbnail_url TEXT,
         start_script TEXT NOT NULL DEFAULT 'dev',
         build_script TEXT NOT NULL DEFAULT 'build',
-        pkg_manager TEXT NOT NULL DEFAULT 'npm'
+        pkg_manager TEXT NOT NULL DEFAULT 'npm',
+        is_favorite INTEGER NOT NULL DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS logs (
