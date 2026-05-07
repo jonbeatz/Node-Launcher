@@ -1295,15 +1295,19 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
   ipcMain.handle('vpe:launcher-port-health', async () => {
     const r3000 = await msc_launcherPortRowHealth(3000);
     const r3001 = await msc_launcherPortRowHealth(3001);
+    const stackOk = r3000.ok && r3001.ok;
+    const forgeReady = !r3000.inUse && !r3001.inUse;
     return {
       p3000: r3000.inUse,
       p3001: r3001.inUse,
-      ok: r3000.ok && r3001.ok,
+      ok: stackOk,
+      forgeReady,
     };
   });
 
   ipcMain.handle('vpe:purge-launcher-ports', async () => {
     const { execSync } = require('child_process');
+    const { setTimeout: delay } = require('timers/promises');
     const myPid = String(process.pid);
     const ports = [3000, 3001, 9222];
     const killed = [];
@@ -1313,21 +1317,28 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
         const img = msc_tasklistImageName(pid);
         if (img !== 'node.exe' && img !== 'electron.exe') continue;
         try {
-          execSync(`taskkill /F /PID ${pid}`, { windowsHide: true });
+          execSync(`taskkill /F /PID ${pid}`, {
+            windowsHide: true,
+            stdio: 'ignore',
+          });
           killed.push({ pid, port, img });
         } catch (_) {
-          /* */
+          /* Process may already be gone; never fail purge for zombie PIDs */
         }
       }
     }
+    await delay(500);
     const ph3000 = await msc_launcherPortRowHealth(3000);
     const ph3001 = await msc_launcherPortRowHealth(3001);
+    const stackOk = ph3000.ok && ph3001.ok;
+    const forgeReady = !ph3000.inUse && !ph3001.inUse;
     return {
       ok: true,
       killed,
       p3000: ph3000.inUse,
       p3001: ph3001.inUse,
-      healthy: ph3000.ok && ph3001.ok,
+      healthy: stackOk,
+      forgeReady,
     };
   });
 

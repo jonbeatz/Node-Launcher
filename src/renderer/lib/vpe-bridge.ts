@@ -116,7 +116,10 @@ export interface CatalogImportResult {
 export interface VpeLauncherPortHealth {
   p3000: boolean
   p3001: boolean
+  /** No foreign process on either port (node/electron-only or free). */
   ok: boolean
+  /** Both 3000 and 3001 have no TCP listener — safe to run pre-forge / packaging. */
+  forgeReady: boolean
 }
 
 export interface VpePurgeLauncherPortsResult {
@@ -125,6 +128,7 @@ export interface VpePurgeLauncherPortsResult {
   p3000?: boolean
   p3001?: boolean
   healthy?: boolean
+  forgeReady?: boolean
 }
 
 export interface VpePromptVaultItem {

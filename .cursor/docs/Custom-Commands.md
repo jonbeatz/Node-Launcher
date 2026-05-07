@@ -81,22 +81,23 @@ Notes:
 
 ## Vader Sync
 
-Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), **close Electron**, then the **forge gate** runs automatically — **`vpe:take-state-snapshot`** (pre-build ZIP with **`-AUTO-PRE-BUILD`**) → **`vpe:check-readiness`** (syntax guard on **`src/main` / `src/renderer` `*.js`**) → **`npm run build:win`** — producing **`dist/Vader Project Engine.exe`** (NSIS) + **`dist/win-unpacked/`** (portable **`Vader Project Engine.exe`**). If the guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
+Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **snapshot / syntax / build** until **all** dev children have exited — then **auto snapshot** (**`-AUTO-PRE-BUILD`**) → **syntax guard** → **`npm run build:win`**. If the guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (master command table v1.1.0+, **`&&`** / exit-code semantics, **`concurrently -k --success first`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, ASAR/native guidance).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.1: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, ASAR/native guidance).
 
 ### How **`vader:sync`** works
 
-- Runs **`npm run vader:dev`**: **`next dev`** and Electron together via **`concurrently -k --success first`**. **`cross-env`** sets **`VPE_LAUNCHER_FORGE=1`** for this phase (Build Forge / thermal watchdog — see protocol doc).
-- **`--kill-others` semantics:** when **Electron exits** (you closed the window), **Next dev is terminated** too—so the shell reaches the **`&&`** gate (normal **`npm run dev`** leaves Next running and would block forever).
-- If either process crashes (e.g. syntax error), **`concurrently`** exits non‑zero and **`vader:post-dev-forge`** (snapshot + guard + pack) does not run.
-- After dev exits **0**: **`vader:post-dev-forge`** = **`npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win`** — all **`&&`** gated; a failing step stops before **`electron-builder`**.
+- Runs **`npm run vader:dev -- --success last`**: same **`concurrently -k --success first …`** as **`vader:dev`**, but **`npm`** appends **`--success last`** so **`concurrently`** uses **`last`** as the success mode — **blocking gate**: no **`&& npm run vader:post-dev-forge`** until every dev process has finished (avoids **`build:win`** racing a still-listening **Next** on **3000**).
+- **`npm run vader:dev`** alone (no extra args) keeps **`--success first`** for day-to-day work: closing **Electron** still **`-k`** stops **Next** quickly.
+- **`--kill-others`:** when one child exits, others are signalled per **`concurrently`** rules; **`--success last`** still ties the **group** exit to the **last** process to finish.
+- If either process crashes (non-zero), **`concurrently`** exits non‑zero and **`vader:post-dev-forge`** does not run.
+- After dev exits **0**: **`vader:post-dev-forge`** = **`npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win`** — all **`&&`** gated.
 
 ### Commands (repo root)
 
 | Command | When to use |
 | :--- | :--- |
-| **`npm run vader:sync`** | Standard flow: dev session → close Electron → **auto snapshot** (**`-AUTO-PRE-BUILD`**) → **syntax guard** → **`prebuild:main`** (icon + static export) + **`electron-builder`** → installer + **`win-unpacked`**. |
+| **`npm run vader:sync`** | **`vader:dev` with `--success last`**, then snapshot → syntax guard → pack. Waits for **full** dev teardown before forge. |
 | **`npm run vader:clean-sync`** | Same as **`vader:sync`**, but first deletes **`dist/`** (**`rimraf`**) so no stale installer/win-unpacked from an older patch. Recommended when bumping versions or nuking ghosts. |
 | **`npm run vader:post-dev-forge`** | Usually internal: snapshot + **`vpe:check-readiness`** + **`build:win`**. Same order as the tail of **`vader:sync`**. |
 | **`npm run vpe:take-state-snapshot`** | Headless pre-forge backup only (CLI **`userData`** path mirrors main process). |

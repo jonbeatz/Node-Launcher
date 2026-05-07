@@ -1,8 +1,15 @@
 # VPE Checkpoint (2026-05-07)
 
-## Build v1.1.0 — Advanced expansion (current shipping line)
+## Build v1.1.1 — Blocking validation gate (on top of v1.1.0)
 
-App **`package.json`** / preload label **v1.1.0**. Highlights:
+- **`vader:sync`:** `npm run vader:dev -- --success last && npm run vader:post-dev-forge` — **`concurrently`** waits for **all** dev processes to exit before snapshot / syntax guard / **`build:win`** (no early **`&&`** while **Next** still owns **3000**).
+- **`vader:dev`:** unchanged **`--success first`** for normal sessions.
+- **Purge:** **500ms** settle after **`taskkill`** before port re-probe; **`stdio: 'ignore'`** so “process already gone” never surfaces as a thrown error.
+- **Footer Net LED:** **Green** = both **3000**/**3001** free (**`forgeReady`**); **Amber** = only node/electron listening (dev still active); **Red** = foreign listener.
+
+## Build v1.1.0 — Advanced expansion (shipping line)
+
+App **`package.json`** / preload label **v1.1.1** (v1.1.0 feature set below). Highlights:
 
 - **Forge gate:** **`vader:sync`** / **`vader:clean-sync`** end with **`vader:post-dev-forge`**: **`vpe:take-state-snapshot`** (`user-data/auto-snapshots/…-AUTO-PRE-BUILD`) → **`vpe:check-readiness`** (forbidden TS-in-`.js` under **`src/main` + `src/renderer`**) → **`build:win`**. All **`&&`** sequential; **`vader:dev`** keeps **`concurrently -k --success first`** and sets **`VPE_LAUNCHER_FORGE=1`** (thermal watchdog during dev).
 - **UI:** Footer **Net** LED + **Purge env** (3000 / 3001 / 9222, node+electron only); **Maintenance** = Repair Logs + **Prompt Vault** (markdown templates + copy **+ version label**); **Sandbox** (react-live / Studio Dark preview).

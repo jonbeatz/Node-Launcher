@@ -3,21 +3,29 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getVpeApi } from '@/lib/vpe-bridge'
 
+type NetLedState = 'unknown' | 'forge' | 'dev' | 'conflict'
+
 export function Footer() {
-  const [ok, setOk] = useState<boolean | null>(null)
+  const [led, setLed] = useState<NetLedState>('unknown')
   const [purging, setPurging] = useState(false)
 
   const refresh = useCallback(async () => {
     const api = getVpeApi()
     if (!api?.getLauncherPortHealth) {
-      setOk(null)
+      setLed('unknown')
       return
     }
     try {
       const h = await api.getLauncherPortHealth()
-      setOk(Boolean(h?.ok))
+      const stackOk = Boolean(h?.ok)
+      const p3000 = Boolean(h?.p3000)
+      const p3001 = Boolean(h?.p3001)
+      const forgeReady = h?.forgeReady ?? (!p3000 && !p3001)
+      if (!stackOk) setLed('conflict')
+      else if (forgeReady) setLed('forge')
+      else setLed('dev')
     } catch {
-      setOk(null)
+      setLed('unknown')
     }
   }, [])
 
@@ -39,13 +47,23 @@ export function Footer() {
     }
   }
 
-  const led =
-    ok === null ? (
+  const ledEl =
+    led === 'unknown' ? (
       <span className="text-[#666666]" title="Port status unknown (browser mode)">
         ●
       </span>
-    ) : ok ? (
-      <span className="text-[#4fde82]" title="Ports 3000 / 3001: free or only node.exe / electron.exe">
+    ) : led === 'forge' ? (
+      <span
+        className="text-[#4fde82]"
+        title="Ports 3000 & 3001 free — pre-forge / packaging ready"
+      >
+        ●
+      </span>
+    ) : led === 'dev' ? (
+      <span
+        className="text-[#e8a838]"
+        title="Port 3000 and/or 3001 still listening (e.g. Next dev) — close dev stack before forge completes"
+      >
         ●
       </span>
     ) : (
@@ -63,10 +81,10 @@ export function Footer() {
         <span className="font-sans text-[10px] text-[#666666] uppercase tracking-wide">
           Net
         </span>
-        {led}
+        {ledEl}
         <button
           type="button"
-          disabled={purging || ok === null}
+          disabled={purging || led === 'unknown'}
           onClick={() => void handlePurge()}
           className="h-6 px-2 rounded border border-[#444444] font-sans text-[10px] uppercase tracking-wide text-[#A0A0A0] hover:text-white hover:border-[#4fde82]/60 disabled:opacity-40 vader-focus"
           title="taskkill node/electron on LISTEN for 3000, 3001, 9222 (excludes own PID)"
@@ -75,7 +93,7 @@ export function Footer() {
         </button>
       </div>
       <span className="font-sans text-[11px] text-[#A0A0A0]">
-        Powered by the MSC Media Engine v1.1.0
+        Powered by the MSC Media Engine v1.1.1
       </span>
     </footer>
   )
