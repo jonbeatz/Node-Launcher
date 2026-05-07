@@ -24,6 +24,10 @@ function msc_detectProjectScripts(projectRoot) {
     }
     return fallback;
   };
+      const nextDeps = pkg.dependencies && pkg.dependencies.next;
+      const isNextJs = Boolean(nextDeps);
+      const nodeModulesMissing = !fs.existsSync(path.join(root, 'node_modules'));
+
   return {
     pkg_manager: msc_detectPackageManager(root),
     start_script: pick(
@@ -31,6 +35,8 @@ function msc_detectProjectScripts(projectRoot) {
       'dev',
     ),
     build_script: pick(['build', 'compile'], 'build'),
+    is_nextjs: isNextJs,
+    node_modules_missing: nodeModulesMissing
   };
 }
 

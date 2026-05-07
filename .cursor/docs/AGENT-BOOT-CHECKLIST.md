@@ -47,6 +47,7 @@ Read when you need **“where we are today”** or **exact command sequences**:
 | :--- | :--- |
 | [Checkpoint.md](Checkpoint.md) | Branch status, recent milestones, risky areas, files to reopen |
 | [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`restart app`**, **`start app`**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
+| [API-SetUp-Master.md](API-SetUp-Master.md) | **LiteLLM + ngrok → Vertex AI**; Cursor Base URL + `master_key`; **post–Cursor-restart reconnect** checklist |
 | [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) | Packaging, ASAR, winCodeSign, native rebuild, telemetry—**resolved** symptoms |
 
 ---
@@ -59,7 +60,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
 - [ ] Intended branch matches [Checkpoint.md](Checkpoint.md) (or `git status` is intentional).
-- [ ] VPE Version: **v1.0.7**
+- [ ] VPE Version: **v1.0.8** (see root `package.json` if disputed)
 - [ ] Node matches team expectation (CI uses Node **20**; local may differ—note if so).
 - [ ] **`npm install`** already run after last `package.json` change (`legacy-peer-deps` via [../../.npmrc](../../.npmrc)).
 

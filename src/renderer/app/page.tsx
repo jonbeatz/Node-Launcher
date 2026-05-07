@@ -24,7 +24,7 @@ import { getVpeApi, msc_rowToDashboardProject } from '@/lib/vpe-bridge'
 
 type FilterType = 'ALL' | 'RUNNING' | 'STOPPED' | 'ERRORS'
 type ViewMode = 'grid' | 'list'
-type NavItem = 'dashboard' | 'repair-logs' | 'settings'
+type NavItem = 'dashboard' | 'repair-logs' | 'repair-history' | 'settings'
 
 interface Project {
   id: string
@@ -45,6 +45,7 @@ interface Project {
   health_checked_at?: string | null
   health_reachable?: boolean | null
   is_favorite?: boolean
+  node_modules_missing?: boolean
 }
 
 /** Browser fallback when `window.vpeAPI` is unavailable (Next standalone). */
@@ -620,6 +621,25 @@ function DashboardContent() {
   }
 
   // Quick Actions
+  const handleInstallAndStart = async (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId)
+    if (!project) return
+    const api = getVpeApi()
+    if (api?.executeTerminalCommand) {
+      addToast('Installing dependencies...', 'info', `${project.name} is running npm install`)
+      try {
+        await api.executeTerminalCommand(`cd "${project.path}" && npm install`, project.id)
+        addToast('Install complete', 'success', 'Starting development server...')
+        await handleToggleStatus(projectId)
+      } catch {
+        addToast('Install failed', 'error', 'Check terminal logs for details')
+      }
+    } else {
+      addToast('Install & Start (demo)', 'info', `Pretending to run npm install for ${project.name}`)
+    }
+  }
+
+  // Quick Actions
   const handleStartAll = () => {
     setProjects(prev => prev.map(p => p.status === 'stopped' ? { ...p, status: 'running' as const } : p))
     addToast('Starting all projects...', 'info')
@@ -760,7 +780,7 @@ function DashboardContent() {
           <div className="flex-1 flex min-h-0 overflow-hidden">
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              {activeNav === 'repair-logs' ? (
+              {activeNav === 'repair-logs' || activeNav === 'repair-history' ? (
                 /* Repair History View */
                 <RepairHistoryView
                   refreshSignal={repairLogRev}
@@ -886,6 +906,7 @@ function DashboardContent() {
                             health_checked_at={project.health_checked_at}
                             health_reachable={project.health_reachable}
                             isFavorite={project.is_favorite}
+                            node_modules_missing={project.node_modules_missing}
                             onToggleFavorite={() => handleToggleFavorite(project.id)}
                             thumbnailUrl={
                               project.thumbnail_url ?? undefined
@@ -893,6 +914,7 @@ function DashboardContent() {
                             hasBuilt={project.hasBuilt}
                             onStart={() => void handleToggleStatus(project.id)}
                             onStop={() => void handleToggleStatus(project.id)}
+                            onInstallAndStart={() => void handleInstallAndStart(project.id)}
                             onBuild={() => void handleRunBuild(project.id)}
                             onLogs={() => handleLogs(project.id)}
                             onViewErrorConsole={() => handleLogs(project.id)}
@@ -1146,13 +1168,9 @@ function DashboardContent() {
               'success',
               'Detection refreshed from package.json',
             )
-          } catch (err: unknown) {
-            const msg =
-              err && typeof err === 'object' && 'message' in err
-                ? String((err as { message?: string }).message)
-                : 'Save failed'
-            addToast('Save failed', 'error', msg)
-          }
+    } catch {
+      addToast('Save failed', 'error', 'Save failed')
+    }
         }}
         onDelete={() => {
           setSettingsModalOpen(false)

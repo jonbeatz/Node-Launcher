@@ -24,7 +24,9 @@ interface Msc_ProjectCardProps {
   errorMessage?: string
   thumbnailUrl?: string
   hasBuilt?: boolean
+  node_modules_missing?: boolean
   isFavorite?: boolean
+  onInstallAndStart?: () => void
   onToggleFavorite?: () => void
   onStart?: () => void
   onStop?: () => void
@@ -53,7 +55,9 @@ export function Msc_ProjectCard({
   errorMessage,
   thumbnailUrl,
   hasBuilt = true,
+  node_modules_missing,
   isFavorite,
+  onInstallAndStart,
   onToggleFavorite,
   onStart,
   onStop,
@@ -77,7 +81,10 @@ export function Msc_ProjectCard({
 
   const getPrimaryButton = () => {
     if (isBuilding) return { label: 'BUILDING...', icon: Hammer, disabled: true }
-    if (!hasBuilt) return { label: 'BUILD', icon: Hammer, action: onBuild }
+    if (!hasBuilt) {
+      if (node_modules_missing) return { label: 'INSTALL & START', icon: Play, action: onInstallAndStart }
+      return { label: 'BUILD', icon: Hammer, action: onBuild }
+    }
     if (isRunning) return { label: 'STOP', icon: Square, action: onStop, active: true }
     if (isError) return { label: 'REBUILD', icon: Hammer, action: onBuild }
     return { label: 'START', icon: Play, action: onStart }
@@ -145,7 +152,7 @@ export function Msc_ProjectCard({
 
   return (
     <div
-      className={`vader-card box-bling overflow-hidden relative ${isError ? 'border-[#e02b20]' : ''}`}
+      className={`vader-card boxBling overflow-hidden relative ${isError ? 'border-[#e02b20]' : ''}`}
       onContextMenu={onContextMenu}
     >
       <div className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]" style={{ borderRadius: '4px 4px 0 0' }}>

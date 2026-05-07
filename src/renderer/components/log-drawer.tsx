@@ -663,8 +663,7 @@ export function LogDrawer({
               className="absolute inset-0 bg-[#0a0a0a] overflow-y-scroll overscroll-y-contain p-4 crt-scanlines vpe-log-container"
               style={{ 
                 boxShadow: 'inset 0 0 30px rgba(0,0,0,0.5)',
-                scrollbarWidth: 'thin',
-                scrollbarColor: '#e02b20 #1c1c1c'
+                scrollbarGutter: 'stable',
               }}
               onClick={() => inputRef.current?.focus()}
             >
@@ -703,16 +702,11 @@ export function LogDrawer({
           </div>
 
           {/* Bottom Status Bar */}
-          <div className="px-4 py-2 border-t border-[#333333] bg-[#161616] flex flex-col gap-1 shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="font-sans text-[11px] text-[#A0A0A0]">
-                {getVpeApi() ? 'ENGINE: Spawn + SQLite' : 'PID: MOCK | DEMO MODE'}
-              </span>
-              <GripVertical size={12} className="text-[#555555]" />
-            </div>
-            <span className="font-sans text-[10px] text-[#555555] text-center">
-              Powered by the MSC Media Engine v1.0.7
+          <div className="px-4 py-2 border-t border-[#333333] bg-[#161616] flex items-center justify-between shrink-0">
+            <span className="font-sans text-[11px] text-[#A0A0A0]">
+              SYSTEM READY
             </span>
+            <GripVertical size={12} className="text-[#555555]" />
           </div>
         </>
       )}

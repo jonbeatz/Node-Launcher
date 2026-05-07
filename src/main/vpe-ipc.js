@@ -26,6 +26,7 @@ function msc_rowToCatalogPayload(row) {
     start_script: row.start_script,
     build_script: row.build_script,
     pkg_manager: row.pkg_manager,
+    node_modules_missing: (row as any).node_modules_missing,
   };
 }
 
@@ -320,11 +321,15 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   const msc_managedPortFloor = () => MSC_VPE_RENDERER_PORT + 1;
 
   /** Next free TCP port excluding renderer and other registered projects (optionally exclude one id during reassignment). */
-  const msc_findAvailablePort = async (preferred = null, excludeProjectId = null) => {
+  const msc_findAvailablePort = async (preferred = null, excludeProjectId = null, isNextJs = false) => {
     const floor = msc_managedPortFloor();
-    const preferredNum = preferred == null ? floor : Number(preferred);
-    let candidate = Number.isFinite(preferredNum) ? preferredNum : floor;
-    if (candidate <= MSC_VPE_RENDERER_PORT) candidate = floor;
+    let candidate = preferred == null ? floor : Number(preferred);
+    
+    if (isNextJs && candidate === MSC_VPE_RENDERER_PORT) {
+        candidate = 3001;
+    } else if (candidate <= MSC_VPE_RENDERER_PORT) {
+        candidate = floor;
+    }
 
     const otherPorts = new Set(
       store
@@ -401,7 +406,14 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     }
   };
 
-  ipcMain.handle('vpe:getProjects', () => store.listProjectsAlphabetical());
+  ipcMain.handle('vpe:getProjects', () => store.listProjectsAlphabetical().map(row => {
+    const root = msc_validateProjectPath(row.path);
+    const det = msc_detectProjectScripts(root);
+    return {
+      ...row,
+      node_modules_missing: det.node_modules_missing
+    };
+  }));
 
   ipcMain.handle('vpe:get-repair-runs', (_event, limit) => {
     const n = Number(limit);
@@ -531,7 +543,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
 
     const root = msc_validateProjectPath(row.path);
     const det = msc_detectProjectScripts(root);
-    const newPort = await msc_findAvailablePort(msc_managedPortFloor(), projectId);
+    const newPort = await msc_findAvailablePort(msc_managedPortFloor(), projectId, det.is_nextjs);
 
     store.updateProject({
       id: row.id,
@@ -550,7 +562,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   ipcMain.handle('vpe:inspect-project', async (_event, projectPath) => {
     const root = msc_validateProjectPath(projectPath);
     const det = msc_detectProjectScripts(root);
-    const suggestedPort = await msc_findAvailablePort(msc_managedPortFloor());
+    const suggestedPort = await msc_findAvailablePort(msc_managedPortFloor(), null, det.is_nextjs);
     return {
       ok: true,
       path: root,
@@ -641,7 +653,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     const portNum =
       rawPort != null && Number.isFinite(Number(rawPort))
         ? Number(rawPort)
-        : await msc_findAvailablePort(msc_managedPortFloor(), id);
+        : await msc_findAvailablePort(msc_managedPortFloor(), id, det.is_nextjs);
     store.insertProject({
       id,
       name: payload.name,
@@ -731,7 +743,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
         let portNum = Number(raw.port);
         if (!Number.isFinite(portNum) || portNum <= 0) {
           // eslint-disable-next-line no-await-in-loop
-          portNum = await msc_findAvailablePort(msc_managedPortFloor(), id);
+          portNum = await msc_findAvailablePort(msc_managedPortFloor(), id, det.is_nextjs);
         }
         portNum = msc_assertPortNotReserved(portNum);
         const rawPm = String(raw.pkg_manager || '').toLowerCase();
@@ -1013,13 +1025,14 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       // Use PowerShell to zip (standard on Windows 10+)
       // Fix: Compress-Archive requires .zip extension. We'll zip then rename.
       const zipPath = path.join(os.tmpdir(), `vpe-snapshot-${randomUUID()}.zip`);
-      const zipCmd = `powershell -Command "Compress-Archive -Path \\"\\"${tempDir}\\\\*\\"\\" -DestinationPath \\"\\"${zipPath}\\"\\" -Force"`;
+      const zipCmd = `powershell -Command "Compress-Archive -Path """${tempDir}\\*""" -DestinationPath """${zipPath}""" -Force"`;
       execSync(zipCmd);
 
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      // Use PowerShell to copy/remove to bypass locks
-      const finalCmd = `powershell -Command "Copy-Item -Path \\"\\"${zipPath}\\"\\" -Destination \\"\\"${filePath}\\"\\" -Force; Remove-Item -Path \\"\\"${zipPath}\\"\\" -Force"`;
-      execSync(finalCmd);
+      
+      // Use atomic fs copy
+      fs.copyFileSync(zipPath, filePath);
+      fs.unlinkSync(zipPath);
 
       // Cleanup temp
       fs.rmSync(tempDir, { recursive: true, force: true });

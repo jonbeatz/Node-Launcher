@@ -16,6 +16,7 @@ export interface VpeProjectRow {
   /** Whether TCP/HTTP reply was received (vs connection error). SQLite may return 0/1. */
   health_reachable?: boolean | number | null
   is_favorite?: number | boolean | null
+  node_modules_missing?: boolean
 }
 
 export interface VpeUnifiedLogRow {
@@ -220,6 +221,7 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   health_checked_at?: string | null
   health_reachable?: boolean | null
   is_favorite?: boolean | null
+  node_modules_missing?: boolean
 } {
   const pm =
     row.pkg_manager === 'yarn' || row.pkg_manager === 'pnpm'
@@ -252,5 +254,6 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
           ? false
           : null,
     is_favorite: row.is_favorite === true || row.is_favorite === 1,
+    node_modules_missing: row.node_modules_missing,
   }
 }

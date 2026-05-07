@@ -1,6 +1,37 @@
-# Vader API Setup: Master Blueprint (v2.1)
+# Vader API Setup: Master Blueprint (v2.2)
 
 This master guide consolidates every technical configuration, fix, and daily routine required to use Google Cloud Vertex AI with Cursor via LiteLLM and Ngrok.
+
+---
+
+## Plug back in after a Cursor restart (copy this checklist)
+
+Cursor does **not** store your Google service account secret. After you restart Cursor—or reboot—you only need processes and settings below. **Nothing in Cursor restores LiteLLM or ngrok for you.**
+
+### How connection actually works
+
+1. **Google → LiteLLM:** `gcp_key.json` is referenced by **`GOOGLE_APPLICATION_CREDENTIALS`**. LiteLLM uses it to call **Vertex AI** (models are listed in **`litellm_config.yaml`**; project id there must match your GCP project).
+2. **LiteLLM:** Listens on a **local TCP port** (watch the LiteLLM console for **`Uvicorn running on …`**—typically **`28401`** in this workspace).
+3. **Ngrok:** Forwards **`http://localhost:<that-port>`** to a **public HTTPS URL** Cursor can reach.
+4. **Cursor:** Sends OpenAI-compatible requests to **Base URL + `/v1`**, with **API Key = LiteLLM `master_key`** (see `litellm_config.yaml` → `general_settings.master_key`). Cursor **never** needs the contents of `gcp_key.json`.
+
+### 6-step reconnect (same order every time)
+
+| Step | What | Notes |
+|:---:|:---|:---|
+| 1 | **Terminal A — LiteLLM** | Repo root (`Node-Launcher`), PowerShell |
+| 2 | Set GCP env | `$env:GOOGLE_APPLICATION_CREDENTIALS="D:\Cursor_Projectz\Node-Launcher\gcp_key.json"` |
+| 3 | (Optional, if console encoding errors) | `$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"` |
+| 4 | Start proxy | `litellm --config litellm_config.yaml` → confirm port (e.g. **28401**) |
+| 5 | **Terminal B — ngrok** | `.\ngrok http 28401` (port **must match** LiteLLM) |
+| 6 | **Cursor → Settings → Models** | **Override OpenAI Base URL:** `https://<your-ngrok-host>/v1` (must end with **`/v1`**) · **API Key:** `sk-vader-protocol-1234` |
+
+**If ngrok assigns a new URL:** update Cursor’s Base URL only; **`master_key`** in `litellm_config.yaml` stays the same unless you change it deliberately.
+
+### Quick sanity checks
+
+- **Local (with auth):** `Invoke-WebRequest -Uri "http://127.0.0.1:28401/v1/models" -Headers @{ Authorization = "Bearer sk-vader-protocol-1234" }` — expect **200**. Empty/wrong Bearer → **401**.
+- **`401` in Cursor:** Re-enter **`sk-vader-protocol-1234`** in Cursor; Base URL must be the **HTTPS** ngrok forwarding URL + **`/v1`**.
 
 ---
 
@@ -81,4 +112,6 @@ To automate this, the following rule is already active in your `.cursorrules`:
 - **Action:** Open PowerShell terminal and run the environment setup + `litellm` command.
 
 ---
+*Document revision v2.2 — Added “after Cursor restart” reconnect chain and sanity checks.*
+
 *Powered by the MSC Media Engine*
