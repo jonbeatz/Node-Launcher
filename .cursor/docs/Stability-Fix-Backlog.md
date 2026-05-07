@@ -1,6 +1,6 @@
 # Stability & fix backlog (resolved)
 
-Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** with **`--success last`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.7**).
+Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** (**`--success last`**), **`vader:clean-sync`** (**`rimraf` + hardened `||`**), **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.8**).
 
 ---
 
@@ -186,4 +186,4 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 ---
 
-*Last updated: 2026-05-07 — align with [Checkpoint](Checkpoint.md); **build v1.1.7**; git branch: **confirm with `git status`**. Powered by the MSC Media Engine.*
+*Last updated: 2026-05-07 — align with [Checkpoint](Checkpoint.md); **build v1.1.8**; git branch: **confirm with `git status`**. Powered by the MSC Media Engine.*

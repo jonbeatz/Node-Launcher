@@ -4,7 +4,7 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.1.7** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata should match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and **v1.1.7** NET / thermal behavior.
+**Shipped desktop build (npm / `package.json` `version`):** **1.1.8** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata should match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts, **`vader:clean-sync`**, and NET (**9222**) behavior.
 
 ---
 

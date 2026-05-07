@@ -33,7 +33,7 @@ Deliverable Output:
 
 &#x20; - 🚀 'dist/Vader Project Engine.exe' (standalone setup installer)
 
-Notes (2026-05-07, **v1.1.7**):
+Notes (2026-05-07, **v1.1.8**):
 
 - If `electron-builder` fails with `Access is denied` in `dist/win-unpacked/*`, close any running `Vader Project Engine.exe` / Electron / Node processes, remove `dist/win-unpacked`, and rerun `npm run build:main`.
 - **Packaging:** `build.asar` is **`true`** in root **`package.json`** for normal releases. If you ever need a one-off unpacked payload for diagnosis, change **`asar`** only with team sign-off and revert after debugging (see [Stability-Fix-Backlog](Stability-Fix-Backlog.md)).

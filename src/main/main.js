@@ -6,7 +6,7 @@ const MSC_PM2Manager = require('./pm2-manager');
 const MSC_TrayManager = require('./tray-manager');
 const { msc_createDatabase, msc_getDatabase } = require('./db/database');
 const MSC_ProjectRunner = require('./project-runner');
-const { msc_registerVpeIpc } = require('./vpe-ipc');
+const { msc_registerVpeIpc, msc_onDevExitCompanionSweep } = require('./vpe-ipc');
 const { msc_archiveLegacyProjectsJson } = require('./legacy-projects-archive');
 const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile');
 
@@ -346,6 +346,9 @@ app.on('will-finish-launching', () => {
 app.on('ready', msc_createWindow);
 
 app.on('before-quit', () => {
+  if (isDev && process.env.VPE_LAUNCHER_FORGE === '1') {
+    msc_onDevExitCompanionSweep();
+  }
   if (pm2Manager && typeof pm2Manager.stopAll === 'function') {
     pm2Manager.stopAll().catch(() => {});
   }
@@ -358,6 +361,12 @@ app.on('before-quit', () => {
     } catch (_) {
       /* ignore */
     }
+  }
+});
+
+app.on('will-quit', () => {
+  if (isDev && process.env.VPE_LAUNCHER_FORGE === '1') {
+    process.exit(0);
   }
 });
 

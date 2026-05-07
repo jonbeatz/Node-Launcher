@@ -32,7 +32,7 @@ If sources disagree, follow this order (**highest wins first**):
 | :--- | :--- |
 | **What VPE is** | Electron shell + Next.js **static-export** UI: register Node/Next projects, PM2 lifecycle, logs, repair/nuke, thumbnails (see [README.md](../../README.md)). |
 | **Main vs UI** | **`src/main`** (Node, PM2, FS), **`src/preload`** (IPC only), **`src/renderer`** (React/Next, **no** raw Node). **Vader Shield** always. |
-| **Launcher port / forge** | Dev UI: **`http://127.0.0.1:3000`** / `localhost:3000` (renderer). **Managed apps must use a higher port**—not the launcher port. **Vader Sync:** **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**`vpe-forge-pause`** → snapshot → syntax guard → **`build:win`** → **`vpe:cleanup-dist`**). **`vader:dev-to-forge`** = **`vader:dev && vader:post-dev-forge`** (no **`rimraf`**; no **`--success last`** — use **`vader:sync`** for strict teardown). Footer **Net** LED: **green** = **`forgeReady`** (**3000/3001** free; **v1.1.7**: **9222** probe uses **400ms** forgiveness / error → idle so CDP does not block green); **amber** = dev stack on **3000** and/or **3001**; **red** = port conflict on **3000/3001**; **3000/3001** rows use **~500ms** bounded probes. |
+| **Launcher port / forge** | Dev UI: **`http://127.0.0.1:3000`** / `localhost:3000` (renderer). **Managed apps must use a higher port**—not the launcher port. **Vader Sync:** **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`**. **`vader:clean-sync`** (**v1.1.8**): **`rimraf dist`** + **`vader:dev`** with **`||`** fallback + **`post-dev-forge`** (no **`--success last`**). **`vader:dev-to-forge`** = **`vader:dev && post-dev-forge`**. Footer **Net** LED: **green** = **`forgeReady`** (**3000/3001** free); **9222** never blocks green (**v1.1.8**: targeted purge + forced idle). **amber** = dev on **3000** and/or **3001**; **red** = conflict on **3000/3001**. |
 | **Diagnostics / logs** | **System Health** panel **closed** by default on load (open from TopBar). **System Log** drawer **collapsed** by default (**Logs** / **Ctrl+`**). |
 | **Persistence** | Canonical store under **`app.getPath('userData')/vpe-db`** (SQLite/JSON); thumbnails under **`userData` media**. Legacy `projects.json` may be migrated/archived. |
 | **E2E / CI** | Playwright, Chromium; **`CI=true`** for deterministic bind—see [../../playwright.config.ts](../../playwright.config.ts) and [.github/workflows/ci.yml](../../.github/workflows/ci.yml). |
@@ -49,7 +49,7 @@ Read when you need **“where we are today”** or **exact command sequences**:
 | :--- | :--- |
 | [Checkpoint.md](Checkpoint.md) | Branch status, recent milestones, risky areas, files to reopen |
 | [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`Update Docs`**, **`restart app`**, **`start app`**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
-| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`** (**`vpe-forge-pause`** → snapshot → syntax guard → **`build:win`** → **`vpe:cleanup-dist`**), **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`** (**v1.1.7**) |
+| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`**, **`vader:clean-sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`** (**v1.1.8**) |
 | [API-SetUp-Master.md](API-SetUp-Master.md) | **LiteLLM + ngrok → Vertex AI**; Cursor Base URL + `master_key`; **post–Cursor-restart reconnect** checklist |
 | [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) | Packaging, ASAR, winCodeSign, native rebuild, telemetry—**resolved** symptoms |
 
@@ -63,7 +63,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
 - [ ] Intended branch matches [Checkpoint.md](Checkpoint.md) (or `git status` is intentional).
-- [ ] VPE Version: **v1.1.7** (see root `package.json` if disputed)
+- [ ] VPE Version: **v1.1.8** (see root `package.json` if disputed)
 - [ ] Node matches team expectation (CI uses Node **20**; local may differ—note if so).
 - [ ] **`npm install`** already run after last `package.json` change (`legacy-peer-deps` via [../../.npmrc](../../.npmrc)).
 
@@ -111,7 +111,7 @@ Defined in [Custom-Commands.md](Custom-Commands.md):
 - **`rebuild exe`** — icon → export → natives → lint → E2E → package → trim `dist/`
 - **`restart app`** / **`start app`** — stop stray node/electron → **`npm run dev`** (prefer **restart app** when you mean kill-then-dev after changes)
 - **`hardened setup`** — clean install / rebuild / optional Playwright / **`repair:ast`** + E2E + lint  
-- **`Vader Sync`** — **`npm run vader:sync`** (or **`npm run vader:clean-sync`**) — **`vader:dev`** with **`--success last`** so packaging waits for **complete** dev process exit, then snapshot + **`vpe:check-readiness`** + **`build:win`**. **Rules:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md). **Examples:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync).  
+- **`Vader Sync`** — **`npm run vader:sync`**: **`vader:dev -- --success last`**, then **`vader:post-dev-forge`** (snapshot → syntax guard → **`build:win`**). **`npm run vader:clean-sync`**: **`rimraf dist`**, then **`vader:dev`** with **`||`** fallback, then the same **`post-dev-forge`** tail (**no** **`--success last`**). **Rules:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md). **Examples:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync).  
 - **`new git branch`** — commit/push/version bump pattern (if still current)
 
 ---
@@ -124,7 +124,7 @@ Copy-paste template:
 You are working on Vader Project Engine (VPE) at <PATH>. Before coding:
 1. Read .cursor/docs/AGENT-BOOT-CHECKLIST.md and follow authority order (TRUTH → .cursorrules → SKILL.md → PRD → package.json).
 2. For current branch and recent decisions, read .cursor/docs/Checkpoint.md.
-3. For build sequencing (vader:sync / hand-off builds / ASAR + natives), read .cursor/docs/VPE-BUILD-PROTOCOL.md.
+3. For build sequencing (vader:sync, vader:clean-sync, hand-off builds, ASAR + natives), read .cursor/docs/VPE-BUILD-PROTOCOL.md.
 4. Obey Vader Shield: no Node APIs in renderer; IPC via preload only.
 5. Scripts: only npm scripts defined in package.json.
 My task: <DESCRIBE>.

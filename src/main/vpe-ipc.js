@@ -102,18 +102,89 @@ async function msc_launcherPortRowHealthInner(port) {
 }
 
 const MSC_PORT_HEALTH_RACE_MS = 500;
-/** CDP bridge: prefer green / forge-ready — treat slow or failed probes as idle (v1.1.7). */
+/** CDP bridge: bounded probe before optional targeted purge (v1.1.8). */
 const MSC_PORT9222_FORGIVENESS_MS = 400;
+
+function msc_purgeProtectedPids() {
+  const mainPid = String(process.pid);
+  const parentPid =
+    typeof process.ppid === 'number' && process.ppid > 0 ? String(process.ppid) : null;
+  const protectedPids = new Set([mainPid]);
+  if (parentPid) protectedPids.add(parentPid);
+  return protectedPids;
+}
+
+/**
+ * @param {Set<string>} protectedPids
+ * @param {string | number} pid
+ * @param {number} port
+ * @param {boolean} aggressive
+ * @param {Array<{ pid: string, port: number, img: string }> | null} killed
+ */
+function msc_purgeTryKillListeningPid(protectedPids, pid, port, aggressive, killed) {
+  const ps = String(pid);
+  if (protectedPids.has(ps)) return;
+  if (process.platform !== 'win32') return;
+  const { execSync } = require('child_process');
+  const img = msc_tasklistImageName(ps);
+  if (!aggressive && img !== 'node.exe' && img !== 'electron.exe') return;
+  try {
+    execSync(`taskkill /F /PID ${ps}`, { windowsHide: true, stdio: 'ignore' });
+    if (killed) killed.push({ pid: ps, port, img: img || (aggressive ? 'aggressive-9222' : '') });
+  } catch (_) {
+    /* Process may already be gone */
+  }
+}
+
+/** Kill listeners on 9222 only (no IPC health re-check — avoids recursion with port-health). */
+async function msc_purgeListenersOnPort9222() {
+  const { setTimeout: delay } = require('timers/promises');
+  const protectedPids = msc_purgeProtectedPids();
+  for (const pid of msc_netstatListeningPidsOnPort(9222)) {
+    msc_purgeTryKillListeningPid(protectedPids, pid, 9222, false, null);
+  }
+  if (process.platform === 'win32') {
+    for (const pid of msc_netstatListeningPidsOnPort(9222)) {
+      msc_purgeTryKillListeningPid(protectedPids, pid, 9222, true, null);
+    }
+  }
+  await delay(300);
+}
+
+/**
+ * v1.1.8: On quit under `VPE_LAUNCHER_FORGE`, sweep renderer/managed dev ports synchronously so
+ * `concurrently` can finish without zombies. Does **not** use `taskkill /IM node.exe` (that would kill
+ * the parent `npm` and abort `vader:post-dev-forge`).
+ */
+function msc_onDevExitCompanionSweep() {
+  if (process.platform !== 'win32') return;
+  if (process.env.VPE_LAUNCHER_FORGE !== '1') return;
+  const protectedPids = msc_purgeProtectedPids();
+  for (const port of [3000, 3001]) {
+    for (const pid of msc_netstatListeningPidsOnPort(port)) {
+      msc_purgeTryKillListeningPid(protectedPids, pid, port, false, null);
+    }
+  }
+}
 
 /** Same as inner, but never hangs the UI: on timeout assume port free (forge-friendly). */
 async function msc_launcherPortRowHealth(port) {
   if (port === 9222) {
-    return await Promise.race([
-      msc_launcherPortRowHealthInner(9222).catch(() => ({ inUse: false, ok: true })),
-      new Promise((resolve) => {
-        setTimeout(() => resolve({ inUse: false, ok: true }), MSC_PORT9222_FORGIVENESS_MS);
-      }),
-    ]);
+    let row = null;
+    try {
+      row = await Promise.race([
+        msc_launcherPortRowHealthInner(9222),
+        new Promise((resolve) => {
+          setTimeout(() => resolve(null), MSC_PORT9222_FORGIVENESS_MS);
+        }),
+      ]);
+    } catch {
+      row = null;
+    }
+    if (row == null || row.inUse) {
+      await msc_purgeListenersOnPort9222();
+    }
+    return { inUse: false, ok: true };
   }
   return await Promise.race([
     msc_launcherPortRowHealthInner(port),
@@ -130,12 +201,7 @@ async function msc_launcherPortRowHealth(port) {
 async function msc_purgeLauncherPorts() {
   const { execSync } = require('child_process');
   const { setTimeout: delay } = require('timers/promises');
-  const mainPid = String(process.pid);
-  const parentPid =
-    typeof process.ppid === 'number' && process.ppid > 0 ? String(process.ppid) : null;
-  const protectedPids = new Set([mainPid]);
-  if (parentPid) protectedPids.add(parentPid);
-
+  const protectedPids = msc_purgeProtectedPids();
   const killed = [];
 
   if (process.platform === 'win32') {
@@ -149,30 +215,16 @@ async function msc_purgeLauncherPorts() {
     }
   }
 
-  const tryKillPid = (pid, port, aggressive) => {
-    const ps = String(pid);
-    if (protectedPids.has(ps)) return;
-    if (process.platform !== 'win32') return;
-    const img = msc_tasklistImageName(ps);
-    if (!aggressive && img !== 'node.exe' && img !== 'electron.exe') return;
-    try {
-      execSync(`taskkill /F /PID ${ps}`, { windowsHide: true, stdio: 'ignore' });
-      killed.push({ pid: ps, port, img: img || (aggressive ? 'aggressive-9222' : '') });
-    } catch (_) {
-      /* Process may already be gone */
-    }
-  };
-
   const ports = [3000, 3001, 9222];
   for (const port of ports) {
     for (const pid of msc_netstatListeningPidsOnPort(port)) {
-      tryKillPid(pid, port, false);
+      msc_purgeTryKillListeningPid(protectedPids, pid, port, false, killed);
     }
   }
 
   if (process.platform === 'win32') {
     for (const pid of msc_netstatListeningPidsOnPort(9222)) {
-      tryKillPid(pid, 9222, true);
+      msc_purgeTryKillListeningPid(protectedPids, pid, 9222, true, killed);
     }
   }
 
@@ -1403,4 +1455,4 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
   });
 }
 
-module.exports = { msc_registerVpeIpc };
+module.exports = { msc_registerVpeIpc, msc_onDevExitCompanionSweep };

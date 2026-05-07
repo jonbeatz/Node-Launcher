@@ -1,7 +1,7 @@
 {
   "name": "vader-project-engine",
-  "version": "1.1.7",
-  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.1.7",
+  "version": "1.1.8",
+  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.1.8",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {
@@ -12,7 +12,7 @@
     "vpe:cleanup-dist": "node scripts/msc-cleanup-dist.cjs",
     "vader:dev-to-forge": "npm run vader:dev && npm run vader:post-dev-forge",
     "vader:sync": "npm run vader:dev -- --success last && npm run vader:post-dev-forge",
-    "vader:clean-sync": "rimraf dist && npm run vader:sync",
+    "vader:clean-sync": "rimraf dist && (npm run vader:dev || node -e \"process.exit(0)\") && npm run vader:post-dev-forge",
     "vpe:take-state-snapshot": "node scripts/vpe-prebuild-snapshot.cjs",
     "vpe:check-readiness": "node scripts/vpe-syntax-guard.cjs",
     "dev:main": "electron . --remote-debugging-port=9222",

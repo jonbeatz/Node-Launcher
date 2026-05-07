@@ -1,8 +1,15 @@
 # VPE Checkpoint (2026-05-07)
 
+## Build v1.1.8 — NET green override & exit-to-build hardening
+
+- **Version:** **`1.1.8`** — shipped label (`package.json`, preload, footer, **`layout.tsx`**).
+- **9222 / NET:** Port-health for **9222** runs a targeted **9222-only** purge when the row is **in use** or the probe times out (**400ms**), then **always** reports **`inUse: false`** (NET never blocked by CDP).
+- **Dev exit:** **`before-quit`** + **`will-quit`** under **`isDev` + `VPE_LAUNCHER_FORGE`**: synchronous sweep of **3000 / 3001** listener PIDs (never global **`node.exe`** — preserves parent **`npm`**), then **`process.exit(0)`**.
+- **`vader:clean-sync`:** **`rimraf dist && (vader:dev || node -e process.exit(0)) && vader:post-dev-forge`** — forge runs even if **`vader:dev`** exits non-zero; use **`vader:sync`** for **`--success last`**.
+
 ## Build v1.1.7 — Scorched Earth UI & build lock
 
-- **Version:** **`1.1.7`** — `package.json`, preload **`vpeInfo.version`**, footer fallback, **`layout.tsx`** metadata.
+- **Version:** **`1.1.7`** — historical; superseded by **v1.1.8** for shipped label.
 - **Thermal UI purge:** System Health no **`Temp:`** line; **`cpuTemp`** removed from **`vpe-bridge`**, **`use-vpe-system-stats`**, and **`vpe:get-system-stats`** payload (**`msc_buildSanitizedSystemStatsPayload`**).
 - **NET / 9222:** **`msc_launcherPortRowHealth(9222)`** — **400ms** race or inner rejection → **`{ inUse: false, ok: true }`** (forge-friendly; **`taskkill`** still available via Purge / scripts).
 - **Scripts:** **`npm run vader:dev-to-forge`** → **`vader:dev && vader:post-dev-forge`** (for strict teardown-before-forge, use **`vader:sync`** with **`--success last`**).
@@ -20,7 +27,7 @@
 
 ## Build v1.1.5 — Gold Master (ghost purge & UI recalibration)
 
-*Historical archive — **v1.1.6** removed main-process thermal PowerShell entirely and changed **Purge** to **`taskkill /F /PID`** only (no **`/T`**). See **Build v1.1.7** for current shipped truth.*
+*Historical archive — **v1.1.6** removed main-process thermal PowerShell entirely and changed **Purge** to **`taskkill /F /PID`** only (no **`/T`**). See **Build v1.1.8** at top for current shipped truth.*
 
 - **PowerShell silence (pre–v1.1.6 thermal path):** `msc_powershellEncodedExecSync` … CLIXML strip — **function removed** with thermal decommission; renderer log strip remains.
 - **Thermal WMI backoff:** access-denied / **0x80041003** now uses a **60-second** silent WMI backoff (reduced log spam vs long multi-minute windows).
@@ -48,22 +55,22 @@
 - **System Health panel:** Default **closed** on load (`systemHealthOpen` initial **`false`**) — no auto-open splash; open from TopBar diagnostics control when needed.
 - **System Log / drawer:** Still defaults **collapsed** (`logDrawerExpanded` **`false`**); no mount **`useEffect`** expands it; **`terminal-prefs.ts`** only persists font + scrollback (not drawer visibility).
 - **Sidebar:** Removed **REGISTRY** section label above **Add New Project** for a tighter nav.
-- **Footer / preload:** **MSC Media Engine v1.1.2** (historical; current label **v1.1.7** — see top of file / `package.json`).
+- **Footer / preload:** **MSC Media Engine v1.1.2** (historical; current label **v1.1.8** — see top of file / `package.json`).
 
 ## Build v1.1.1 — Blocking validation gate (on top of v1.1.0)
 
 - **`vader:sync`:** `npm run vader:dev -- --success last && npm run vader:post-dev-forge` — **`concurrently`** waits for **all** dev processes to exit before snapshot / syntax guard / **`build:win`** (no early **`&&`** while **Next** still owns **3000**).
 - **`vader:dev`:** unchanged **`--success first`** for normal sessions.
 - **Purge:** **500ms** settle after **`taskkill`** before port re-probe; **`stdio: 'ignore'`** so “process already gone” never surfaces as a thrown error.
-- **Footer Net LED:** Superseded by **v1.1.4+** semantics (**9222** + bounded probe); **v1.1.7** adds **9222** forgiveness for forge-ready **green**; see **Build v1.1.7** / **v1.1.6** / **v1.1.5** / **v1.1.4** sections above.
+- **Footer Net LED:** Superseded by **v1.1.4+** semantics (**9222** + bounded probe); **v1.1.8** forces **9222** non-blocking (purge + idle row) and **`forgeReady`-only** green in the footer; see **Build v1.1.8** / **v1.1.7** / **v1.1.6** / **v1.1.5** / **v1.1.4** sections above.
 
 ## Build v1.1.0 — Advanced expansion (shipping line)
 
-App **`package.json`** / preload track **v1.1.x** (see **v1.1.7** at top for current label). Highlights:
+App **`package.json`** / preload track **v1.1.x** (see **v1.1.8** at top for current label). Highlights:
 
-- **Forge gate:** **`vader:sync`** / **`vader:clean-sync`** end with **`vader:post-dev-forge`**: **`node scripts/vpe-forge-pause.cjs`** (3s) then **`vpe:take-state-snapshot`** (`user-data/auto-snapshots/…-AUTO-PRE-BUILD`) → **`vpe:check-readiness`** (forbidden TS-in-`.js` under **`src/main` + `src/renderer`**) → **`build:win`** → **`vpe:cleanup-dist`**. **`npm run vader:dev-to-forge`** runs **`vader:dev`** then the same tail (no leading **`rimraf`**). All **`&&`** sequential; **`vader:dev`** keeps **`concurrently -k --success first`** and sets **`VPE_LAUNCHER_FORGE=1`** (reserved forge flag; **v1.1.6+** no main-process thermal polling; **v1.1.7** no **`cpuTemp`** in IPC/UI).
+- **Forge gate:** **`vader:sync`**, **`vader:clean-sync`**, and **`vader:dev-to-forge`** all end with **`vader:post-dev-forge`**: **`node scripts/vpe-forge-pause.cjs`** (3s) then **`vpe:take-state-snapshot`** (`user-data/auto-snapshots/…-AUTO-PRE-BUILD`) → **`vpe:check-readiness`** (forbidden TS-in-`.js` under **`src/main` + `src/renderer`**) → **`build:win`** → **`vpe:cleanup-dist`**. **`vader:sync`** uses **`--success last`**; **`vader:clean-sync`** does **`rimraf dist`** then **`(vader:dev || …)`** (**v1.1.8**, no **`--success last`**). **`npm run vader:dev-to-forge`** runs **`vader:dev`** then the same tail (no **`rimraf`**). **`vader:dev`** sets **`VPE_LAUNCHER_FORGE=1`** (**v1.1.6+** no main-process thermal polling; **v1.1.7+** no **`cpuTemp`** in IPC/UI).
 - **UI:** Footer **Net** LED + **Purge env** (3000 / 3001 / 9222, node+electron only); **Maintenance** = Repair Logs + **Prompt Vault** (markdown templates + copy **+ version label**); **Sandbox** (react-live / Studio Dark preview).
-- **Docs:** Canonical detail — [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.7). Phrases — [Custom-Commands.md](Custom-Commands.md).
+- **Docs:** Canonical detail — [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.8). Phrases — [Custom-Commands.md](Custom-Commands.md).
 
 **Active git branch:** confirm with **`git status`** (branch name varies; milestones in this file are historical snapshots).
 
@@ -155,7 +162,7 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 - `brave-search` will stay in error state until `BRAVE_API_KEY` is replaced with a real key.
 - Several MCP smoke tests show terminal `exit_code=4294967295` because processes were intentionally stopped after successful startup verification.
 
-**Last doc update:** 2026-05-07 (**v1.1.7** — thermal UI scrub, **9222** forgiveness, **`vader:dev-to-forge`**, cleanup protocol log) — **active branch:** confirm with **`git status`** (example: **`Node-Launcher-v9`** / `origin/Node-Launcher-v9`). Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer (default under `%LocalAppData%\Programs\Vader Project Engine\`, user can change path); **custom `.exe` icon** via **`afterPack` + `rcedit`** because **`signAndEditExecutable: true`** hits winCodeSign symlink limits on some Windows setups (see backlog). **Current optimized packaging mode:** `build.asar = true`.
+**Last doc update:** 2026-05-07 (**v1.1.8** — **9222** purge + forced NET green, dev-exit port sweep, **`vader:clean-sync`** `||` hardening) — **active branch:** confirm with **`git status`** (example: **`Node-Launcher-v9`** / `origin/Node-Launcher-v9`). Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer (default under `%LocalAppData%\Programs\Vader Project Engine\`, user can change path); **custom `.exe` icon** via **`afterPack` + `rcedit`** because **`signAndEditExecutable: true`** hits winCodeSign symlink limits on some Windows setups (see backlog). **Current optimized packaging mode:** `build.asar = true`.
 
 ## Current project status (snapshot)
 

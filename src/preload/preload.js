@@ -66,7 +66,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.1.7',
+  version: '1.1.8',
   hardware: '9700x Tuned',
 });
 
