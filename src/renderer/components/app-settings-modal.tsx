@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react'
 import { X, FolderOpen, Download, Upload, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/vader-toast'
 import { getVpeApi } from '@/lib/vpe-bridge'
+import {
+  VPE_TERM_FONT_KEY,
+  VPE_TERM_SCROLL_KEY,
+  msc_emitTerminalPrefsChanged,
+} from '@/lib/terminal-prefs'
 
 interface AppSettingsModalProps {
   isOpen: boolean
@@ -36,8 +41,16 @@ export function AppSettingsModal({
   const [logRetention, setLogRetention] = useState('30')
   const [diagnosticPath, setDiagnosticPath] = useState('')
   const [defaultShell, setDefaultShell] = useState('powershell')
-  const [fontSize, setFontSize] = useState(13)
-  const [scrollbackLines, setScrollbackLines] = useState(1000)
+  const [fontSize, setFontSize] = useState(() => {
+    if (typeof window === 'undefined') return 13
+    const n = parseInt(window.localStorage.getItem(VPE_TERM_FONT_KEY) || '13', 10)
+    return Number.isFinite(n) ? Math.min(24, Math.max(10, n)) : 13
+  })
+  const [scrollbackLines, setScrollbackLines] = useState(() => {
+    if (typeof window === 'undefined') return 1000
+    const n = parseInt(window.localStorage.getItem(VPE_TERM_SCROLL_KEY) || '1000', 10)
+    return Number.isFinite(n) ? Math.min(50_000, Math.max(100, n)) : 1000
+  })
 
   const handleTakeSnapshot = async () => {
     const api = getVpeApi()
@@ -372,7 +385,15 @@ export function AppSettingsModal({
                 <input
                   type="number"
                   value={fontSize}
-                  onChange={(e) => setFontSize(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    const raw = parseInt(e.target.value, 10)
+                    const v = Number.isFinite(raw) ? Math.min(24, Math.max(10, raw)) : 13
+                    setFontSize(v)
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem(VPE_TERM_FONT_KEY, String(v))
+                      msc_emitTerminalPrefsChanged()
+                    }
+                  }}
                   min={10}
                   max={18}
                   className="w-20 px-3 py-1.5 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-sm text-white focus:outline-none focus:border-[#4fde82]"
@@ -383,7 +404,17 @@ export function AppSettingsModal({
                 <input
                   type="number"
                   value={scrollbackLines}
-                  onChange={(e) => setScrollbackLines(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    const raw = parseInt(e.target.value, 10)
+                    const v = Number.isFinite(raw) ? Math.min(50_000, Math.max(100, raw)) : 1000
+                    setScrollbackLines(v)
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem(VPE_TERM_SCROLL_KEY, String(v))
+                      msc_emitTerminalPrefsChanged()
+                    }
+                  }}
+                  min={100}
+                  max={20000}
                   className="w-24 px-3 py-1.5 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-sm text-white focus:outline-none focus:border-[#4fde82]"
                 />
               </div>

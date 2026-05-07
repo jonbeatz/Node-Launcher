@@ -1,17 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-  LayoutDashboard, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Settings,
   ChevronLeft,
   ChevronRight,
   Plus,
   FileText,
   Square,
   Star,
-  Activity,
-  ChevronDown
+  ChevronDown,
 } from 'lucide-react'
 
 interface AppSidebarProps {
@@ -22,20 +21,27 @@ interface AppSidebarProps {
   favorites?: { id: string; name: string }[]
 }
 
-export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject, onStopAll, favorites = [] }: AppSidebarProps) {
+export function AppSidebar({
+  activeItem = 'dashboard',
+  onNavigate,
+  onAddProject,
+  onStopAll,
+  favorites = [],
+}: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [maintenanceOpen, setMaintenanceOpen] = useState(false)
+  const [favoritesOpen, setFavoritesOpen] = useState(false)
 
   const sidebarWidth = collapsed ? 'w-12' : 'w-[220px]'
 
   const dashboardActive = activeItem === 'dashboard'
   const repairLogsActive = activeItem === 'repair-logs'
-  const repairHistoryActive = activeItem === 'repair-history'
 
   return (
-    <aside className={`${sidebarWidth} h-full flex flex-col bg-[#1c1c1c] border-r border-[#333333] transition-all duration-200 shrink-0`}>
-      {/* Collapse Toggle */}
+    <aside
+      className={`${sidebarWidth} h-full flex flex-col bg-[#1c1c1c] border-r border-[#333333] transition-all duration-200 shrink-0`}
+    >
       <div className="p-2 border-b border-[#333333]">
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -46,40 +52,8 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 p-2 overflow-y-auto custom-scrollbar">
         <div className="space-y-4">
-          {/* Favorites Section - Replaces Diagnostics in top nav logic */}
-          {!collapsed && (
-            <div>
-              <div className="px-2 mb-2 flex items-center gap-2">
-                <Star size={10} className="text-[#ffcc00] fill-[#ffcc00]" />
-                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
-                  Favorites
-                </span>
-              </div>
-              {favorites.length > 0 ? (
-                <div className="space-y-1">
-                  {favorites.map((fav) => (
-                    <button
-                      key={fav.id}
-                      onClick={() => onNavigate?.(`project:${fav.id}`)}
-                      className="w-full flex items-center gap-3 p-2 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all vader-focus group"
-                    >
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#333333] group-hover:bg-[#ffcc00]" />
-                      <span className="font-sans text-xs truncate">{fav.name}</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="px-2 py-1 text-[10px] text-[#555555] italic">
-                  No favorites yet
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Dashboard */}
           <div>
             <button
               onClick={() => onNavigate?.('dashboard')}
@@ -87,11 +61,12 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
               onMouseLeave={() => setHoveredItem(null)}
               className={`
                 w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
-                ${dashboardActive 
-                  ? 'bg-[#252525] text-white' 
-                  : hoveredItem === 'dashboard'
-                    ? 'bg-[#252525] text-white' 
-                    : 'text-[#A0A0A0]'
+                ${
+                  dashboardActive
+                    ? 'bg-[#252525] text-white'
+                    : hoveredItem === 'dashboard'
+                      ? 'bg-[#252525] text-white'
+                      : 'text-[#A0A0A0]'
                 }
               `}
               title={collapsed ? 'Dashboard' : undefined}
@@ -101,7 +76,6 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
             </button>
           </div>
 
-          {/* Registry Section */}
           <div>
             {!collapsed && (
               <div className="px-2 mb-2">
@@ -110,7 +84,6 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
                 </span>
               </div>
             )}
-            {/* Add New Project - VPE Green */}
             <button
               onClick={onAddProject}
               onMouseEnter={() => setHoveredItem('add-project')}
@@ -127,17 +100,20 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
             </button>
           </div>
 
-          {/* Maintenance Submenu */}
           <div>
             {!collapsed && (
-              <button 
+              <button
+                type="button"
                 onClick={() => setMaintenanceOpen(!maintenanceOpen)}
                 className="w-full px-2 mb-2 flex items-center justify-between group"
               >
                 <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left">
-                  Maintenance Submenu
+                  Maintenance
                 </span>
-                <ChevronDown size={10} className={`text-[#A0A0A0] transition-transform ${maintenanceOpen ? '' : '-rotate-90'}`} />
+                <ChevronDown
+                  size={10}
+                  className={`text-[#A0A0A0] transition-transform ${maintenanceOpen ? '' : '-rotate-90'}`}
+                />
               </button>
             )}
             {(maintenanceOpen || collapsed) && (
@@ -148,11 +124,12 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
                   onMouseLeave={() => setHoveredItem(null)}
                   className={`
                     w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
-                    ${repairLogsActive 
-                      ? 'bg-[#252525] text-white' 
-                      : hoveredItem === 'repair-logs'
-                        ? 'bg-[#252525] text-white' 
-                        : 'text-[#A0A0A0]'
+                    ${
+                      repairLogsActive
+                        ? 'bg-[#252525] text-white'
+                        : hoveredItem === 'repair-logs'
+                          ? 'bg-[#252525] text-white'
+                          : 'text-[#A0A0A0]'
                     }
                   `}
                   title={collapsed ? 'Repair Logs' : undefined}
@@ -160,34 +137,57 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
                   <FileText size={18} />
                   {!collapsed && <span className="font-sans text-sm font-medium">Repair Logs</span>}
                 </button>
-                <button
-                  onClick={() => onNavigate?.('repair-history')}
-                  onMouseEnter={() => setHoveredItem('repair-history')}
-                  onMouseLeave={() => setHoveredItem(null)}
-                  className={`
-                    w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
-                    ${repairHistoryActive 
-                      ? 'bg-[#252525] text-white' 
-                      : hoveredItem === 'repair-history'
-                        ? 'bg-[#252525] text-white' 
-                        : 'text-[#A0A0A0]'
-                    }
-                  `}
-                  title={collapsed ? 'Repair History' : undefined}
-                >
-                  <Activity size={18} />
-                  {!collapsed && <span className="font-sans text-sm font-medium">Repair History</span>}
-                </button>
+              </div>
+            )}
+          </div>
+
+          <div>
+            {!collapsed && (
+              <button
+                type="button"
+                onClick={() => setFavoritesOpen(!favoritesOpen)}
+                className="w-full px-2 mb-2 flex items-center justify-between group"
+              >
+                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left flex items-center gap-2">
+                  <Star size={10} className="text-[#ffcc00] fill-[#ffcc00] shrink-0" />
+                  Favorites
+                </span>
+                <ChevronDown
+                  size={10}
+                  className={`text-[#A0A0A0] transition-transform ${favoritesOpen ? '' : '-rotate-90'}`}
+                />
+              </button>
+            )}
+            {(favoritesOpen || collapsed) && (
+              <div className="space-y-1">
+                {favorites.length > 0 ? (
+                  favorites.map((fav) => (
+                    <button
+                      key={fav.id}
+                      onClick={() => onNavigate?.(`favorite:${fav.id}`)}
+                      className="w-full flex items-center gap-3 p-2 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all vader-focus group"
+                      title={collapsed ? fav.name : undefined}
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#333333] group-hover:bg-[#ffcc00] shrink-0" />
+                      {!collapsed && (
+                        <span className="font-sans text-xs truncate text-left">{fav.name}</span>
+                      )}
+                      {collapsed && <Star size={14} className="text-[#ffcc00] fill-[#ffcc00] mx-auto" />}
+                    </button>
+                  ))
+                ) : (
+                  !collapsed && (
+                    <div className="px-2 py-1 text-[10px] text-[#555555] italic">No favorites yet</div>
+                  )
+                )}
               </div>
             )}
           </div>
         </div>
       </nav>
 
-      {/* Divider */}
       <div className="mx-2 border-t border-[#333333]" />
 
-      {/* STOP ALL - Red on hover */}
       <div className="p-2">
         <button
           onClick={onStopAll}
@@ -205,10 +205,8 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
         </button>
       </div>
 
-      {/* Divider */}
       <div className="mx-2 border-t border-[#333333]" />
 
-      {/* Settings - Bottom */}
       <div className="p-2">
         <button
           onClick={() => onNavigate?.('settings')}
@@ -216,11 +214,12 @@ export function AppSidebar({ activeItem = 'dashboard', onNavigate, onAddProject,
           onMouseLeave={() => setHoveredItem(null)}
           className={`
             w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
-            ${activeItem === 'settings' 
-              ? 'bg-[#252525] text-white' 
-              : hoveredItem === 'settings'
-                ? 'bg-[#252525] text-white' 
-                : 'text-[#A0A0A0]'
+            ${
+              activeItem === 'settings'
+                ? 'bg-[#252525] text-white'
+                : hoveredItem === 'settings'
+                  ? 'bg-[#252525] text-white'
+                  : 'text-[#A0A0A0]'
             }
           `}
           title={collapsed ? 'Settings' : undefined}

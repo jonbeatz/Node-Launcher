@@ -83,11 +83,11 @@ Notes:
 
 Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), **close Electron**, then **`npm run build:win`** runs automatically— **`dist/Vader Project Engine.exe`** (NSIS) + **`dist/win-unpacked/`** (portable **`Vader Project Engine.exe`**).
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (master command table, **`&&`** / exit-code semantics, **`concurrently -k`**, **`rimraf dist`**, ASAR/native guidance).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (master command table, **`&&`** / exit-code semantics, **`concurrently -k --success first`**, **`rimraf dist`**, ASAR/native guidance).
 
 ### How **`vader:sync`** works
 
-- Runs **`npm run vader:dev`**: **`next dev`** and Electron together via **`concurrently -k`**.
+- Runs **`npm run vader:dev`**: **`next dev`** and Electron together via **`concurrently -k --success first`**.
 - **`--kill-others` semantics:** when **Electron exits** (you closed the window), **Next dev is terminated** too—so the shell reaches the **`&&`** gate (normal **`npm run dev`** leaves Next running and would block forever).
 - If either process crashes (e.g. syntax error), **`concurrently`** exits non‑zero and **`npm run build:win`** does not run.
 

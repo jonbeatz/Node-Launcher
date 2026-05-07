@@ -191,6 +191,7 @@ export interface VpeApi {
   killProcessOnPort?: (port: number) => Promise<{ ok: boolean; message: string }>
   setProjectFavorite?: (projectId: string, isFavorite: boolean) => Promise<{ ok: boolean }>
   clearRepairHistory?: () => Promise<{ ok: boolean }>
+  deleteRepairRun?: (repairId: string) => Promise<{ ok: boolean }>
 }
 
 declare global {

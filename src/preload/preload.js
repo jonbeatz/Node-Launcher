@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   setProjectFavorite: (projectId, isFavorite) =>
     ipcRenderer.invoke('vpe:set-project-favorite', { projectId, isFavorite }),
   clearRepairHistory: () => ipcRenderer.invoke('vpe:clear-repair-history'),
+  deleteRepairRun: (repairId) =>
+    ipcRenderer.invoke('vpe:delete-repair-run', repairId),
 });
 
 contextBridge.exposeInMainWorld('vpeInfo', {

@@ -24,7 +24,7 @@ import { getVpeApi, msc_rowToDashboardProject } from '@/lib/vpe-bridge'
 
 type FilterType = 'ALL' | 'RUNNING' | 'STOPPED' | 'ERRORS'
 type ViewMode = 'grid' | 'list'
-type NavItem = 'dashboard' | 'repair-logs' | 'repair-history' | 'settings'
+type NavItem = 'dashboard' | 'repair-logs' | 'settings'
 
 interface Project {
   id: string
@@ -145,7 +145,7 @@ function DashboardContent() {
   const [systemHealthOpen, setSystemHealthOpen] = useState(true) // Show System Health Panel with warnings on load
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [activeLogProject, setActiveLogProject] = useState('2')
-  const [logDrawerVisible, setLogDrawerVisible] = useState(false)
+  const [logDrawerExpanded, setLogDrawerExpanded] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [compactMode, setCompactMode] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -234,7 +234,7 @@ function DashboardContent() {
     // Ctrl+` - Toggle Log Drawer
     if (e.ctrlKey && e.key === '`') {
       e.preventDefault()
-      setLogDrawerVisible(prev => !prev)
+      setLogDrawerExpanded(prev => !prev)
     }
 
     // Escape - Close modal, then drawer, then clear search
@@ -246,7 +246,7 @@ function DashboardContent() {
       else if (deleteModalOpen) setDeleteModalOpen(false)
       else if (appSettingsModalOpen) setAppSettingsModalOpen(false)
       else if (systemHealthOpen) setSystemHealthOpen(false)
-      else if (logDrawerVisible) setLogDrawerVisible(false)
+      else if (logDrawerExpanded) setLogDrawerExpanded(false)
       else if (searchTerm) setSearchTerm('')
     }
 
@@ -264,7 +264,7 @@ function DashboardContent() {
     deleteModalOpen,
     appSettingsModalOpen,
     systemHealthOpen,
-    logDrawerVisible,
+    logDrawerExpanded,
     searchTerm,
     addToast,
     refreshProjects,
@@ -315,7 +315,7 @@ function DashboardContent() {
 
   const handleLogs = (projectId: string) => {
     setActiveLogProject(projectId)
-    setLogDrawerVisible(true)
+    setLogDrawerExpanded(true)
   }
 
   const handleConfirmDelete = async () => {
@@ -404,10 +404,22 @@ function DashboardContent() {
       try {
         await api.clearRepairHistory()
         setRepairLogRev(n => n + 1)
-        addToast('Repair history cleared', 'success')
+        addToast('Repair logs cleared', 'success')
       } catch (err: unknown) {
-        addToast('Failed to clear history', 'error', err instanceof Error ? err.message : 'Unknown error')
+        addToast('Failed to clear logs', 'error', err instanceof Error ? err.message : 'Unknown error')
       }
+    }
+  }
+
+  const handleRemoveRepairEntry = async (repairId: string) => {
+    const api = getVpeApi()
+    if (!api?.deleteRepairRun) return
+    try {
+      await api.deleteRepairRun(repairId)
+      setRepairLogRev((n) => n + 1)
+      addToast('Log entry removed', 'info')
+    } catch (err: unknown) {
+      addToast('Remove failed', 'error', err instanceof Error ? err.message : 'Unknown error')
     }
   }
 
@@ -688,9 +700,16 @@ function DashboardContent() {
   const handleNavigation = (nav: string) => {
     if (nav === 'settings') {
       setAppSettingsModalOpen(true)
-    } else {
-      setActiveNav(nav as NavItem)
+      return
     }
+    if (nav.startsWith('favorite:')) {
+      const id = nav.slice('favorite:'.length)
+      setActiveNav('dashboard')
+      setActiveLogProject(id)
+      setLogDrawerExpanded(true)
+      return
+    }
+    setActiveNav(nav as NavItem)
   }
 
   // Filter and search projects
@@ -780,8 +799,8 @@ function DashboardContent() {
           <div className="flex-1 flex min-h-0 overflow-hidden">
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              {activeNav === 'repair-logs' || activeNav === 'repair-history' ? (
-                /* Repair History View */
+              {activeNav === 'repair-logs' ? (
+                /* Repair Logs */
                 <RepairHistoryView
                   refreshSignal={repairLogRev}
                   onViewDiff={(row) => {
@@ -792,6 +811,7 @@ function DashboardContent() {
                     addToast('Undo successful', 'success', 'Previous state restored from .vader-backup')
                   }}
                   onClearHistory={handleClearRepairHistory}
+                  onRemoveEntry={handleRemoveRepairEntry}
                 />
               ) : (
                 <>
@@ -974,8 +994,9 @@ function DashboardContent() {
               projects={logDrawerTabs}
               activeProject={activeLogProject}
               onProjectSelect={setActiveLogProject}
-              onClose={() => setLogDrawerVisible(false)}
-              isVisible={logDrawerVisible}
+              onClose={() => setLogDrawerExpanded(false)}
+              expanded={logDrawerExpanded}
+              onExpandedChange={setLogDrawerExpanded}
               onCloseTab={(projectId) => {
                 if (projectId === '__vpe_all__') return
                 if (logProjects.length > 1) {

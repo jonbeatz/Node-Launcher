@@ -885,6 +885,12 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     return { ok: true };
   });
 
+  ipcMain.handle('vpe:delete-repair-run', async (_event, repairId) => {
+    if (!repairId) throw new Error('VPE: Missing repair run id');
+    store.deleteRepairRun(repairId);
+    return { ok: true };
+  });
+
   ipcMain.handle('vpe:set-project-favorite', async (_event, { projectId, isFavorite }) => {
     if (!projectId) throw new Error('VPE: Missing project id');
     store.setProjectFavorite(projectId, isFavorite);
@@ -899,28 +905,58 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     
     if (trimmed === '/clean') {
       try {
-        const ports = [3000, 9222];
+        const stalePorts = [3000, 3001];
+        const debugPorts = [9222];
         let output = 'Vader: Initiating port cleanup...\n';
-        for (const port of ports) {
+
+        const killPidOnPort = (port, pid, aggressive) => {
+          let processInfo = '';
+          try {
+            processInfo = execSync(`tasklist /FI "PID eq ${pid}" /NH`).toString().trim();
+          } catch {
+            return `PID ${pid} on port ${port}: tasklist failed (skipped)\n`;
+          }
+          const exe = (processInfo.split(/\s+/)[0] || '').toLowerCase();
+          const isNodeLike = /node\.exe|electron\.exe/i.test(processInfo);
+          if (aggressive) {
+            if (isNodeLike) {
+              execSync(`taskkill /F /PID ${pid}`);
+              return `Killed ${exe || 'process'} PID ${pid} on port ${port}\n`;
+            }
+            return `Skipped PID ${pid} on port ${port} (${exe || 'non-node'}) — not Node/Electron\n`;
+          }
+          const isVpeProcess = /node\.exe|electron\.exe|Vader-Project-Engine\.exe/i.test(processInfo);
+          if (!isVpeProcess) {
+            return `Non-VPE process (${exe}) on port ${port}. Skipped. Use /clean again after closing external debug tools.\n`;
+          }
+          execSync(`taskkill /F /PID ${pid}`);
+          return `Killed process ${pid} on port ${port}\n`;
+        };
+
+        const sweepPort = (port, aggressive) => {
           try {
             const netstat = execSync(`netstat -ano | findstr :${port}`).toString();
-            const pids = new Set(netstat.split('\n').map(l => l.trim().split(/\s+/).pop()).filter(p => p && !isNaN(p) && p !== '0'));
+            const pids = new Set(
+              netstat
+                .split('\n')
+                .map((l) => l.trim().split(/\s+/).pop())
+                .filter((p) => p && !Number.isNaN(Number(p)) && p !== '0'),
+            );
+            if (pids.size === 0) {
+              output += `Port ${port} already clear.\n`;
+              return;
+            }
             for (const pid of pids) {
-              const processInfo = execSync(`tasklist /FI "PID eq ${pid}" /NH`).toString().trim();
-              const isVpeProcess = /node\.exe|electron\.exe|Vader-Project-Engine\.exe/i.test(processInfo);
-              
-              if (!isVpeProcess) {
-                output += `Non-VPE process detected (${processInfo.split(/\s+/)[0]}) on port ${port}. Skipped. Use manual kill for external processes.\n`;
-                continue;
-              }
-
-              execSync(`taskkill /F /PID ${pid}`);
-              output += `Killed process ${pid} on port ${port}\n`;
+              output += killPidOnPort(port, pid, aggressive);
             }
           } catch {
             output += `Port ${port} already clear.\n`;
           }
-        }
+        };
+
+        for (const p of stalePorts) sweepPort(p, true);
+        for (const p of debugPorts) sweepPort(p, false);
+
         return { ok: true, output: output + 'Cleanup complete.' };
       } catch (err) {
         return { ok: false, output: `Cleanup failed: ${err.message}` };
@@ -1009,32 +1045,37 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       const tempDir = path.join(os.tmpdir(), `vpe-snapshot-${randomUUID()}`);
       fs.mkdirSync(tempDir, { recursive: true });
 
-      // Copy SQLite
       if (fs.existsSync(dbPath)) {
         fs.copyFileSync(dbPath, path.join(tempDir, 'database.sqlite'));
       }
 
-      // Copy environment files from current project
-      // Note: This logic assumes we want the Node-Launcher's own env if present, 
-      // or we might want to iterate registered projects. For now, let's target root VPE env.
       const rootEnv = path.join(process.cwd(), '.env');
       const rootEnvLocal = path.join(process.cwd(), '.env.local');
       if (fs.existsSync(rootEnv)) fs.copyFileSync(rootEnv, path.join(tempDir, '.env'));
       if (fs.existsSync(rootEnvLocal)) fs.copyFileSync(rootEnvLocal, path.join(tempDir, '.env.local'));
 
-      // Use PowerShell to zip (standard on Windows 10+)
-      // Fix: Compress-Archive requires .zip extension. We'll zip then rename.
       const zipPath = path.join(os.tmpdir(), `vpe-snapshot-${randomUUID()}.zip`);
-      const zipCmd = `powershell -Command "Compress-Archive -Path """${tempDir}\\*""" -DestinationPath """${zipPath}""" -Force"`;
-      execSync(zipCmd);
+      if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
 
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      
-      // Use atomic fs copy
+      const srcPs = tempDir.replace(/'/g, "''");
+      const zipPs = zipPath.replace(/'/g, "''");
+      execSync(
+        `powershell -NoProfile -Command "$ErrorActionPreference='Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::CreateFromDirectory('${srcPs}', '${zipPs}', [System.IO.Compression.CompressionLevel]::Optimal, $false)"`,
+        { stdio: 'pipe', encoding: 'utf-8' },
+      );
+
+      if (!fs.existsSync(zipPath)) {
+        throw new Error('VPE: Snapshot zip was not created under %TEMP%.');
+      }
+      const st = fs.statSync(zipPath);
+      if (!st.size) throw new Error('VPE: Snapshot zip is empty.');
+
+      const destDir = path.dirname(filePath);
+      fs.mkdirSync(destDir, { recursive: true });
+
       fs.copyFileSync(zipPath, filePath);
       fs.unlinkSync(zipPath);
 
-      // Cleanup temp
       fs.rmSync(tempDir, { recursive: true, force: true });
 
       return { ok: true, path: filePath };

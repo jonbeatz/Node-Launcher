@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { FileText, Eye, Undo2, Search, Calendar } from 'lucide-react'
+import { FileText, Eye, Undo2, Search, Calendar, X } from 'lucide-react'
 import { format, isAfter, parseISO, subDays } from 'date-fns'
 import { getVpeApi, type VpeRepairRunRow, type VpeRepairRunStatus } from '@/lib/vpe-bridge'
 
@@ -22,6 +22,8 @@ interface RepairHistoryViewProps {
   onViewDiff: (repair: RepairHistoryRow) => void
   onUndo: (repairId: string) => void
   onClearHistory?: () => void
+  /** Remove a single persisted repair run (SQLite / JSON store). */
+  onRemoveEntry?: (repairId: string) => void
 }
 
 function formatRepairDate(iso: string): string {
@@ -39,6 +41,7 @@ export function RepairHistoryView({
   onViewDiff,
   onUndo,
   onClearHistory,
+  onRemoveEntry,
 }: RepairHistoryViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState('all')
@@ -154,7 +157,7 @@ export function RepairHistoryView({
     return (
       <div className="h-full flex flex-col items-center justify-center px-6">
         <FileText size={48} className="text-[#333333] mb-4 animate-pulse" />
-        <p className="font-sans text-[#A0A0A0] text-center">Loading repair history…</p>
+        <p className="font-sans text-[#A0A0A0] text-center">Loading repair logs…</p>
       </div>
     )
   }
@@ -163,7 +166,7 @@ export function RepairHistoryView({
     return (
       <div className="h-full flex flex-col items-center justify-center px-6">
         <FileText size={48} className="text-[#333333] mb-4" />
-        <p className="font-sans text-[#A0A0A0] mb-1 text-center">Repair history unavailable</p>
+        <p className="font-sans text-[#A0A0A0] mb-1 text-center">Repair logs unavailable</p>
         <p className="font-sans text-sm text-[#555555] text-center max-w-md">
           Open the app in Electron to load persisted repair runs from the main process.
         </p>
@@ -190,17 +193,18 @@ export function RepairHistoryView({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[#333333] flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-[#333333] flex items-center justify-between gap-4">
         <div>
-          <h2 className="font-sans font-bold text-white text-lg mb-1">REPAIR HISTORY</h2>
+          <h2 className="font-sans font-bold text-white text-lg mb-1">REPAIR LOGS</h2>
           <p className="text-[11px] text-[#555555] uppercase tracking-wider font-medium">Maintenance Engine v1.0.8</p>
         </div>
         {onClearHistory && (
           <button
+            type="button"
             onClick={onClearHistory}
-            className="flex items-center gap-2 px-3 py-1.5 rounded bg-transparent border border-[#e02b20]/30 text-[#e02b20] hover:bg-[#e02b20]/10 font-sans text-[11px] font-medium transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded bg-transparent border border-[#e02b20]/30 text-[#e02b20] hover:bg-[#e02b20]/10 font-sans text-[11px] font-medium transition-all shrink-0"
           >
-            CLEAR HISTORY
+            CLEAR ALL
           </button>
         )}
       </div>
@@ -277,6 +281,16 @@ export function RepairHistoryView({
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
+                    {onRemoveEntry && (
+                      <button
+                        type="button"
+                        title="Remove this entry"
+                        onClick={() => onRemoveEntry(repair.id)}
+                        className="flex items-center justify-center w-7 h-6 rounded-sm border border-[#333333] font-sans text-[#A0A0A0] hover:text-[#e02b20] hover:border-[#e02b20] transition-all"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => onViewDiff(repair)}

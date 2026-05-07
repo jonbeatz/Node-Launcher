@@ -179,6 +179,11 @@ class SqlitePersistence {
     this._db.prepare(`DELETE FROM repair_runs`).run();
   }
 
+  deleteRepairRun(repairId) {
+    if (!repairId) return;
+    this._db.prepare(`DELETE FROM repair_runs WHERE id = ?`).run(String(repairId));
+  }
+
   insertLog(projectId, timestamp, level, message) {
     this._db
       .prepare(
@@ -478,6 +483,13 @@ class JsonPersistence {
 
   clearRepairHistory() {
     this._data.repairRuns = [];
+    this.save();
+  }
+
+  deleteRepairRun(repairId) {
+    if (!repairId) return;
+    if (!Array.isArray(this._data.repairRuns)) return;
+    this._data.repairRuns = this._data.repairRuns.filter((r) => r.id !== repairId);
     this.save();
   }
 

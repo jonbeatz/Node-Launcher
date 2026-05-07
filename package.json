@@ -6,9 +6,9 @@
   "main": "src/main/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
-    "vader:dev": "concurrently -k \"npm run dev:renderer\" \"npm run dev:main\"",
+    "vader:dev": "concurrently -k --success first \"npm run dev:renderer\" \"npm run dev:main\"",
     "vader:sync": "npm run vader:dev && npm run build:win",
-    "vader:clean-sync": "rimraf dist && npm run vader:dev && npm run build:win",
+    "vader:clean-sync": "rimraf dist && npm run vader:sync",
     "dev:main": "electron . --remote-debugging-port=9222",
     "start": "electron . --remote-debugging-port=9222",
     "dev:renderer": "next dev src/renderer -p 3000",

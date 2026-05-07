@@ -3,6 +3,10 @@
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
 import { X, GripVertical, ChevronLeft, ChevronRight, ExternalLink, ArrowDownToLine } from 'lucide-react'
 import { getVpeApi } from '@/lib/vpe-bridge'
+import {
+  msc_getTerminalFontSize,
+  msc_getTerminalScrollback,
+} from '@/lib/terminal-prefs'
 
 interface Project {
   id: string
@@ -15,7 +19,9 @@ interface LogDrawerProps {
   activeProject?: string
   onProjectSelect?: (projectId: string) => void
   onClose?: () => void
-  isVisible?: boolean
+  /** When false, docked panel shows only the slide-out rail; logs still mount for quick expand. */
+  expanded?: boolean
+  onExpandedChange?: (expanded: boolean) => void
   onCloseTab?: (projectId: string) => void
 }
 
@@ -106,16 +112,28 @@ export function LogDrawer({
   activeProject = '',
   onProjectSelect,
   onClose,
-  isVisible = true,
+  expanded: expandedProp = false,
+  onExpandedChange,
   onCloseTab
 }: LogDrawerProps) {
   const [selectedProject, setSelectedProject] = useState(activeProject)
   const [width, setWidth] = useState(420)
-  const [isCollapsed, setIsCollapsed] = useState(false)
   const [isDetached, setIsDetached] = useState(false)
+  const [termPrefsRev, setTermPrefsRev] = useState(0)
   const [floatingPosition, setFloatingPosition] = useState({ x: 100, y: 100 })
   const [floatingSize, setFloatingSize] = useState({ width: 500, height: 400 })
   const [logs, setLogs] = useState<LogEntry[]>(() => mscBootstrapLogs())
+
+  useEffect(() => {
+    const fn = () => setTermPrefsRev((r) => r + 1)
+    if (typeof window === 'undefined') return
+    window.addEventListener('vpe-terminal-prefs', fn)
+    return () => window.removeEventListener('vpe-terminal-prefs', fn)
+  }, [])
+
+  void termPrefsRev
+  const logFontPx = msc_getTerminalFontSize()
+  const scrollCap = msc_getTerminalScrollback()
 
   /** Map IPC log line → drawer row */
   const mscMapVpeLog = useCallback((payload: {
@@ -184,14 +202,16 @@ export function LogDrawer({
             return
           }
           setLogs(
-            rows.map((row) =>
-              mscMapVpeUnifiedLog({
-                project_id: row.project_id,
-                timestamp: row.timestamp,
-                level: row.level,
-                message: row.message,
-              }),
-            ),
+            rows
+              .map((row) =>
+                mscMapVpeUnifiedLog({
+                  project_id: row.project_id,
+                  timestamp: row.timestamp,
+                  level: row.level,
+                  message: row.message,
+                }),
+              )
+              .slice(-scrollCap),
           )
         })
         .catch(() => {})
@@ -213,13 +233,13 @@ export function LogDrawer({
             message: row.message,
           }),
         )
-        setLogs(mapped)
+        setLogs(mapped.slice(-scrollCap))
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog])
+  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog, scrollCap])
 
   /** Real-time IPC stream filtered to active drawer tab */
   useEffect(() => {
@@ -236,15 +256,15 @@ export function LogDrawer({
               level: payload.level,
               message: payload.message,
             }),
-          ].slice(-500),
+          ].slice(-scrollCap),
         )
         return
       }
       if (payload.projectId !== selectedProject) return
-      setLogs((prev) => [...prev, mscMapVpeLog(payload)].slice(-500))
+      setLogs((prev) => [...prev, mscMapVpeLog(payload)].slice(-scrollCap))
     })
     return unsub
-  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog])
+  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog, scrollCap])
   const [commandInput, setCommandInput] = useState('')
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
@@ -364,19 +384,21 @@ export function LogDrawer({
           time: getCurrentTime(),
           message: line
         }))
-        setLogs([...newLogs, ...entries])
+        setLogs(([...newLogs, ...entries]).slice(-scrollCap))
       } else {
-        setLogs([...newLogs, { type: 'error', time: getCurrentTime(), message: 'Engine API unavailable.' }])
+        setLogs(([...newLogs, { type: 'error', time: getCurrentTime(), message: 'Engine API unavailable.' }]).slice(-scrollCap))
       }
     } else {
       const response = COMMAND_RESPONSES[trimmedCommand]
       if (response) {
-        setLogs([...newLogs, ...response])
+        setLogs(([...newLogs, ...response]).slice(-scrollCap))
       } else {
-        setLogs([
-          ...newLogs,
-          { type: 'error' as const, time: '', label: '', message: `Command not recognized. Type 'help' for available commands.` }
-        ])
+        setLogs(
+          ([
+            ...newLogs,
+            { type: 'error' as const, time: '', label: '', message: `Command not recognized. Type 'help' for available commands.` },
+          ]).slice(-scrollCap),
+        )
       }
     }
 
@@ -430,16 +452,14 @@ export function LogDrawer({
     }
   }
 
-  if (!isVisible) return null
-
-  // Collapsed state - show only expand button
-  if (isCollapsed && !isDetached) {
+  if (!expandedProp && !isDetached) {
     return (
       <div className="h-full flex flex-col bg-[#1c1c1c]/85 backdrop-blur-[16px] border-l border-[#333333] shrink-0 w-8">
         <button
-          onClick={() => setIsCollapsed(false)}
+          type="button"
+          onClick={() => onExpandedChange?.(true)}
           className="flex-1 flex items-center justify-center text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all"
-          title="Expand Log Drawer"
+          title="Expand System Log"
         >
           <ChevronLeft size={16} />
         </button>
@@ -475,7 +495,11 @@ export function LogDrawer({
               <ArrowDownToLine size={14} />
             </button>
             <button 
-              onClick={onClose}
+              onClick={() => {
+                setIsDetached(false)
+                onExpandedChange?.(false)
+                onClose?.()
+              }}
               className="p-1.5 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all"
             >
               <X size={14} />
@@ -495,9 +519,9 @@ export function LogDrawer({
             }}
             onClick={() => inputRef.current?.focus()}
           >
-            <div className="relative z-20 space-y-0.5">
+            <div className="relative z-20 space-y-0.5" style={{ fontSize: logFontPx }}>
               {logs.map((log, index) => (
-                <div key={index} className="flex font-sans text-[11px] leading-relaxed">
+                <div key={index} className="flex font-sans leading-relaxed">
                   {log.time && (
                     <span className="text-[#444444] mr-2 select-none shrink-0">[{log.time}]</span>
                   )}
@@ -513,7 +537,7 @@ export function LogDrawer({
 
         {/* Floating Command Input */}
         <div className="h-8 px-4 border-t border-[#333333] bg-[#0a0a0a] flex items-center shrink-0">
-          <span className="font-sans text-[13px] text-[#00cc66] mr-2 shrink-0">root@vpe:~#</span>
+          <span className="font-sans text-[#00cc66] mr-2 shrink-0" style={{ fontSize: logFontPx }}>root@vpe:~#</span>
           <input
             ref={inputRef}
             type="text"
@@ -521,7 +545,8 @@ export function LogDrawer({
             onChange={(e) => setCommandInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a command..."
-            className="flex-1 bg-transparent font-sans text-[13px] text-white placeholder:text-[#555555] focus:outline-none"
+            className="flex-1 bg-transparent font-sans text-white placeholder:text-[#555555] focus:outline-none"
+            style={{ fontSize: logFontPx }}
           />
           <div className="w-0.5 h-4 bg-[#4fde82] animate-pulse" />
         </div>
@@ -641,14 +666,19 @@ export function LogDrawer({
                 <ExternalLink size={14} />
               </button>
               <button 
-                onClick={() => setIsCollapsed(true)}
+                type="button"
+                onClick={() => onExpandedChange?.(false)}
                 className="p-1.5 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all"
-                title="Collapse Drawer"
+                title="Collapse System Log"
               >
                 <ChevronRight size={14} />
               </button>
               <button 
-                onClick={onClose}
+                type="button"
+                onClick={() => {
+                  onExpandedChange?.(false)
+                  onClose?.()
+                }}
                 className="p-1.5 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all"
               >
                 <X size={14} />
@@ -667,11 +697,11 @@ export function LogDrawer({
               }}
               onClick={() => inputRef.current?.focus()}
             >
-              <div className="relative z-20 space-y-0.5">
+              <div className="relative z-20 space-y-0.5" style={{ fontSize: logFontPx }}>
                 {logs.map((log, index) => (
                   <div
                     key={`${log.time}:${index}:${log.message.slice(0, 16)}`}
-                    className="flex font-sans text-[11px] leading-relaxed"
+                    className="flex font-sans leading-relaxed"
                   >
                     {log.time && (
                       <span className="text-[#444444] mr-2 select-none shrink-0">[{log.time}]</span>
@@ -688,7 +718,7 @@ export function LogDrawer({
 
           {/* Interactive Command Input */}
           <div className="h-8 px-4 border-t border-[#333333] bg-[#0a0a0a] flex items-center shrink-0">
-            <span className="font-sans text-[13px] text-[#00cc66] mr-2 shrink-0">root@vpe:~#</span>
+            <span className="font-sans text-[#00cc66] mr-2 shrink-0" style={{ fontSize: logFontPx }}>root@vpe:~#</span>
             <input
               ref={inputRef}
               type="text"
@@ -696,7 +726,8 @@ export function LogDrawer({
               onChange={(e) => setCommandInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type a command..."
-              className="flex-1 bg-transparent font-sans text-[13px] text-white placeholder:text-[#555555] focus:outline-none"
+              className="flex-1 bg-transparent font-sans text-white placeholder:text-[#555555] focus:outline-none"
+              style={{ fontSize: logFontPx }}
             />
             <div className="w-0.5 h-4 bg-[#4fde82] animate-pulse" />
           </div>

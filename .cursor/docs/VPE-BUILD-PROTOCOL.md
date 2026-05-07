@@ -14,7 +14,7 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 | Command | Primary use case | What it does |
 | :--- | :--- | :--- |
-| **`npm run vader:dev`** | **Rapid prototyping** | Starts **Next.js** + **Electron** with **`concurrently -k`**. When the **Electron** process exits (e.g. you close the window), **Next dev** is stopped too — avoids leaving a stray listener on the **launcher** port (**3000** by default). |
+| **`npm run vader:dev`** | **Rapid prototyping** | Starts **Next.js** + **Electron** with **`concurrently -k --success first`** (see **`package.json`**). **`--success first`** ties process-group success to the **first** listed script so closing **Electron** reliably ends the dev session and **`vader:sync`** can continue. |
 | **`npm run vader:sync`** | **Validate + forge** | Runs **`vader:dev`**, then **`&& npm run build:win`**. Production pack runs **only after** dev exits **successfully** (exit code **0**). If dev crashes, the chain stops — no broken `.exe` from the same command. |
 | **`npm run vader:clean-sync`** | **Version bump / major UI** | **`rimraf dist`** (clears old installer + **`win-unpacked`**), then same flow as **`vader:sync`**. Use when you need to avoid **ghost** assets or stale **`dist/`** trees. |
 
@@ -27,7 +27,7 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 ## 2. Execution logic & rules
 
 - **Sequential `&&` chains:** **`vader:sync`** and **`vader:clean-sync`** rely on **`&&`**. **`build:win` / `build:main`** must **not** start until the **`vader:dev`** phase exited **without error**.
-- **`concurrently -k` for gated flows:** **`vader:dev`** must use **`concurrently`** with **`--kill-others`** (short: **`-k`**) so closing **Electron** tears down **Next** and the terminal can proceed to **`build:win`**. Ordinary **`npm run dev`** leaves **Next** running by design — do not chain **`&& build:win`** off it unless you intentionally stop Next yourself.
+- **`concurrently -k --success first` for gated flows:** **`vader:dev`** uses **`concurrently`** with **`--kill-others`** ( **`-k`** ) and **`--success first`** so the first script’s exit semantics match the **Electron-first** validation gate (see **`package.json`**).
 - **Cleanup before big releases:** For version bumps or large UI/asset changes — especially anything that affects packaged static output — prefer **`npm run vader:clean-sync`** over **`vader:sync`** so **`dist/`** cannot carry ghosts from earlier builds.
 - **ASAR & native rebuild:**
   - Keep **`asar: true`** in **`package.json`** **`build`** config for normal packaged payloads.
