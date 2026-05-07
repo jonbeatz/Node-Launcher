@@ -47,7 +47,7 @@ Read when you need **“where we are today”** or **exact command sequences**:
 | Doc | Use when |
 | :--- | :--- |
 | [Checkpoint.md](Checkpoint.md) | Branch status, recent milestones, risky areas, files to reopen |
-| [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`restart app`**, **`start app`**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
+| [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`Update Docs`**, **`restart app`**, **`start app`**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
 | [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`** uses **`npm run vader:dev -- --success last`** (blocking full exit before forge), **`vader:post-dev-forge`**, snapshot, syntax guard, **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`** |
 | [API-SetUp-Master.md](API-SetUp-Master.md) | **LiteLLM + ngrok → Vertex AI**; Cursor Base URL + `master_key`; **post–Cursor-restart reconnect** checklist |
 | [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) | Packaging, ASAR, winCodeSign, native rebuild, telemetry—**resolved** symptoms |
@@ -62,7 +62,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
 - [ ] Intended branch matches [Checkpoint.md](Checkpoint.md) (or `git status` is intentional).
-- [ ] VPE Version: **v1.1.3** (see root `package.json` if disputed)
+- [ ] VPE Version: **v1.1.4** (see root `package.json` if disputed)
 - [ ] Node matches team expectation (CI uses Node **20**; local may differ—note if so).
 - [ ] **`npm install`** already run after last `package.json` change (`legacy-peer-deps` via [../../.npmrc](../../.npmrc)).
 
@@ -78,7 +78,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 ### Docs honest?
 
-- [ ] If you changed ports, persistence paths, MCP names, or release steps: update **Checkpoint**, **Custom-Commands**, or **SKILL.md** in the same effort (low drift).
+- [ ] If you changed ports, persistence paths, MCP names, or release steps: update **Checkpoint**, **Custom-Commands**, or **SKILL.md** in the same effort (low drift). For a full doc/rules sweep after a release, say **[Update Docs](Custom-Commands.md#update-docs)**.
 
 ---
 

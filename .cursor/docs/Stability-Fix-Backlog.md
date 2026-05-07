@@ -1,6 +1,6 @@
 # Stability & fix backlog (resolved)
 
-Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** with **`--success last`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.3**).
+Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** with **`--success last`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.4**).
 
 ---
 

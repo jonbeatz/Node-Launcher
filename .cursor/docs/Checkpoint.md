@@ -19,7 +19,7 @@
 - **System Health panel:** Default **closed** on load (`systemHealthOpen` initial **`false`**) — no auto-open splash; open from TopBar diagnostics control when needed.
 - **System Log / drawer:** Still defaults **collapsed** (`logDrawerExpanded` **`false`**); no mount **`useEffect`** expands it; **`terminal-prefs.ts`** only persists font + scrollback (not drawer visibility).
 - **Sidebar:** Removed **REGISTRY** section label above **Add New Project** for a tighter nav.
-- **Footer / preload:** **MSC Media Engine v1.1.2** (superseded by **v1.1.3** above; `package.json` **1.1.3**).
+- **Footer / preload:** **MSC Media Engine v1.1.2** (historical; current label **v1.1.4** — see top of file / `package.json`).
 
 ## Build v1.1.1 — Blocking validation gate (on top of v1.1.0)
 

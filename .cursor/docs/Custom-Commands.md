@@ -4,9 +4,36 @@ This file tracks shorthand commands you want me to execute in this repo.
 
 **Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [.cursor/docs/VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md).
 
-**Active branch:** `Node-Launcher-v8` (see [Checkpoint](Checkpoint.md) for full status).
+**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md).
 
 **Solved problems (symptoms → fixes):** [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
+
+## Update Docs
+
+Intent: after a release or behavior change, **reconcile every doc surface** so agents and humans see **one** story—no stale version strings, no conflicting build rules, no orphaned UI specs.
+
+### How to say it
+
+Use **Update Docs** (or **update docs**, **sync documentation**) when you want a full pass with **no code change** unless something is objectively wrong (e.g. broken link). Pair it with context if only a subset changed (e.g. *"Update Docs — footer LED only"*).
+
+### Steps I will run
+
+1. **Version source of truth** — Read root **`package.json` → `"version"`** (and **`description"`** if it carries the build label). That string drives preload, footer copy, and doc headers.
+2. **Enforcement rules** — Update [`.cursorrules`](../../.cursorrules): **Current Version**, footer signature line, and any UI bullets that changed (TopBar, sidebar, log drawer, purge/LED, forge scripts).
+3. **Agent skill** — Update [`SKILL.md`](../../SKILL.md): design/footer guardrails, **`Vader Sync` / `vader:force-forge`** wording, and any version examples to match **`package.json`**.
+4. **Cold-start index** — Update [AGENT-BOOT-CHECKLIST.md](AGENT-BOOT-CHECKLIST.md): **Session verification** version tick, **Quick mental model** table if ports/LED/forge behavior shifted.
+5. **Build protocol** — Update [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md): document title version, master table if **`package.json`** scripts changed, **§4 In-app tooling** for UI/IPC (purge, Net LED, logs, thermal).
+6. **This file** — Refresh [Custom-Commands.md](Custom-Commands.md): **Active branch** line (Checkpoint link), **Full protocol** parenthetical version, and any command tables that reference new scripts.
+7. **Checkpoint** — Update [Checkpoint.md](Checkpoint.md): add or extend a **Build vX.Y.Z** section for the release; fix downstream lines that still say an older “current” version.
+8. **Cross-links** — Align [README.md](../../README.md) (packaging line), [START-HERE.md](START-HERE.md), [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) protocol version string, and [TRUTH.md](TRUTH.md) only if architecture facts changed (do not churn TRUTH for pure marketing bumps).
+9. **Shipped UI strings** — If the user-facing version label changed: [`src/preload/preload.js`](../../src/preload/preload.js) **`vpeInfo.version`**, [`src/renderer/app/layout.tsx`](../../src/renderer/app/layout.tsx) **`metadata.description`**, and [`src/renderer/components/footer.tsx`](../../src/renderer/components/footer.tsx) fallback to match **`package.json`**.
+10. **Drift sweep** — `rg` (or editor search) for the **previous** patch version and fix stragglers (e.g. **`v1.1.3`** after bumping to **`v1.1.4`**).
+11. **Optional** — If **`layout.tsx`** / preload changed: **`npm run lint`** and **`npm run build:renderer`** from repo root.
+
+### Rules
+
+- **Authority order** stays: [TRUTH.md](TRUTH.md) → **`.cursorrules`** → **`SKILL.md`** → PRD → **`package.json`** scripts. Docs describe reality; they do not invent npm scripts.
+- **One version story:** every “current build” mention should match **`package.json`** unless explicitly labeled historical (archive bullets in Checkpoint).
 
 ## rebuild exe
 
@@ -83,7 +110,7 @@ Notes:
 
 Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **snapshot / syntax / build** until **all** dev children have exited — then **auto snapshot** (**`-AUTO-PRE-BUILD`**) → **syntax guard** → **`npm run build:win`**. If the guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.3: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, **`vader:force-forge`**, ASAR/native guidance).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.4: **`--success last`** gate, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, **`vader:force-forge`**, ASAR/native guidance).
 
 ### How **`vader:sync`** works
 
