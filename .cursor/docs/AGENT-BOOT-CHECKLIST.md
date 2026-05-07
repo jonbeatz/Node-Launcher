@@ -32,11 +32,12 @@ If sources disagree, follow this order (**highest wins first**):
 | :--- | :--- |
 | **What VPE is** | Electron shell + Next.js **static-export** UI: register Node/Next projects, PM2 lifecycle, logs, repair/nuke, thumbnails (see [README.md](../../README.md)). |
 | **Main vs UI** | **`src/main`** (Node, PM2, FS), **`src/preload`** (IPC only), **`src/renderer`** (React/Next, **no** raw Node). **Vader Shield** always. |
-| **Launcher port / forge** | Dev UI: **`http://127.0.0.1:3000`** / `localhost:3000` (renderer). **Managed apps must use a higher port**—not the launcher port. **Vader Sync:** **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**`timeout`** → snapshot → syntax guard → **`build:win`** — see protocol). Footer **Net** LED (**3000** / **3001** / **9222**): **green** = all idle (**`forgeReady`**), **amber** = only **node/electron** listening (incl. CDP on **9222**), **red** = foreign listener; port row health uses a **~500ms** bounded probe so the LED can recover after purge. |
+| **Launcher port / forge** | Dev UI: **`http://127.0.0.1:3000`** / `localhost:3000` (renderer). **Managed apps must use a higher port**—not the launcher port. **Vader Sync:** **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**`vpe-forge-pause`** → snapshot → syntax guard → **`build:win`** → **`vpe:cleanup-dist`**). **`vader:dev-to-forge`** = **`vader:dev && vader:post-dev-forge`** (no **`rimraf`**; no **`--success last`** — use **`vader:sync`** for strict teardown). Footer **Net** LED: **green** = **`forgeReady`** (**3000/3001** free; **v1.1.7**: **9222** probe uses **400ms** forgiveness / error → idle so CDP does not block green); **amber** = dev stack on **3000** and/or **3001**; **red** = port conflict on **3000/3001**; **3000/3001** rows use **~500ms** bounded probes. |
 | **Diagnostics / logs** | **System Health** panel **closed** by default on load (open from TopBar). **System Log** drawer **collapsed** by default (**Logs** / **Ctrl+`**). |
 | **Persistence** | Canonical store under **`app.getPath('userData')/vpe-db`** (SQLite/JSON); thumbnails under **`userData` media**. Legacy `projects.json` may be migrated/archived. |
 | **E2E / CI** | Playwright, Chromium; **`CI=true`** for deterministic bind—see [../../playwright.config.ts](../../playwright.config.ts) and [.github/workflows/ci.yml](../../.github/workflows/ci.yml). |
 | **Electron debug** | **`npm run dev:main`** uses **`--remote-debugging-port=9222`** — for MCP attach workflows. |
+| **CPU temperature** | **Removed (v1.1.6+); UI scrub v1.1.7:** no WMI / PowerShell thermal in main; System Health has **no** temperature field. Do not restore without [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) sign-off. |
 
 ---
 
@@ -48,7 +49,7 @@ Read when you need **“where we are today”** or **exact command sequences**:
 | :--- | :--- |
 | [Checkpoint.md](Checkpoint.md) | Branch status, recent milestones, risky areas, files to reopen |
 | [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`Update Docs`**, **`restart app`**, **`start app`**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
-| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`** uses **`npm run vader:dev -- --success last`** (blocking full exit before forge), **`vader:post-dev-forge`** (**Windows `timeout`** → snapshot → syntax guard → **`build:win`**), **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`** |
+| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`** (**`vpe-forge-pause`** → snapshot → syntax guard → **`build:win`** → **`vpe:cleanup-dist`**), **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`** (**v1.1.7**) |
 | [API-SetUp-Master.md](API-SetUp-Master.md) | **LiteLLM + ngrok → Vertex AI**; Cursor Base URL + `master_key`; **post–Cursor-restart reconnect** checklist |
 | [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) | Packaging, ASAR, winCodeSign, native rebuild, telemetry—**resolved** symptoms |
 
@@ -62,7 +63,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
 - [ ] Intended branch matches [Checkpoint.md](Checkpoint.md) (or `git status` is intentional).
-- [ ] VPE Version: **v1.1.5** (see root `package.json` if disputed)
+- [ ] VPE Version: **v1.1.7** (see root `package.json` if disputed)
 - [ ] Node matches team expectation (CI uses Node **20**; local may differ—note if so).
 - [ ] **`npm install`** already run after last `package.json` change (`legacy-peer-deps` via [../../.npmrc](../../.npmrc)).
 

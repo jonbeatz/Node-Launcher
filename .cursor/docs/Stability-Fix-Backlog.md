@@ -1,6 +1,6 @@
 # Stability & fix backlog (resolved)
 
-Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** with **`--success last`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.5**).
+Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** with **`--success last`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.7**).
 
 ---
 
@@ -186,4 +186,4 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 ---
 
-*Last updated: 2026-05-06 — align with [Checkpoint](Checkpoint.md) and packaging on branch **`Node-Launcher-v4`**. Powered by the MSC Media Engine.*
+*Last updated: 2026-05-07 — align with [Checkpoint](Checkpoint.md); **build v1.1.7**; git branch: **confirm with `git status`**. Powered by the MSC Media Engine.*

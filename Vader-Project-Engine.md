@@ -46,7 +46,7 @@
 ## 🖥️ Log Drawer (Right Panel)
 *   **Structure**: Slides out from the right, 420px width, backdrop-blur glassmorphic surface (`bg #1c1c1c/80`).
 *   **Navigation**: Tab bar at the top to switch context between different running projects.
-*   **Terminal**: Background `#0a0a0a`, JetBrains Mono font, full ANSI color support.
+*   **Terminal (System Log)**: Background `#121212`, JetBrains Mono font, full ANSI color support.
 *   **Overlay**: 1px horizontal scanline pattern (2% opacity) and an inner-vignette shadow for visual focus.
 *   **Status**: Bottom bar displaying active PM2 process ID and current runtime.
 

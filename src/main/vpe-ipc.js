@@ -1,4 +1,4 @@
-const { ipcMain, BrowserWindow, dialog, shell, nativeImage, app, Notification } = require('electron');
+const { ipcMain, BrowserWindow, dialog, shell, nativeImage, app } = require('electron');
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -16,14 +16,6 @@ const MAX_THUMB_EDGE = 960;
 const MAX_THUMB_BYTES = 512 * 1024;
 const VPE_CATALOG_VERSION = 1;
 const VPE_SYSTEM_REPAIR_PROJECT_ID = '__vpe_system__';
-
-/** Skip WMI thermal reads until this timestamp after permission failure (60s silent backoff). */
-let msc_thermalWmiSilenceUntil = 0;
-/** After WMI access denied (e.g. 0x80041003): no high-temp notifications for rest of process. */
-let msc_thermalAlertsDisabledForSession = false;
-let msc_thermalPermissionRepairLogged = false;
-/** Set in `msc_registerVpeIpc` — inserts one repair row on first permission failure. */
-let msc_thermalPermissionLogHook = null;
 
 /**
  * @returns {Promise<boolean>} true if something accepts TCP connections on 127.0.0.1:port
@@ -79,157 +71,6 @@ function msc_tasklistImageName(pid) {
   }
 }
 
-/** Strip PowerShell CLIXML / serialization blobs from captured stdout/stderr. */
-function msc_stripPowerShellClixml(text) {
-  if (text == null || typeof text !== 'string') return text;
-  return text
-    .replace(/#< CLIXML[\s\S]*?<\/Objs>/gi, '')
-    .replace(/<Objs[^>]*>[\s\S]*?<\/Objs>/gi, '')
-    .trim();
-}
-
-/**
- * UTF-16LE → Base64 for `powershell -EncodedCommand` (PS 5.1-safe).
- * Prepends module/progress silencing + UTF-8 output to reduce CLIXML / “Preparing modules” noise.
- */
-function msc_powershellEncodedExecSync(script) {
-  const { execSync } = require('child_process');
-  const preamble = [
-    '$env:PSModuleAnalysisCachePath = (Join-Path $env:TEMP "PSModuleAnalysisCache")',
-    '$ProgressPreference = "SilentlyContinue"',
-    '$ErrorActionPreference = "Stop"',
-    '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
-    '$OutputEncoding = [System.Text.Encoding]::UTF8',
-  ].join('\n');
-  const fullScript = `${preamble}\n\n${String(script).trim()}`;
-  const b64 = Buffer.from(fullScript, 'utf16le').toString('base64');
-  const raw = execSync(
-    `powershell.exe -NoProfile -NoLogo -NonInteractive -EncodedCommand ${b64}`,
-    {
-      windowsHide: true,
-      timeout: 8000,
-      encoding: 'utf8',
-    },
-  );
-  return msc_stripPowerShellClixml(String(raw));
-}
-
-/** @returns {{ ok: true, c: number } | { ok: false, denied?: boolean }} */
-function msc_execThermalWmiRead() {
-  const THERMAL_PRIMARY_PS = `
-$ErrorActionPreference = 'Stop'
-try {
-  $tz = Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature -ErrorAction Stop | Select-Object -First 1
-  if ($null -eq $tz) { exit 1 }
-  Write-Output ([decimal]$tz.CurrentTemperature)
-} catch {
-  [Console]::Error.WriteLine($_.Exception.Message)
-  $hr = $_.Exception.HResult
-  if ($hr -eq -2147217405 -or $hr -eq [int]0x80041003) { exit 2 }
-  exit 3
-}
-`.trim();
-
-  const THERMAL_FALLBACK_PS = `
-$ErrorActionPreference = 'Stop'
-try {
-  $r = Get-CimInstance -ClassName Win32_TemperatureProbe -ErrorAction Stop | Select-Object -First 1 -ExpandProperty CurrentReading
-  if ($null -eq $r) { exit 1 }
-  Write-Output ([decimal]$r)
-} catch {
-  [Console]::Error.WriteLine($_.Exception.Message)
-  $hr = $_.Exception.HResult
-  if ($hr -eq -2147217405 -or $hr -eq [int]0x80041003) { exit 2 }
-  exit 3
-}
-`.trim();
-
-  const runDenied = (e) => {
-    const st = e && typeof e.status === 'number' ? e.status : null;
-    const stderr = msc_stripPowerShellClixml(e && e.stderr != null ? String(e.stderr) : '');
-    const stdout = msc_stripPowerShellClixml(e && e.stdout != null ? String(e.stdout) : '');
-    const blob = `${stderr}\n${stdout}\n${e && e.message ? String(e.message) : ''}`;
-    if (
-      st === 2 ||
-      /0x80041003|WBEM_E_ACCESS_DENIED|-2147217405|Access is denied|Required privilege is not held|denied by WMI/i.test(
-        blob,
-      )
-    ) {
-      return { ok: false, denied: true };
-    }
-    return { ok: false };
-  };
-
-  try {
-    const raw = msc_powershellEncodedExecSync(THERMAL_PRIMARY_PS);
-    const lastLine = String(raw)
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .pop();
-    const n = Number(lastLine);
-    if (!Number.isFinite(n)) return { ok: false };
-    return { ok: true, c: n / 10 - 273.15 };
-  } catch (e) {
-    const d = runDenied(e);
-    if (d.denied) return d;
-  }
-
-  try {
-    const raw2 = msc_powershellEncodedExecSync(THERMAL_FALLBACK_PS);
-    const lastLine2 = String(raw2)
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .pop();
-    const n2 = Number(lastLine2);
-    if (!Number.isFinite(n2)) return { ok: false };
-    return { ok: true, c: n2 / 10 - 273.15 };
-  } catch (e2) {
-    const d2 = runDenied(e2);
-    if (d2.denied) return d2;
-    return { ok: false };
-  }
-}
-
-/** Thermal read with 60s WMI backoff on permission error; alerts disabled for session after deny. */
-function msc_readCpuTempCelsiusWithMeta() {
-  if (Date.now() < msc_thermalWmiSilenceUntil) {
-    return { c: null };
-  }
-  const r = msc_execThermalWmiRead();
-  if (r.denied) {
-    msc_thermalWmiSilenceUntil = Date.now() + 60 * 1000;
-    msc_thermalAlertsDisabledForSession = true;
-    if (msc_thermalPermissionLogHook) {
-      try {
-        msc_thermalPermissionLogHook();
-      } catch (_) {
-        /* */
-      }
-    }
-    return { c: null, denied: true };
-  }
-  if (r.ok) return { c: r.c };
-  return { c: null };
-}
-
-/** @returns {number|null} °C or null if unavailable / denied / non-numeric */
-function msc_readCpuTempCelsius() {
-  const m = msc_readCpuTempCelsiusWithMeta();
-  return m.c != null ? m.c : null;
-}
-
-function msc_launcherPackageVersion() {
-  try {
-    const p = path.join(__dirname, '..', '..', 'package.json');
-    const j = JSON.parse(fs.readFileSync(p, 'utf8'));
-    return String(j.version || '0.0.0');
-  } catch (_) {
-    return '0.0.0';
-  }
-}
-
 function msc_promptVaultPath() {
   return path.join(app.getPath('userData'), 'prompt-vault.json');
 }
@@ -261,15 +102,95 @@ async function msc_launcherPortRowHealthInner(port) {
 }
 
 const MSC_PORT_HEALTH_RACE_MS = 500;
+/** CDP bridge: prefer green / forge-ready — treat slow or failed probes as idle (v1.1.7). */
+const MSC_PORT9222_FORGIVENESS_MS = 400;
 
 /** Same as inner, but never hangs the UI: on timeout assume port free (forge-friendly). */
 async function msc_launcherPortRowHealth(port) {
+  if (port === 9222) {
+    return await Promise.race([
+      msc_launcherPortRowHealthInner(9222).catch(() => ({ inUse: false, ok: true })),
+      new Promise((resolve) => {
+        setTimeout(() => resolve({ inUse: false, ok: true }), MSC_PORT9222_FORGIVENESS_MS);
+      }),
+    ]);
+  }
   return await Promise.race([
     msc_launcherPortRowHealthInner(port),
     new Promise((resolve) => {
       setTimeout(() => resolve({ inUse: false, ok: true }), MSC_PORT_HEALTH_RACE_MS);
     }),
   ]);
+}
+
+/**
+ * Purge orphan TCP listeners on 3000 / 3001 / 9222. Never targets the main app (`process.pid`)
+ * or `process.ppid`. Uses `taskkill /F /PID` only (no `/T`) so the Electron tree is not torn down.
+ */
+async function msc_purgeLauncherPorts() {
+  const { execSync } = require('child_process');
+  const { setTimeout: delay } = require('timers/promises');
+  const mainPid = String(process.pid);
+  const parentPid =
+    typeof process.ppid === 'number' && process.ppid > 0 ? String(process.ppid) : null;
+  const protectedPids = new Set([mainPid]);
+  if (parentPid) protectedPids.add(parentPid);
+
+  const killed = [];
+
+  if (process.platform === 'win32') {
+    try {
+      execSync('taskkill /F /IM chrome.exe /FI "WINDOWTITLE eq VPE*"', {
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+    } catch (_) {
+      /* No matching Chrome window */
+    }
+  }
+
+  const tryKillPid = (pid, port, aggressive) => {
+    const ps = String(pid);
+    if (protectedPids.has(ps)) return;
+    if (process.platform !== 'win32') return;
+    const img = msc_tasklistImageName(ps);
+    if (!aggressive && img !== 'node.exe' && img !== 'electron.exe') return;
+    try {
+      execSync(`taskkill /F /PID ${ps}`, { windowsHide: true, stdio: 'ignore' });
+      killed.push({ pid: ps, port, img: img || (aggressive ? 'aggressive-9222' : '') });
+    } catch (_) {
+      /* Process may already be gone */
+    }
+  };
+
+  const ports = [3000, 3001, 9222];
+  for (const port of ports) {
+    for (const pid of msc_netstatListeningPidsOnPort(port)) {
+      tryKillPid(pid, port, false);
+    }
+  }
+
+  if (process.platform === 'win32') {
+    for (const pid of msc_netstatListeningPidsOnPort(9222)) {
+      tryKillPid(pid, 9222, true);
+    }
+  }
+
+  await delay(500);
+  const ph3000 = await msc_launcherPortRowHealth(3000);
+  const ph3001 = await msc_launcherPortRowHealth(3001);
+  const ph9222 = await msc_launcherPortRowHealth(9222);
+  const stackOk = ph3000.ok && ph3001.ok;
+  const forgeReady = !ph3000.inUse && !ph3001.inUse;
+  return {
+    ok: true,
+    killed,
+    p3000: ph3000.inUse,
+    p3001: ph3001.inUse,
+    p9222: ph9222.inUse,
+    healthy: stackOk,
+    forgeReady,
+  };
 }
 
 function msc_rowToCatalogPayload(row) {
@@ -450,7 +371,6 @@ function msc_buildSanitizedSystemStatsPayload(p) {
       active: Math.max(0, Math.floor(Number(p.projectsActive) || 0)),
       total: Math.max(0, Math.floor(Number(p.projectsTotal) || 0)),
     },
-    cpuTemp: p.cpuTemp != null ? Math.round(p.cpuTemp) : null,
   };
 }
 
@@ -621,27 +541,6 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   if (msc_vpeIpcRegistered) return;
   msc_vpeIpcRegistered = true;
 
-  msc_thermalPermissionLogHook = () => {
-    if (msc_thermalPermissionRepairLogged) return;
-    msc_thermalPermissionRepairLogged = true;
-    try {
-      const ts = new Date().toISOString();
-      store.insertRepairRun({
-        id: randomUUID(),
-        project_id: VPE_SYSTEM_REPAIR_PROJECT_ID,
-        project_name: 'VPE System',
-        created_at: ts,
-        status: 'partial',
-        description:
-          'Thermal Monitoring requires Admin Privileges. Alerts disabled.',
-        files_changed: 0,
-      });
-      msc_emitRepairRunsChanged();
-    } catch (e) {
-      console.warn('[VPE thermal permission log]', e);
-    }
-  };
-
   const msc_emitProjectsUpdated = () => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win?.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
@@ -782,8 +681,6 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
         pm2ProcessCount = 0;
       }
 
-      const cpuTemp = msc_readCpuTempCelsius();
-
       return msc_buildSanitizedSystemStatsPayload({
         cpuPercent,
         totalMem,
@@ -794,7 +691,6 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
         vpeUptimeLabel,
         projectsActive,
         projectsTotal,
-        cpuTemp,
       });
     } catch (err) {
       return msc_fallbackSystemStats(err);
@@ -1458,79 +1354,7 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
     };
   });
 
-  ipcMain.handle('vpe:purge-launcher-ports', async () => {
-    const { execSync } = require('child_process');
-    const { setTimeout: delay } = require('timers/promises');
-    const myPid = String(process.pid);
-    const parentPid =
-      typeof process.ppid === 'number' && process.ppid > 0 ? String(process.ppid) : null;
-    const protectedPids = new Set([myPid]);
-    if (parentPid) protectedPids.add(parentPid);
-
-    const killed = [];
-
-    if (process.platform === 'win32') {
-      try {
-        execSync('taskkill /F /IM chrome.exe /FI "WINDOWTITLE eq VPE*"', {
-          windowsHide: true,
-          stdio: 'ignore',
-        });
-      } catch (_) {
-        /* No matching Chrome window */
-      }
-    }
-
-    const ports = [3000, 3001, 9222];
-    for (const port of ports) {
-      for (const pid of msc_netstatListeningPidsOnPort(port)) {
-        if (protectedPids.has(pid)) continue;
-        const img = msc_tasklistImageName(pid);
-        if (img !== 'node.exe' && img !== 'electron.exe') continue;
-        try {
-          execSync(`taskkill /F /T /PID ${pid}`, {
-            windowsHide: true,
-            stdio: 'ignore',
-          });
-          killed.push({ pid, port, img });
-        } catch (_) {
-          /* Process may already be gone; never fail purge for zombie PIDs */
-        }
-      }
-    }
-
-    /** Aggressive CDP sweep: any LISTEN PID on 9222 except launcher + parent (catches chrome/ghosts). */
-    if (process.platform === 'win32') {
-      for (const pid of msc_netstatListeningPidsOnPort(9222)) {
-        if (protectedPids.has(pid)) continue;
-        try {
-          execSync(`taskkill /F /T /PID ${pid}`, {
-            windowsHide: true,
-            stdio: 'ignore',
-          });
-          const img = msc_tasklistImageName(pid);
-          killed.push({ pid, port: 9222, img: img || 'aggressive-9222' });
-        } catch (_) {
-          /* */
-        }
-      }
-    }
-
-    await delay(500);
-    const ph3000 = await msc_launcherPortRowHealth(3000);
-    const ph3001 = await msc_launcherPortRowHealth(3001);
-    const ph9222 = await msc_launcherPortRowHealth(9222);
-    const stackOk = ph3000.ok && ph3001.ok;
-    const forgeReady = !ph3000.inUse && !ph3001.inUse;
-    return {
-      ok: true,
-      killed,
-      p3000: ph3000.inUse,
-      p3001: ph3001.inUse,
-      p9222: ph9222.inUse,
-      healthy: stackOk,
-      forgeReady,
-    };
-  });
+  ipcMain.handle('vpe:purge-launcher-ports', () => msc_purgeLauncherPorts());
 
   ipcMain.handle('vpe:prompt-vault-read', () => {
     const filePath = msc_promptVaultPath();
@@ -1554,53 +1378,25 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
     return { ok: true };
   });
 
-  if (process.env.VPE_LAUNCHER_FORGE === '1') {
-    let lastThermalAlertMs = 0;
-    const THERMAL_COOLDOWN_MS = 5 * 60 * 1000;
-    setInterval(() => {
-      try {
-        if (msc_thermalAlertsDisabledForSession) return;
-
-        const m = msc_readCpuTempCelsiusWithMeta();
-        if (m.c == null || m.c <= 90) return;
-
-        const now = Date.now();
-        if (now - lastThermalAlertMs < THERMAL_COOLDOWN_MS) return;
-        lastThermalAlertMs = now;
-        const ver = msc_launcherPackageVersion();
-        const ts = new Date().toISOString();
-        if (Notification.isSupported()) {
-          const n = new Notification({
-            title: 'VPE: High Thermal Load',
-            body: `Thermal read ~${Math.round(m.c)}°C during Build Forge (v${ver}). Reduce load or improve cooling.`,
-          });
-          n.show();
-        }
-        store.insertRepairRun({
-          id: randomUUID(),
-          project_id: VPE_SYSTEM_REPAIR_PROJECT_ID,
-          project_name: 'VPE System',
-          created_at: ts,
-          status: 'partial',
-          description: `Thermal spike detected — ${Math.round(m.c)}°C at ${ts} (launcher v${ver}, Build Forge)`,
-          files_changed: 0,
-        });
-        msc_emitRepairRunsChanged();
-      } catch (e) {
-        console.warn('[VPE thermal monitor]', e);
-      }
-    }, 20000);
-  }
-
   ipcMain.handle('vpe:kill-process-on-port', async (_event, port) => {
     const { execSync } = require('child_process');
+    const mainPid = String(process.pid);
+    const parentPid =
+      typeof process.ppid === 'number' && process.ppid > 0 ? String(process.ppid) : null;
+    const protectedPids = new Set([mainPid]);
+    if (parentPid) protectedPids.add(parentPid);
     try {
       const netstat = execSync(`netstat -ano | findstr :${port}`).toString();
       const pids = new Set(netstat.split('\n').map(l => l.trim().split(/\s+/).pop()).filter(p => p && !isNaN(p) && p !== '0'));
       for (const pid of pids) {
-        execSync(`taskkill /F /PID ${pid}`);
+        if (protectedPids.has(String(pid))) continue;
+        try {
+          execSync(`taskkill /F /PID ${pid}`, { windowsHide: true, stdio: 'ignore' });
+        } catch (_) {
+          /* */
+        }
       }
-      return { ok: true, message: `Killed all processes on port ${port}.` };
+      return { ok: true, message: `Killed listeners on port ${port} (launcher PIDs excluded).` };
     } catch (err) {
       return { ok: false, message: `Failed to clear port ${port}: ${err.message}` };
     }

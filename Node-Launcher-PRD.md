@@ -4,6 +4,8 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
+**Shipped desktop build (npm / `package.json` `version`):** **1.1.7** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata should match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and **v1.1.7** NET / thermal behavior.
+
 ---
 
 ## 1. Project Vision
@@ -100,6 +102,8 @@ module.exports = {
 *   **Hardware Optimization:** Targets Ryzen 9700x[cite: 13]. Offloads heavy tasks to background worker threads to maintain 60 fps UI performance[cite: 13].
 *   **Windows 11 25H2 Tuning:** Batched file I/O and whitelisted paths to reduce antivirus scanning impact[cite: 13].
 *   **Zombie Prevention:** Uses `tree-kill` to guarantee termination of Next.js/Node processes on stop[cite: 13].
+*   **Hardware telemetry (v1.1.6+; UI v1.1.7):** CPU temperature via WMI / PowerShell in the Electron main process is **removed**; System Health has **no** temperature display and IPC omits **`cpuTemp`**. Do not reintroduce without an explicit product decision ([`.cursor/docs/VPE-BUILD-PROTOCOL.md`](.cursor/docs/VPE-BUILD-PROTOCOL.md)).
+*   **Footer Purge env:** Clears orphan listeners on **3000 / 3001 / 9222** with **`taskkill /F /PID`** only (no **`/T`**), always skipping the launcher **`process.pid`** and **`process.ppid`**.
 *   **Snapshot Engine:** Backs up SQLite and `.env` files to `.vader-checkpoint` via `%TEMP%` staging and copy-on-write logic to bypass file locks.
 
 ### **5.1 API Orchestration (LiteLLM)**

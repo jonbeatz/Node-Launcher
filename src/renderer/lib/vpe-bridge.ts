@@ -83,7 +83,6 @@ export interface VpeSystemStats {
     active: number
     total: number
   }
-  cpuTemp?: number | null
 }
 
 export type VpeRepairRunStatus = 'success' | 'partial' | 'failed'

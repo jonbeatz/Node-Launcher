@@ -544,10 +544,11 @@ export function LogDrawer({
         <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
           <div 
             ref={terminalRef}
-            className="absolute inset-0 z-10 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain pl-8 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
+            className="absolute inset-0 z-10 bg-[#121212] overflow-y-auto overscroll-y-contain pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
+            style={{ opacity: 1 }}
             onClick={() => inputRef.current?.focus()}
           >
-            <div className="relative z-20 space-y-0.5" style={{ fontSize: logFontPx }}>
+            <div className="relative z-30 space-y-0.5" style={{ fontSize: logFontPx }}>
               {logs.map((log, index) => (
                 <div key={index} className="flex font-sans leading-relaxed">
                   {log.time && (
@@ -566,7 +567,7 @@ export function LogDrawer({
         </div>
 
         {/* Floating Command Input */}
-        <div className="h-8 px-4 border-t border-[#333333] bg-[#0a0a0a] flex items-center shrink-0">
+        <div className="h-8 px-4 border-t border-[#333333] bg-[#121212] flex items-center shrink-0">
           <span className="font-sans text-[#00cc66] mr-2 shrink-0" style={{ fontSize: logFontPx }}>root@vpe:~#</span>
           <input
             ref={inputRef}
@@ -630,7 +631,7 @@ export function LogDrawer({
       <div
         ref={resizeRef}
         onMouseDown={startResize}
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#4fde82]/20 transition-colors z-30"
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#4fde82]/20 transition-colors z-10"
       />
 
       {/* Tab Bar - SQUARED with 4px top radius only, dark grey active state */}
@@ -716,14 +717,15 @@ export function LogDrawer({
             </div>
           </div>
 
-          {/* Terminal Area — inset-y + left-1 clears the resize strip; scroll pane z-stacks above */}
+          {/* Terminal Area — left-1 clears resize gutter; log lines z-30 above scrollbar (z-10) */}
           <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
             <div 
               ref={terminalRef}
-              className="absolute inset-y-0 right-0 left-1 z-10 bg-[#0a0a0a] overflow-y-auto overscroll-y-contain pl-8 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
+              className="absolute inset-y-0 right-0 left-1 z-10 bg-[#121212] overflow-y-auto overscroll-y-contain pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
+              style={{ opacity: 1 }}
               onClick={() => inputRef.current?.focus()}
             >
-              <div className="relative z-20 space-y-0.5" style={{ fontSize: logFontPx }}>
+              <div className="relative z-30 space-y-0.5" style={{ fontSize: logFontPx }}>
                 {logs.map((log, index) => (
                   <div
                     key={`${log.time}:${index}:${log.message.slice(0, 16)}`}
@@ -745,7 +747,7 @@ export function LogDrawer({
           </div>
 
           {/* Interactive Command Input */}
-          <div className="h-8 px-4 border-t border-[#333333] bg-[#0a0a0a] flex items-center shrink-0">
+          <div className="h-8 px-4 border-t border-[#333333] bg-[#121212] flex items-center shrink-0">
             <span className="font-sans text-[#00cc66] mr-2 shrink-0" style={{ fontSize: logFontPx }}>root@vpe:~#</span>
             <input
               ref={inputRef}

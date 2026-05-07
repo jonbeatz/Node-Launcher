@@ -6,9 +6,9 @@ import { getVpeApi } from '@/lib/vpe-bridge'
 type NetLedState = 'unknown' | 'forge' | 'dev' | 'conflict'
 
 function msc_engineVersionLabel(): string {
-  if (typeof window === 'undefined') return '1.1.5'
+  if (typeof window === 'undefined') return '1.1.7'
   const w = window as Window & { vpeInfo?: { version?: string } }
-  return w.vpeInfo?.version ?? '1.1.5'
+  return w.vpeInfo?.version ?? '1.1.7'
 }
 
 export function Footer() {
@@ -63,14 +63,14 @@ export function Footer() {
     ) : led === 'forge' ? (
       <span
         className="text-[#4fde82]"
-        title="Ports 3000 & 3001 free and 9222 CDP idle — pre-forge / packaging ready"
+        title="Ports 3000 & 3001 free — pre-forge / packaging ready (9222 does not block NET green; v1.1.7+)"
       >
         ●
       </span>
     ) : led === 'dev' ? (
       <span
         className="text-[#e8a838]"
-        title="Dev stack on 3000/3001 and/or CDP on 9222 (debug bridge) — gold until clear + idle"
+        title="Dev stack active on 3000 and/or 3001 — stop dev servers for forge-ready (green)"
       >
         ●
       </span>
@@ -95,7 +95,7 @@ export function Footer() {
           disabled={purging || led === 'unknown'}
           onClick={() => void handlePurge()}
           className="h-6 px-2 rounded border border-[#444444] font-sans text-[10px] uppercase tracking-wide text-[#A0A0A0] hover:text-white hover:border-[#4fde82]/60 disabled:opacity-40 vader-focus"
-          title="taskkill /F /T tree-kill node/electron on 3000, 3001, 9222 — skips own PID and parent PID"
+          title="taskkill /F /PID on listeners for 3000, 3001, 9222 (no /T) — skips launcher PID and parent PID"
         >
           {purging ? 'Purging…' : 'Purge env'}
         </button>

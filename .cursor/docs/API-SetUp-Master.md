@@ -11,7 +11,7 @@ Cursor does **not** store your Google service account secret. After you restart 
 ### How connection actually works
 
 1. **Google → LiteLLM:** `gcp_key.json` is referenced by **`GOOGLE_APPLICATION_CREDENTIALS`**. LiteLLM uses it to call **Vertex AI** (models are listed in **`litellm_config.yaml`**; project id there must match your GCP project).
-2. **LiteLLM:** Listens on a **local TCP port** (watch the LiteLLM console for **`Uvicorn running on …`**—typically **`28401`** in this workspace).
+2. **LiteLLM:** Listens on a **local TCP port** printed in the console (**`Uvicorn running on http://0.0.0.0:<port>`**). Use **that** `<port>` for ngrok (older notes used **`28401`**; recent runs on this machine used **`4000`**—always trust the live line).
 3. **Ngrok:** Forwards **`http://localhost:<that-port>`** to a **public HTTPS URL** Cursor can reach.
 4. **Cursor:** Sends OpenAI-compatible requests to **Base URL + `/v1`**, with **API Key = LiteLLM `master_key`** (see `litellm_config.yaml` → `general_settings.master_key`). Cursor **never** needs the contents of `gcp_key.json`.
 
@@ -23,14 +23,14 @@ Cursor does **not** store your Google service account secret. After you restart 
 | 2 | Set GCP env | `$env:GOOGLE_APPLICATION_CREDENTIALS="D:\Cursor_Projectz\Node-Launcher\gcp_key.json"` |
 | 3 | (Optional, if console encoding errors) | `$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"` |
 | 4 | Start proxy | `litellm --config litellm_config.yaml` → confirm port (e.g. **28401**) |
-| 5 | **Terminal B — ngrok** | `.\ngrok http 28401` (port **must match** LiteLLM) |
+| 5 | **Terminal B — ngrok** | `.\ngrok http <that-port>` (port **must match** LiteLLM’s Uvicorn line) |
 | 6 | **Cursor → Settings → Models** | **Override OpenAI Base URL:** `https://<your-ngrok-host>/v1` (must end with **`/v1`**) · **API Key:** `sk-vader-protocol-1234` |
 
 **If ngrok assigns a new URL:** update Cursor’s Base URL only; **`master_key`** in `litellm_config.yaml` stays the same unless you change it deliberately.
 
 ### Quick sanity checks
 
-- **Local (with auth):** `Invoke-WebRequest -Uri "http://127.0.0.1:28401/v1/models" -Headers @{ Authorization = "Bearer sk-vader-protocol-1234" }` — expect **200**. Empty/wrong Bearer → **401**.
+- **Local (with auth):** `Invoke-WebRequest -Uri "http://127.0.0.1:<port>/v1/models" -Headers @{ Authorization = "Bearer sk-vader-protocol-1234" }` — expect **200** (use the same `<port>` as Uvicorn). Empty/wrong Bearer → **401**.
 - **`401` in Cursor:** Re-enter **`sk-vader-protocol-1234`** in Cursor; Base URL must be the **HTTPS** ngrok forwarding URL + **`/v1`**.
 
 ---
@@ -112,6 +112,8 @@ To automate this, the following rule is already active in your `.cursorrules`:
 - **Action:** Open PowerShell terminal and run the environment setup + `litellm` command.
 
 ---
+*Document revision v2.3 — Port guidance: always read Uvicorn `<port>` from the live LiteLLM console (ngrok must match); sanity-check URL uses the same `<port>`.*
+
 *Document revision v2.2 — Added “after Cursor restart” reconnect chain and sanity checks.*
 
 *Powered by the MSC Media Engine*

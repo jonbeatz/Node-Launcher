@@ -23,7 +23,7 @@ Whenever the command "rebuild exe" (or aliases like "production build",
 
 7\. Packager Run      | Run 'npm run build:main' (generates 'dist/Vader Project Engine.exe'; `build.afterPack` runs `msc-after-pack-embed-icon.cjs` + `rcedit` so the app `.exe` shows the staged `build/icon.ico` without winCodeSign symlink issues)
 
-8\. Prune Dist        | Delete '.blockmap', 'builder-debug.yml', and 'latest.yml'
+8\. Prune Dist        | Run **`npm run vpe:cleanup-dist`** (same as **`vader:post-dev-forge`** tail): removes **top-level** **`dist/`** **`*.blockmap`**, **`*.yml`**, **`builder-effective-config.yaml`** only — never **`win-unpacked/`** or **`*.exe`**. Logs **`[Vader Protocol] All Thermal UI artifacts and Ghost PIDs purged.`**
 
 
 
@@ -33,8 +33,9 @@ Deliverable Output:
 
 &#x20; - 🚀 'dist/Vader Project Engine.exe' (standalone setup installer)
 
-Notes (2026-05-06):
+Notes (2026-05-07, **v1.1.7**):
 
 - If `electron-builder` fails with `Access is denied` in `dist/win-unpacked/*`, close any running `Vader Project Engine.exe` / Electron / Node processes, remove `dist/win-unpacked`, and rerun `npm run build:main`.
-- Current emergency packaging mode sets `build.asar = false` in `package.json` to avoid a production main-process parse crash seen with ASAR on this environment.
+- **Packaging:** `build.asar` is **`true`** in root **`package.json`** for normal releases. If you ever need a one-off unpacked payload for diagnosis, change **`asar`** only with team sign-off and revert after debugging (see [Stability-Fix-Backlog](Stability-Fix-Backlog.md)).
+- **Gated forge:** full dev → pack flow and script truth live in [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (**`vader:sync`**, **`vader:dev-to-forge`**, **`vpe:cleanup-dist`**).
 

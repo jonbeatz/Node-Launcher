@@ -13,7 +13,7 @@ To maintain architectural integrity, all development must follow this strict hie
 4. **Node-Launcher-PRD.md**: Feature and requirement truth.
 5. **package.json**: Authority for executable scripts only.
 
-**Packaging pipeline (v1.1.5+):** **`npm run vader:sync`** runs **`vader:dev`** with **`--success last`** so npm waits for **full** dev process teardown, then **`vader:post-dev-forge`**: a **3s** Windows **`timeout`** pause, **`vpe:take-state-snapshot`**, **`vpe:check-readiness`**, and **`build:win`**. Full command table: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**.
+**Current release (npm):** **`1.1.7`** in root **`package.json`**. **Packaging pipeline:** **`npm run vader:sync`** runs **`vader:dev`** with **`--success last`** so npm waits for **full** dev process teardown, then **`vader:post-dev-forge`**: a **3s** pause via **`node scripts/vpe-forge-pause.cjs`**, then **`vpe:take-state-snapshot`**, **`vpe:check-readiness`**, **`build:win`**, and **`vpe:cleanup-dist`**. **`npm run vader:dev-to-forge`** chains **`vader:dev`** → **`vader:post-dev-forge`** without **`rimraf`**; for strict teardown use **`vader:sync`**. Full command table: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**. **v1.1.7** removes thermal UI / **`cpuTemp`** from IPC and applies **9222** port-health forgiveness for NET **green** when **3000/3001** are free.
 
 ---
 

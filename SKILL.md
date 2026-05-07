@@ -31,10 +31,11 @@ When this skill applies, **always**:
 - **PM2:** Prefer the **bundled programmatic API** in main; do not assume a globally installed PM2 daemon is required for the product story.
 - **Termination:** Discuss and implement stops with **`tree-kill`** (and project-runner preflight / Windows port sweeps where already implemented).
 - **Repairs:** **`.vader-backup`** before writes; diff-first confirmation for AST changes; align with `scripts/repair` / PRD repair suite.
-- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.1.5**).
+- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.1.7**).
 - **Naming:** Custom CSS/Tailwind-style classes prefixed with **`msc-`**; new main-process helpers follow existing **`msc_`** naming (match surrounding code).
-- **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. 
+- **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. **Forge / packaging sequencing:** [`.cursor/docs/VPE-BUILD-PROTOCOL.md`](.cursor/docs/VPE-BUILD-PROTOCOL.md) — e.g. **`vader:sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vpe:cleanup-dist`**.
 - **API Bootstrap:** Always ensure the **"start API"** (LiteLLM) is running for any task requiring model orchestration. Confirmation: **"API is Live"**.
+- **Hardware telemetry:** WMI / PowerShell CPU temperature in **`vpe-ipc.js`** was **removed in v1.1.6**; **v1.1.7** removed **`cpuTemp`** from IPC and all System Health temperature UI — do not restore without product sign-off (**`VPE-BUILD-PROTOCOL.md`** §2).
 - **Windows default:** Prefer Windows 11 25H2 and repo-documented pipelines (PowerShell, `CI=true` for E2E) unless the user scopes otherwise.
 - **UI completion:** Run the **Master Quality Gate** (§4) before calling UI work done.
 
@@ -109,14 +110,14 @@ Never delete **`.next`** while **`next dev`** is actively running for that proje
 ### 2.2 Principles
 
 - Layer surfaces (background → card → modal), thin **1px** borders, **sparse** use of Vader Red.
-- **Glass** + **backdrop-blur** for elevated panels (log drawer); optional **CRT scanline** overlay at **~2%** opacity.
+- **Glass** + **backdrop-blur** for elevated panels (log drawer shell). **System Log** text viewport is **plain HTML** (**#121212**, **`pl-10`**, log **`z-30`** / gutter **`z-10`**) — no CRT overlay on log text (see **`.cursorrules`**).
 
 ### 2.3 Key components
 
 - **HUD:** 1px horizontal **#e02b20 @ 30%** at extreme top/bottom framing.
 - **Top bar:** **48px**; breadcrumb; settings affordance.
 - **Grid:** `repeat(auto-fill, minmax(320px, 1fr))`, **20px** gap; cards with **4:3 WebP**, status LED, sparkline strip, actions **Start/Stop**, **Repair**, **Nuke**.
-- **Log drawer:** **420px**; glass surface; tabs per project; terminal **#0a0a0a**; bottom status (PM2 id / runtime).
+- **Log drawer:** **420px**; glass surface; tabs per project; System Log viewport **#121212** + **`pl-10 pr-4 py-4`**; ANSI + CLIXML strip; bottom status line.
 - **Repair modal:** max **900px**; split diff (add **green**, remove **red**); **Apply** / **Undo** / **Cancel**.
 - **Destructive confirms (Nuke):** **2px** pulsing Vader Red border on confirm surface when specified.
 
@@ -167,8 +168,8 @@ Before marking UI **done**:
 
 ### Release-oriented phrases (see `Custom-Commands.md`)
 
-- **`rebuild exe`:** Icon staging → *(optional **`npm run build:renderer`** for fail-fast export)* → **`npm run rebuild:natives`** → **`npm run lint`** → **`CI=true npm run test:e2e`** → clean **`dist/`** → **`npm run build:main`** ( **`prebuild:main`** = icon + **`build:renderer`** once ) → trim blockmap / `builder-debug.yml` / `latest.yml`.
-- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — runs **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**Windows `timeout /t 3`** → **snapshot** → **`vpe:check-readiness`** → **`build:win`**). **`npm run vader:force-forge`** runs the same forge tail without **`vader:dev`** (manual escape hatch). Standalone **`vader:dev`** keeps **`--success first`**. Rules: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**; phrases: **`Custom-Commands.md`**.
+- **`rebuild exe`:** Icon staging → *(optional **`npm run build:renderer`** for fail-fast export)* → **`npm run rebuild:natives`** → **`npm run lint`** → **`CI=true npm run test:e2e`** → clean **`dist/`** → **`npm run build:main`** ( **`prebuild:main`** = icon + **`build:renderer`** once ) → **`npm run vpe:cleanup-dist`** ( **`scripts/msc-cleanup-dist.cjs`** — root **`dist/`** junk only).
+- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — runs **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**`node scripts/vpe-forge-pause.cjs`** → **snapshot** → **`vpe:check-readiness`** → **`build:win`**). **`npm run vader:force-forge`** runs the same forge tail without **`vader:dev`** (manual escape hatch). Standalone **`vader:dev`** keeps **`--success first`**. Rules: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**; phrases: **`Custom-Commands.md`**.
 - **`restart app`** / **`start app`:** Stop stray **node/electron** (per **`Custom-Commands`**), then **`npm run dev`**.
 - **`hardened setup`:** Install, **`rebuild:natives`**, optional Playwright browsers, **`repair:ast`**, E2E, lint.
 

@@ -84,8 +84,6 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
 
   const cpuDisplay =
     systemStats != null && systemStats.cpu >= 0 ? `${systemStats.cpu}%` : '—'
-  const cpuTempDisplay = 
-    systemStats?.cpuTemp != null ? `${systemStats.cpuTemp}°C` : '—'
   const projectsLine =
     systemStats != null
       ? `${systemStats.projects.active} of ${systemStats.projects.total} active`
@@ -94,7 +92,7 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
     systemStats != null ? `${systemStats.memory.free.toFixed(2)} GB` : '—'
   const resourcesLine =
     systemStats != null
-      ? `CPU: ${cpuDisplay} (${cpuTempDisplay}) | RAM: ${memFreeLabel} free (${systemStats.memory.percentage}% used)`
+      ? `CPU: ${cpuDisplay} | RAM: ${memFreeLabel} free (${systemStats.memory.percentage}% used)`
       : '—'
 
   if (!isOpen) return null

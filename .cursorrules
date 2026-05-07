@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## 1. Project Context & Identity
 - **Project Name:** Vader Project Engine (VPE)
-- **Current Version:** v1.1.5 (see root `package.json` if disputed)
+- **Current Version:** v1.1.7 (see root `package.json` if disputed)
 - **Target Hardware:** AMD Ryzen 9700x / Gigabyte B650 (Optimized for high-performance I/O)
 - **OS Focus:** Windows 11 25H2 (Native optimizations for Defender/Antivirus paths)
 - **Branding:** My Studio Channel (MSC) / Vader Protocol
@@ -40,7 +40,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Log Drawer:** Per-project log segregation via PM2 process ID; stream into dedicated xterm.js instance; support ANSI colors, Ctrl+F search, copy, clear view
 
 ## 4. Active Agency & Recovery Protocols
-- **Fix Local First:** If the local environment breaks, the agent must proactively run recovery commands (e.g., `npm run dev:recover`) rather than just listing instructions.
+- **Fix Local First:** If the local environment breaks, the agent must proactively run recovery commands defined in **`package.json`** (e.g. **`npm run dev`**, **`hardened setup`** per [Custom-Commands.md](.cursor/docs/Custom-Commands.md)) rather than just listing instructions.
 - **Smoke Checks:** After any runtime change, the agent must verify `http://localhost:3000/` and report HTTP status (report 200/404/500).
 - **Command Authority:** Never reference or run scripts not currently explicitly defined in `package.json`.
 - **Safe Cleanup:** Never run destructive `.next` cleanup while `next dev` is actively running.
@@ -66,12 +66,10 @@ If documentation conflicts occur, follow this hierarchy strictly:
   - Hover: scale 1.02, shadow-vader-glow
 - **Side navigation:** **Dashboard** first; **Add New Project** is the high-contrast primary CTA directly below (no separate **REGISTRY** label). **Maintenance** (Repair Logs + Prompt Vault) and **Sandbox** per `src/renderer/components/app-sidebar.tsx`.
 - **Log Drawer:** 420px width; glassmorphic surface (bg #1c1c1c at 80% opacity); backdrop-blur; **default collapsed** on load (expand via **Logs** / **Ctrl+`**).
-  - Horizontal inset + z-ordering so the resize strip does not cover log text; terminal stream strips ANSI + PowerShell CLIXML noise for display
-  - Terminal area: background #0a0a0a; JetBrains Mono font
+  - **System Log** viewport: plain HTML lines (ANSI stripped); **#121212** solid background (`opacity: 1`); **`pl-10 pr-4 py-4`**; log text **`z-30`**, scroll pane + resize gutter **`z-10`** — no overlay sitting on text
+  - Strips PowerShell **CLIXML** / **`<Objs>`** blobs in display path (renderer)
   - **Force Scrollbar:** Width 10px, Thumb #ff0000 (Vader Red), `z-index: 9999`, `scrollbar-gutter: stable both-edges`.
-  - CRT scanline overlay: repeating 1px horizontal lines, #000000 at 2% opacity, 3px spacing
-  - Vignette: inner box-shadow `inset 0 0 100px rgba(0,0,0,0.6)`
-  - Bottom status bar showing PM2 process ID and runtime
+  - Bottom status bar (drawer chrome); per-project **xterm** terminals (when used) follow monospace / Studio Dark elsewhere in app
   - Horizontal tab bar at top for per-project log switching
   - Close button in top-right corner
 - **Vader Repair Suite (Modal):**
@@ -107,9 +105,9 @@ If documentation conflicts occur, follow this hierarchy strictly:
 ## 8. Implementation Requirements
 - **Process Restoration:** On initialization, call `pm2.list()` to sync UI state with active projects
 - **Port Management:** Implement auto-increment logic (up to 10 attempts) for occupied ports; if exhausted, show toast notification
-- **Footer Net / Purge:** **Net** LED + **Purge env** reflect **3000** / **3001** / **9222** (green = **`forgeReady`** all idle; amber = **node/electron** only, incl. CDP; red = foreign); bounded (~**500ms**) port-health probe after purge; see main-process purge / port-row IPC
+- **Footer Net / Purge:** **Net** LED + **Purge env** reflect **3000** / **3001** / **9222** (green = **`forgeReady`** all idle; amber = **node/electron** only, incl. CDP; red = foreign); bounded (~**500ms**) port-health probe after purge; **`vpe:purge-launcher-ports`** uses **`taskkill /F /PID`** only (no **`/T`**) and skips **`process.pid`** / **`process.ppid`**
 - **Nuke Action:** Ensure `nuke` deletes `node_modules` and `.next` before executing the specific `<detectedPackageManager> install`
-- **Signature:** Every footer must include "Powered by the MSC Media Engine" with the **current** release version string (e.g. **v1.1.5** — match `package.json` / preload `vpeInfo.version`).
+- **Signature:** Every footer must include "Powered by the MSC Media Engine" with the **current** release version string (e.g. **v1.1.7** — match `package.json` / preload `vpeInfo.version`).
 
 ## 9. Error Handling & Feedback States
 - **Toasts:** Top-right corner, dark background with red left accent border, auto-dismiss after 4 seconds; used for start, stop, nuke, and port-lock failures
