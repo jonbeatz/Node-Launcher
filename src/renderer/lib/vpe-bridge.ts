@@ -113,6 +113,34 @@ export interface CatalogImportResult {
   errors?: { id?: string; message: string }[]
 }
 
+export interface VpeLauncherPortHealth {
+  p3000: boolean
+  p3001: boolean
+  ok: boolean
+}
+
+export interface VpePurgeLauncherPortsResult {
+  ok: boolean
+  killed?: { pid: string; port: number; img: string }[]
+  p3000?: boolean
+  p3001?: boolean
+  healthy?: boolean
+}
+
+export interface VpePromptVaultItem {
+  id: string
+  title: string
+  /** e.g. "Vader Protocol v1.0.8" */
+  versionLabel: string
+  bodyMd: string
+  updatedAt: string
+}
+
+export interface VpePromptVaultData {
+  v: number
+  items: VpePromptVaultItem[]
+}
+
 export interface CatalogExportResult {
   ok: boolean
   canceled?: boolean
@@ -192,6 +220,11 @@ export interface VpeApi {
   setProjectFavorite?: (projectId: string, isFavorite: boolean) => Promise<{ ok: boolean }>
   clearRepairHistory?: () => Promise<{ ok: boolean }>
   deleteRepairRun?: (repairId: string) => Promise<{ ok: boolean }>
+  getLauncherPortHealth?: () => Promise<VpeLauncherPortHealth>
+  purgeLauncherPorts?: () => Promise<VpePurgeLauncherPortsResult>
+  promptVaultRead?: () => Promise<{ ok: boolean; data?: VpePromptVaultData; error?: string }>
+  promptVaultWrite?: (data: VpePromptVaultData) => Promise<{ ok: boolean }>
+  subscribeRepairRunsChanged?: (callback: () => void) => () => void
 }
 
 declare global {

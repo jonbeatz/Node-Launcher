@@ -299,7 +299,7 @@ class JsonPersistence {
   constructor(paths) {
     this._storeDir = paths.storeDir;
     this._jsonPath = paths.jsonPath;
-    /** @type {{ projects: Record<string, any>, logs: any[], logSeq: number, repairRuns: any[] }} */
+    /** @type {{ projects: Object.<string, any>, logs: any[], logSeq: number, repairRuns: any[] }} */
     this._data = { projects: {}, logs: [], logSeq: 0, repairRuns: [] };
   }
 

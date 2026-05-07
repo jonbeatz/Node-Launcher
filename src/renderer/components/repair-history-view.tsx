@@ -47,9 +47,18 @@ export function RepairHistoryView({
   const [dateFilter, setDateFilter] = useState('all')
   const [rows, setRows] = useState<RepairHistoryRow[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [liveRev, setLiveRev] = useState(0)
   const [loading, setLoading] = useState(
     () => typeof window !== 'undefined' && Boolean(getVpeApi()?.getRepairRuns),
   )
+
+  useEffect(() => {
+    const api = getVpeApi()
+    if (!api?.subscribeRepairRunsChanged) return
+    return api.subscribeRepairRunsChanged(() => {
+      setLiveRev((n) => n + 1)
+    })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -97,7 +106,7 @@ export function RepairHistoryView({
     return () => {
       cancelled = true
     }
-  }, [refreshSignal])
+  }, [refreshSignal, liveRev])
 
   const filteredRepairs = useMemo(() => {
     const cutoff =

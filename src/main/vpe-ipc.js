@@ -1,4 +1,4 @@
-const { ipcMain, BrowserWindow, dialog, shell, nativeImage, app } = require('electron');
+const { ipcMain, BrowserWindow, dialog, shell, nativeImage, app, Notification } = require('electron');
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -15,6 +15,132 @@ const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 const MAX_THUMB_EDGE = 960;
 const MAX_THUMB_BYTES = 512 * 1024;
 const VPE_CATALOG_VERSION = 1;
+const VPE_SYSTEM_REPAIR_PROJECT_ID = '__vpe_system__';
+
+/**
+ * @returns {Promise<boolean>} true if something accepts TCP connections on 127.0.0.1:port
+ */
+function msc_tcpPortHasListener(port) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ port, host: '127.0.0.1' });
+    let settled = false;
+    const done = (listening) => {
+      if (settled) return;
+      settled = true;
+      try {
+        socket.destroy();
+      } catch (_) {
+        /* */
+      }
+      resolve(listening);
+    };
+    socket.setTimeout(250);
+    socket.on('connect', () => done(true));
+    socket.on('timeout', () => done(false));
+    socket.on('error', () => done(false));
+    socket.on('close', () => done(false));
+  });
+}
+
+function msc_netstatListeningPidsOnPort(port) {
+  const { execSync } = require('child_process');
+  const pids = new Set();
+  try {
+    const out = execSync('netstat -ano', { windowsHide: true }).toString();
+    const portRe = new RegExp(`:${port}\\s`);
+    for (const line of out.split(/\r?\n/)) {
+      if (!/\bLISTENING\b/i.test(line) || !portRe.test(line)) continue;
+      const parts = line.trim().split(/\s+/);
+      const pid = parts[parts.length - 1];
+      if (/^\d+$/.test(pid)) pids.add(pid);
+    }
+  } catch (_) {
+    /* */
+  }
+  return [...pids];
+}
+
+function msc_tasklistImageName(pid) {
+  const { execSync } = require('child_process');
+  try {
+    const out = execSync(`tasklist /FI "PID eq ${pid}" /NH /FO CSV`, { windowsHide: true }).toString();
+    const m = out.match(/^"([^"]+)"/);
+    return m ? m[1].toLowerCase() : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/** Best-effort CPU / thermal zone °C via WMI (Ryzen laptops may deny or return non-package). */
+function msc_readCpuTempCelsius() {
+  try {
+    const { execSync } = require('child_process');
+    let cmd =
+      'Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature | Select-Object -ExpandProperty CurrentTemperature';
+    let res = execSync(`powershell -NoProfile -Command "${cmd}"`, {
+      windowsHide: true,
+      timeout: 8000,
+    })
+      .toString()
+      .trim();
+    if (!res) {
+      cmd =
+        'Get-WmiObject -Class Win32_TemperatureProbe | Select-Object -ExpandProperty CurrentReading';
+      res = execSync(`powershell -NoProfile -Command "${cmd}"`, {
+        windowsHide: true,
+        timeout: 8000,
+      })
+        .toString()
+        .trim();
+    }
+    if (!res) return null;
+    const n = Number(res);
+    if (!Number.isFinite(n)) return null;
+    return (n / 10) - 273.15;
+  } catch (_) {
+    return null;
+  }
+}
+
+function msc_launcherPackageVersion() {
+  try {
+    const p = path.join(__dirname, '..', '..', 'package.json');
+    const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return String(j.version || '0.0.0');
+  } catch (_) {
+    return '0.0.0';
+  }
+}
+
+function msc_promptVaultPath() {
+  return path.join(app.getPath('userData'), 'prompt-vault.json');
+}
+
+function msc_emitRepairRunsChanged() {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win?.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+      win.webContents.send('vpe:repair-runs-changed');
+    }
+  }
+}
+
+/**
+ * Port "healthy for VPE" if free, or only node/electron LISTEN (normal dev stack).
+ * @returns {Promise<{ inUse: boolean, ok: boolean }>}
+ */
+async function msc_launcherPortRowHealth(port) {
+  const inUse = await msc_tcpPortHasListener(port);
+  if (!inUse) return { inUse: false, ok: true };
+  const pids = msc_netstatListeningPidsOnPort(port);
+  if (!pids.length) return { inUse: true, ok: true };
+  for (const pid of pids) {
+    const img = msc_tasklistImageName(pid);
+    if (img && img !== 'node.exe' && img !== 'electron.exe') {
+      return { inUse: true, ok: false };
+    }
+  }
+  return { inUse: true, ok: true };
+}
 
 function msc_rowToCatalogPayload(row) {
   return {
@@ -428,12 +554,19 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     }
     const projectId = payload.projectId != null ? String(payload.projectId) : '';
     if (!projectId) throw new Error('VPE: Missing project id');
-    const row = store.getProject(projectId);
-    if (!row) throw new Error('VPE: Project not found');
+    const row =
+      projectId === VPE_SYSTEM_REPAIR_PROJECT_ID ? null : store.getProject(projectId);
+    if (projectId !== VPE_SYSTEM_REPAIR_PROJECT_ID && !row) {
+      throw new Error('VPE: Project not found');
+    }
     const name =
-      typeof payload.projectName === 'string' && payload.projectName.trim()
-        ? payload.projectName.trim()
-        : String(row.name);
+      projectId === VPE_SYSTEM_REPAIR_PROJECT_ID
+        ? typeof payload.projectName === 'string' && payload.projectName.trim()
+          ? payload.projectName.trim()
+          : 'VPE System'
+        : typeof payload.projectName === 'string' && payload.projectName.trim()
+          ? payload.projectName.trim()
+          : String(row.name);
     const st = payload.status;
     const status =
       st === 'partial' || st === 'failed' || st === 'success' ? st : 'success';
@@ -498,26 +631,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
         pm2ProcessCount = 0;
       }
 
-      let cpuTemp = null;
-      try {
-        const { execSync } = require('child_process');
-        // Primary: MSAcpi_ThermalZoneTemperature
-        let cmd = 'Get-CimInstance -Namespace root/wmi -ClassName MSAcpi_ThermalZoneTemperature | Select-Object -ExpandProperty CurrentTemperature';
-        let res = execSync(`powershell -Command "${cmd}"`, { windowsHide: true }).toString().trim();
-        
-        if (!res) {
-          // Fallback: Win32_TemperatureProbe (may return null on some boards)
-          cmd = 'Get-WmiObject -Class Win32_TemperatureProbe | Select-Object -ExpandProperty CurrentReading';
-          res = execSync(`powershell -Command "${cmd}"`, { windowsHide: true }).toString().trim();
-        }
-
-        if (res) {
-          // Convert decikelvins to Celsius: (dK / 10) - 273.15
-          cpuTemp = (Number(res) / 10) - 273.15;
-        }
-      } catch {
-        // Fallback or ignore if WMI fails
-      }
+      const cpuTemp = msc_readCpuTempCelsius();
 
       return msc_buildSanitizedSystemStatsPayload({
         cpuPercent,
@@ -1178,7 +1292,103 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
   }
 });
 
-ipcMain.handle('vpe:kill-process-on-port', async (_event, port) => {
+  ipcMain.handle('vpe:launcher-port-health', async () => {
+    const r3000 = await msc_launcherPortRowHealth(3000);
+    const r3001 = await msc_launcherPortRowHealth(3001);
+    return {
+      p3000: r3000.inUse,
+      p3001: r3001.inUse,
+      ok: r3000.ok && r3001.ok,
+    };
+  });
+
+  ipcMain.handle('vpe:purge-launcher-ports', async () => {
+    const { execSync } = require('child_process');
+    const myPid = String(process.pid);
+    const ports = [3000, 3001, 9222];
+    const killed = [];
+    for (const port of ports) {
+      for (const pid of msc_netstatListeningPidsOnPort(port)) {
+        if (pid === myPid) continue;
+        const img = msc_tasklistImageName(pid);
+        if (img !== 'node.exe' && img !== 'electron.exe') continue;
+        try {
+          execSync(`taskkill /F /PID ${pid}`, { windowsHide: true });
+          killed.push({ pid, port, img });
+        } catch (_) {
+          /* */
+        }
+      }
+    }
+    const ph3000 = await msc_launcherPortRowHealth(3000);
+    const ph3001 = await msc_launcherPortRowHealth(3001);
+    return {
+      ok: true,
+      killed,
+      p3000: ph3000.inUse,
+      p3001: ph3001.inUse,
+      healthy: ph3000.ok && ph3001.ok,
+    };
+  });
+
+  ipcMain.handle('vpe:prompt-vault-read', () => {
+    const filePath = msc_promptVaultPath();
+    if (!fs.existsSync(filePath)) {
+      return { ok: true, data: { v: 1, items: [] } };
+    }
+    try {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      return { ok: true, data };
+    } catch (err) {
+      const m = err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
+      return { ok: false, error: m };
+    }
+  });
+
+  ipcMain.handle('vpe:prompt-vault-write', (_event, data) => {
+    if (!data || typeof data !== 'object') throw new Error('VPE: Invalid prompt vault payload');
+    const dir = path.dirname(msc_promptVaultPath());
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(msc_promptVaultPath(), JSON.stringify(data, null, 2), 'utf8');
+    return { ok: true };
+  });
+
+  if (process.env.VPE_LAUNCHER_FORGE === '1') {
+    let lastThermalAlertMs = 0;
+    const THERMAL_COOLDOWN_MS = 5 * 60 * 1000;
+    setInterval(() => {
+      try {
+        const t = msc_readCpuTempCelsius();
+        if (t == null || t <= 90) return;
+        const now = Date.now();
+        if (now - lastThermalAlertMs < THERMAL_COOLDOWN_MS) return;
+        lastThermalAlertMs = now;
+        const ver = msc_launcherPackageVersion();
+        const ts = new Date().toISOString();
+        if (Notification.isSupported()) {
+          const n = new Notification({
+            title: 'VPE: High Thermal Load',
+            body: `Thermal read ~${Math.round(t)}°C during Build Forge (v${ver}). Reduce load or improve cooling.`,
+          });
+          n.show();
+        }
+        store.insertRepairRun({
+          id: randomUUID(),
+          project_id: VPE_SYSTEM_REPAIR_PROJECT_ID,
+          project_name: 'VPE System',
+          created_at: ts,
+          status: 'partial',
+          description: `Thermal spike detected — ${Math.round(t)}°C at ${ts} (launcher v${ver}, Build Forge)`,
+          files_changed: 0,
+        });
+        msc_emitRepairRunsChanged();
+      } catch (e) {
+        console.warn('[VPE thermal monitor]', e);
+      }
+    }, 20000);
+  }
+
+  ipcMain.handle('vpe:kill-process-on-port', async (_event, port) => {
     const { execSync } = require('child_process');
     try {
       const netstat = execSync(`netstat -ano | findstr :${port}`).toString();

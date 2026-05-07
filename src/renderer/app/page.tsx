@@ -17,14 +17,16 @@ import { DeleteConfirmModal } from '@/components/delete-confirm-modal'
 import { ContextMenu } from '@/components/context-menu'
 import { AppSettingsModal } from '@/components/app-settings-modal'
 import { SystemHealthPanel } from '@/components/system-health-panel'
-import { RepairHistoryView, type RepairHistoryRow } from '@/components/repair-history-view'
+import { MaintenanceSection, type MaintenanceTab } from '@/components/maintenance-section'
+import { VpeSandboxPanel } from '@/components/vpe-sandbox-panel'
+import { type RepairHistoryRow } from '@/components/repair-history-view'
 import { QuickActionsBar } from '@/components/quick-actions-bar'
 import { ToastProvider, useToast } from '@/components/vader-toast'
 import { getVpeApi, msc_rowToDashboardProject } from '@/lib/vpe-bridge'
 
 type FilterType = 'ALL' | 'RUNNING' | 'STOPPED' | 'ERRORS'
 type ViewMode = 'grid' | 'list'
-type NavItem = 'dashboard' | 'repair-logs' | 'settings'
+type NavItem = 'dashboard' | 'maintenance' | 'sandbox' | 'settings'
 
 interface Project {
   id: string
@@ -137,6 +139,7 @@ function DashboardContent() {
   const [repairModalOpen, setRepairModalOpen] = useState(false)
   const [repairLogRev, setRepairLogRev] = useState(0)
   const [repairModalContext, setRepairModalContext] = useState<RepairHistoryRow | null>(null)
+  const [maintenanceTab, setMaintenanceTab] = useState<MaintenanceTab>('logs')
   const [nukeModalOpen, setNukeModalOpen] = useState(false)
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false)
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
@@ -799,20 +802,24 @@ function DashboardContent() {
           <div className="flex-1 flex min-h-0 overflow-hidden">
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              {activeNav === 'repair-logs' ? (
-                /* Repair Logs */
-                <RepairHistoryView
-                  refreshSignal={repairLogRev}
+              {activeNav === 'maintenance' ? (
+                <MaintenanceSection
+                  maintenanceTab={maintenanceTab}
+                  onMaintenanceTab={setMaintenanceTab}
+                  repairLogRev={repairLogRev}
                   onViewDiff={(row) => {
                     setRepairModalContext(row)
                     setRepairModalOpen(true)
                   }}
-                  onUndo={() => {
+                  onUndo={(repairId: string) => {
+                    void repairId
                     addToast('Undo successful', 'success', 'Previous state restored from .vader-backup')
                   }}
                   onClearHistory={handleClearRepairHistory}
                   onRemoveEntry={handleRemoveRepairEntry}
                 />
+              ) : activeNav === 'sandbox' ? (
+                <VpeSandboxPanel />
               ) : (
                 <>
                   {/* Filter Pills Bar */}

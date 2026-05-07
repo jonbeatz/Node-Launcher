@@ -11,6 +11,7 @@ import {
   Square,
   Star,
   ChevronDown,
+  FlaskConical,
 } from 'lucide-react'
 
 interface AppSidebarProps {
@@ -36,7 +37,8 @@ export function AppSidebar({
   const sidebarWidth = collapsed ? 'w-12' : 'w-[220px]'
 
   const dashboardActive = activeItem === 'dashboard'
-  const repairLogsActive = activeItem === 'repair-logs'
+  const maintenanceActive = activeItem === 'maintenance'
+  const sandboxActive = activeItem === 'sandbox'
 
   return (
     <aside
@@ -119,23 +121,42 @@ export function AppSidebar({
             {(maintenanceOpen || collapsed) && (
               <div className="space-y-1">
                 <button
-                  onClick={() => onNavigate?.('repair-logs')}
-                  onMouseEnter={() => setHoveredItem('repair-logs')}
+                  onClick={() => onNavigate?.('maintenance')}
+                  onMouseEnter={() => setHoveredItem('maintenance')}
                   onMouseLeave={() => setHoveredItem(null)}
                   className={`
                     w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
                     ${
-                      repairLogsActive
+                      maintenanceActive
                         ? 'bg-[#252525] text-white'
-                        : hoveredItem === 'repair-logs'
+                        : hoveredItem === 'maintenance'
                           ? 'bg-[#252525] text-white'
                           : 'text-[#A0A0A0]'
                     }
                   `}
-                  title={collapsed ? 'Repair Logs' : undefined}
+                  title={collapsed ? 'Maintenance' : undefined}
                 >
                   <FileText size={18} />
-                  {!collapsed && <span className="font-sans text-sm font-medium">Repair Logs</span>}
+                  {!collapsed && <span className="font-sans text-sm font-medium">Maintenance</span>}
+                </button>
+                <button
+                  onClick={() => onNavigate?.('sandbox')}
+                  onMouseEnter={() => setHoveredItem('sandbox')}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  className={`
+                    w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
+                    ${
+                      sandboxActive
+                        ? 'bg-[#252525] text-white'
+                        : hoveredItem === 'sandbox'
+                          ? 'bg-[#252525] text-white'
+                          : 'text-[#A0A0A0]'
+                    }
+                  `}
+                  title={collapsed ? 'VPE Sandbox' : undefined}
+                >
+                  <FlaskConical size={18} />
+                  {!collapsed && <span className="font-sans text-sm font-medium">Sandbox</span>}
                 </button>
               </div>
             )}

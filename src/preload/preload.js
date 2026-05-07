@@ -53,11 +53,20 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   clearRepairHistory: () => ipcRenderer.invoke('vpe:clear-repair-history'),
   deleteRepairRun: (repairId) =>
     ipcRenderer.invoke('vpe:delete-repair-run', repairId),
+  getLauncherPortHealth: () => ipcRenderer.invoke('vpe:launcher-port-health'),
+  purgeLauncherPorts: () => ipcRenderer.invoke('vpe:purge-launcher-ports'),
+  promptVaultRead: () => ipcRenderer.invoke('vpe:prompt-vault-read'),
+  promptVaultWrite: (data) => ipcRenderer.invoke('vpe:prompt-vault-write', data),
+  subscribeRepairRunsChanged: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('vpe:repair-runs-changed', listener);
+    return () => ipcRenderer.removeListener('vpe:repair-runs-changed', listener);
+  },
 });
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.0.8',
+  version: '1.1.0',
   hardware: '9700x Tuned',
 });
 
