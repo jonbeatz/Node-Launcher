@@ -20,7 +20,11 @@ If documentation conflicts occur, follow this hierarchy strictly:
 4. `Node-Launcher-PRD.md` (Feature & Requirement Truth)
 5. `package.json` (Authority for executable scripts only)
 
-**Session bootstrap (cold start):** `.cursor/docs/AGENT-BOOT-CHECKLIST.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above. **Crucial:** Always ensure the **LiteLLM API** is running by executing the **"start API"** command sequence:
+**Session bootstrap (cold start):** `.cursor/docs/AGENT-BOOT-CHECKLIST.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above.
+
+**Critical:** Before performing any build, deployment, or environment setup, read and adhere to the protocols in **`.cursor/docs/VPE-BUILD-PROTOCOL.md`.**
+
+**Crucial:** Always ensure the **LiteLLM API** is running by executing the **"start API"** command sequence:
    1. `$env:GOOGLE_APPLICATION_CREDENTIALS="D:\Cursor_Projectz\Node-Launcher\gcp_key.json"`
    2. `litellm --config litellm_config.yaml`
    Confirm with **"API is Live"** once the terminal shows it's listening.
