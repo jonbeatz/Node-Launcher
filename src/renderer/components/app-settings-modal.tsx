@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, FolderOpen, Download, Upload, Trash2 } from 'lucide-react'
 import { useToast } from '@/components/vader-toast'
-import { getVpeApi } from '@/lib/vpe-bridge'
+import { getVpeApi, type VpeAppSettings } from '@/lib/vpe-bridge'
 import {
   VPE_TERM_FONT_KEY,
   VPE_TERM_SCROLL_KEY,
@@ -28,13 +28,13 @@ export function AppSettingsModal({
   const [clearAllOpen, setClearAllOpen] = useState(false)
   const [dbBusy, setDbBusy] = useState(false)
 
-  const [launchOnStartup, setLaunchOnStartup] = useState(true)
+  const [launchOnStartup, setLaunchOnStartup] = useState(false)
   const [minimizeToTray, setMinimizeToTray] = useState(false)
   const [defaultView, setDefaultView] = useState<'card' | 'list'>('card')
   const [defaultPkgManager, setDefaultPkgManager] = useState('auto')
   const [portRangeStart, setPortRangeStart] = useState(3000)
   const [portRangeEnd, setPortRangeEnd] = useState(3020)
-  const [autoStart, setAutoStart] = useState(true)
+  const [autoStart, setAutoStart] = useState(false)
   const [buildOnAdd, setBuildOnAdd] = useState(false)
   const [autoRepairSuspense, setAutoRepairSuspense] = useState(true)
   const [preBuildChecks, setPreBuildChecks] = useState(true)
@@ -95,6 +95,92 @@ export function AppSettingsModal({
       )
     }
   }, [isOpen, projects])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const api = getVpeApi()
+    if (!api?.getAppSettings) return
+    void api.getAppSettings().then((s: VpeAppSettings) => {
+      setLaunchOnStartup(!!s.launch_at_login)
+      setMinimizeToTray(!!s.minimize_to_tray)
+      setAutoStart(!!s.auto_start_projects)
+      setDefaultView(s.default_view === 'list' ? 'list' : 'card')
+    })
+  }, [isOpen])
+
+  const persistAppSettingsPatch = async (
+    patch: Partial<{
+      launch_at_login: boolean
+      minimize_to_tray: boolean
+      auto_start_projects: boolean
+      default_view: 'card' | 'list'
+    }>,
+  ) => {
+    const api = getVpeApi()
+    if (!api?.updateAppSettings) {
+      addToast('Settings unavailable', 'error', 'Run inside Electron with VPE preload.')
+      return false
+    }
+    setDbBusy(true)
+    try {
+      await api.updateAppSettings(patch)
+      addToast('Settings saved', 'success')
+      onSave?.()
+      return true
+    } catch (e) {
+      addToast('Save failed', 'error', e instanceof Error ? e.message : String(e))
+      return false
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  const handleLaunchStartupToggle = async (next: boolean) => {
+    const prev = launchOnStartup
+    setLaunchOnStartup(next)
+    const api = getVpeApi()
+    if (!api?.updateAppSettings && !api?.updateSettingLaunchStartup) {
+      setLaunchOnStartup(prev)
+      addToast('Settings unavailable', 'error', 'Run inside Electron with VPE preload.')
+      return
+    }
+    setDbBusy(true)
+    try {
+      if (api.updateSettingLaunchStartup) {
+        await api.updateSettingLaunchStartup(next)
+      } else if (api.updateAppSettings) {
+        await api.updateAppSettings({ launch_at_login: next })
+      }
+      addToast('Settings saved', 'success')
+      onSave?.()
+    } catch (e) {
+      setLaunchOnStartup(prev)
+      addToast('Save failed', 'error', e instanceof Error ? e.message : String(e))
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  const handleMinimizeTrayToggle = async (next: boolean) => {
+    const prev = minimizeToTray
+    setMinimizeToTray(next)
+    const ok = await persistAppSettingsPatch({ minimize_to_tray: next })
+    if (!ok) setMinimizeToTray(prev)
+  }
+
+  const handleAutoStartToggle = async (next: boolean) => {
+    const prev = autoStart
+    setAutoStart(next)
+    const ok = await persistAppSettingsPatch({ auto_start_projects: next })
+    if (!ok) setAutoStart(prev)
+  }
+
+  const handleDefaultViewChange = async (next: 'card' | 'list') => {
+    const prev = defaultView
+    setDefaultView(next)
+    const ok = await persistAppSettingsPatch({ default_view: next })
+    if (!ok) setDefaultView(prev)
+  }
 
   const handleClose = () => {
     setClearAllOpen(false)
@@ -228,14 +314,20 @@ export function AppSettingsModal({
                   <span className="font-sans text-sm text-white">Launch on Startup</span>
                   <p className="font-sans text-[11px] text-[#555555]">Start VPE when Windows starts</p>
                 </div>
-                <Toggle checked={launchOnStartup} onChange={setLaunchOnStartup} />
+                <Toggle
+                  checked={launchOnStartup}
+                  onChange={(v) => void handleLaunchStartupToggle(v)}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-sans text-sm text-white">Minimize to Tray</span>
                   <p className="font-sans text-[11px] text-[#555555]">Minimize to system tray instead of closing</p>
                 </div>
-                <Toggle checked={minimizeToTray} onChange={setMinimizeToTray} />
+                <Toggle
+                  checked={minimizeToTray}
+                  onChange={(v) => void handleMinimizeTrayToggle(v)}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -243,7 +335,9 @@ export function AppSettingsModal({
                 </div>
                 <select
                   value={defaultView}
-                  onChange={(e) => setDefaultView(e.target.value as 'card' | 'list')}
+                  onChange={(e) =>
+                    void handleDefaultViewChange(e.target.value as 'card' | 'list')
+                  }
                   className="px-3 py-1.5 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-sm text-white focus:outline-none focus:border-[#4fde82]"
                 >
                   <option value="card">Card View</option>
@@ -301,7 +395,10 @@ export function AppSettingsModal({
                   <span className="font-sans text-sm text-white">Auto-Start Projects</span>
                   <p className="font-sans text-[11px] text-[#555555]">Automatically start previously running projects on launch</p>
                 </div>
-                <Toggle checked={autoStart} onChange={setAutoStart} />
+                <Toggle
+                  checked={autoStart}
+                  onChange={(v) => void handleAutoStartToggle(v)}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -427,7 +524,7 @@ export function AppSettingsModal({
               DATABASE & STATE ACTIONS
             </h3>
           <p className="font-sans text-[11px] text-[#555555] mb-4">
-            Snapshot management for database and environment state. Powered by the MSC Media Engine v1.0.8
+            Snapshot management for database and environment state. Powered by the MSC Media Engine v1.3.7
           </p>
             <div className="space-y-3 mb-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -563,8 +660,15 @@ export function AppSettingsModal({
               type="button"
               onClick={() => {
                 if (dbBusy) return
-                onSave?.()
-                handleClose()
+                void (async () => {
+                  const ok = await persistAppSettingsPatch({
+                    launch_at_login: launchOnStartup,
+                    minimize_to_tray: minimizeToTray,
+                    auto_start_projects: autoStart,
+                    default_view: defaultView,
+                  })
+                  if (ok) handleClose()
+                })()
               }}
               className="h-9 px-6 rounded bg-[#4fde82] hover:bg-[#3fcf72] font-sans text-sm font-medium text-black transition-colors vader-focus"
             >
@@ -572,7 +676,7 @@ export function AppSettingsModal({
             </button>
           </div>
           <span className="font-sans text-[10px] text-[#555555]">
-            Powered by the MSC Media Engine v1.0.8
+            Powered by the MSC Media Engine v1.3.7
           </span>
         </div>
       </div>

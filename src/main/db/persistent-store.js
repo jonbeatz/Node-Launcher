@@ -1,6 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { msc_launcherRendererPort } = require('../launcher-port');
+const {
+  MSC_VPE_APP_SETTINGS_DEFAULTS,
+  msc_normalizeAppSettingsRow,
+} = require('../settings-defaults');
 
 /** One-time migrate source; cwd file is archived to media/_vpe_archive after boot. */
 const LEGACY_REGISTRY = path.join(process.cwd(), 'projects.json');
@@ -256,17 +260,47 @@ class SqlitePersistence {
     try {
       const row = this._db.prepare(`SELECT * FROM settings WHERE id = 1`).get();
       if (!row) {
-        this._db.prepare(`INSERT INTO settings (id) VALUES (1)`).run();
-        return { id: 1, minimize_to_tray: 0, theme_accent: '#4fde82' };
+        this._db
+          .prepare(
+            `INSERT INTO settings (id, minimize_to_tray, theme_accent, launch_at_login, auto_start_projects, default_view)
+             VALUES (1, 0, ?, 0, 0, 'card')`,
+          )
+          .run(MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent);
+        return { id: 1, ...msc_normalizeAppSettingsRow({}) };
       }
-      return {
-        ...row,
-        minimize_to_tray: row.minimize_to_tray === 1,
-      };
+      const n = msc_normalizeAppSettingsRow(row);
+      return { id: 1, ...n };
     } catch (e) {
       console.error('VPE: getSettings failed', e);
-      return {};
+      return { id: 1, ...msc_normalizeAppSettingsRow({}) };
     }
+  }
+
+  /** @param {Object.<string, *>} patch */
+  updateAppSettings(patch) {
+    let cur = this._db.prepare(`SELECT * FROM settings WHERE id = 1`).get();
+    if (!cur) {
+      this._db
+        .prepare(
+          `INSERT INTO settings (id, minimize_to_tray, theme_accent, launch_at_login, auto_start_projects, default_view)
+           VALUES (1, 0, ?, 0, 0, 'card')`,
+        )
+        .run(MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent);
+      cur = this._db.prepare(`SELECT * FROM settings WHERE id = 1`).get();
+    }
+    const merged = { ...msc_normalizeAppSettingsRow(cur || {}), ...patch };
+    const minimize = merged.minimize_to_tray ? 1 : 0;
+    const launch = merged.launch_at_login ? 1 : 0;
+    const autoStart = merged.auto_start_projects ? 1 : 0;
+    const dv = merged.default_view === 'list' ? 'list' : 'card';
+    const accent = merged.theme_accent || MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent;
+    this._db
+      .prepare(
+        `UPDATE settings SET minimize_to_tray = ?, theme_accent = ?, launch_at_login = ?, auto_start_projects = ?, default_view = ?
+         WHERE id = 1`,
+      )
+      .run(minimize, accent, launch, autoStart, dv);
+    return this.getSettings();
   }
 
   _trimLogs(projectId) {
@@ -340,8 +374,14 @@ class JsonPersistence {
   constructor(paths) {
     this._storeDir = paths.storeDir;
     this._jsonPath = paths.jsonPath;
-    /** @type {{ projects: Object.<string, any>, logs: any[], logSeq: number, repairRuns: any[] }} */
-    this._data = { projects: {}, logs: [], logSeq: 0, repairRuns: [] };
+    /** @type {{ projects: Object.<string, *>, logs: Array<*>, logSeq: number, repairRuns: Array<*>, settings?: Object.<string, *> }} */
+    this._data = {
+      projects: {},
+      logs: [],
+      logSeq: 0,
+      repairRuns: [],
+      settings: { ...MSC_VPE_APP_SETTINGS_DEFAULTS },
+    };
   }
 
   load() {
@@ -353,10 +393,23 @@ class JsonPersistence {
           logs: Array.isArray(raw.logs) ? raw.logs : [],
           logSeq: typeof raw.logSeq === 'number' ? raw.logSeq : this._inferNextLogId(),
           repairRuns: Array.isArray(raw.repairRuns) ? raw.repairRuns : [],
+          settings:
+            raw.settings && typeof raw.settings === 'object'
+              ? { ...MSC_VPE_APP_SETTINGS_DEFAULTS, ...raw.settings }
+              : { ...MSC_VPE_APP_SETTINGS_DEFAULTS },
         };
       }
     } catch {
-      this._data = { projects: {}, logs: [], logSeq: 0, repairRuns: [] };
+      this._data = {
+        projects: {},
+        logs: [],
+        logSeq: 0,
+        repairRuns: [],
+        settings: { ...MSC_VPE_APP_SETTINGS_DEFAULTS },
+      };
+    }
+    if (!this._data.settings || typeof this._data.settings !== 'object') {
+      this._data.settings = { ...MSC_VPE_APP_SETTINGS_DEFAULTS };
     }
     this._migrateJsonHealthAndPorts();
   }
@@ -657,6 +710,25 @@ class JsonPersistence {
       message: row.message,
     }));
   }
+
+  getSettings() {
+    return { id: 1, ...msc_normalizeAppSettingsRow(this._data.settings) };
+  }
+
+  /** @param {Object.<string, *>} patch */
+  updateAppSettings(patch) {
+    const cur = msc_normalizeAppSettingsRow(this._data.settings);
+    const merged = { ...cur, ...patch };
+    this._data.settings = {
+      minimize_to_tray: merged.minimize_to_tray,
+      launch_at_login: merged.launch_at_login,
+      auto_start_projects: merged.auto_start_projects,
+      default_view: merged.default_view === 'list' ? 'list' : 'card',
+      theme_accent: merged.theme_accent || MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent,
+    };
+    this.save();
+    return this.getSettings();
+  }
 }
 
 function msc_migrateFromProjectsJsonSQLite(db) {
@@ -784,6 +856,26 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
       db.exec(`ALTER TABLE projects ADD COLUMN notes TEXT`);
     }
     ver = 8;
+  }
+
+  if (ver < 9) {
+    let sn = msc_sqliteTableColumnNames(db, 'settings');
+    if (!sn.includes('launch_at_login')) {
+      db.exec(
+        `ALTER TABLE settings ADD COLUMN launch_at_login INTEGER NOT NULL DEFAULT 0`,
+      );
+      sn = msc_sqliteTableColumnNames(db, 'settings');
+    }
+    if (!sn.includes('auto_start_projects')) {
+      db.exec(
+        `ALTER TABLE settings ADD COLUMN auto_start_projects INTEGER NOT NULL DEFAULT 0`,
+      );
+      sn = msc_sqliteTableColumnNames(db, 'settings');
+    }
+    if (!sn.includes('default_view')) {
+      db.exec(`ALTER TABLE settings ADD COLUMN default_view TEXT NOT NULL DEFAULT 'card'`);
+    }
+    ver = 9;
   }
 
   db.pragma(`user_version = ${ver}`);

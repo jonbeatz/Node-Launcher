@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-const LS_VIEW = 'vpe.settings.dashboard.viewMode'
+/** Exported for boot-time default view (main `default_view` vs session `localStorage`). */
+export const VPE_DASHBOARD_VIEW_LS_KEY = 'vpe.settings.dashboard.viewMode'
+const LS_VIEW = VPE_DASHBOARD_VIEW_LS_KEY
 const LS_FILTER = 'vpe.settings.dashboard.activeFilter'
 
 export type DashboardViewMode = 'grid' | 'list'

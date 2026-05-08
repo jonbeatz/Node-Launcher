@@ -188,4 +188,14 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 ---
 
-*Last updated: 2026-05-08 — cross-ref **v1.3.2** Ghost watcher UI (see **Windows ghost process** section above); align with [Checkpoint](Checkpoint.md). Forge / `concurrently` baseline still **v1.1.8** in [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md). Git branch: **confirm with `git status`**. Powered by the MSC Media Engine.*
+## Packaged app: SQLite / terminal natives fail (`better-sqlite3`, `node-pty`)
+
+**Symptom:** Production **`Vader Project Engine.exe`** shows a blank or Next **Runtime Error** (e.g. **`[object Event]`**), or main log shows failure to load a **`.node`** addon.
+
+**Cause:** With **`build.asar: true`**, native modules cannot execute from inside **`app.asar`**.
+
+**Fix in repo (v1.3.7):** [`package.json`](../../package.json) **`build.asarUnpack`** includes **`**/node_modules/better-sqlite3/**/*`**, **`**/node_modules/node-pty/**/*`**, and **`**/node_modules/pm2/**/*`** so copies land under **`resources/app.asar.unpacked`**. After changing deps, run **`npm install`** so **`node-pty`** is present (electron-builder **`node-pty@undefined`** if missing).
+
+---
+
+*Last updated: 2026-05-08 — **v1.3.7** ASAR **`asarUnpack`** for natives (above); **v1.3.2** Ghost watcher (see **Windows ghost process**); [Checkpoint](Checkpoint.md). Forge / `concurrently` baseline **v1.1.8** in [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md). **Powered by the MSC Media Engine v1.3.7**.*

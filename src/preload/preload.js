@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-/** v1.3.5 — preload bridge (IPC formatting + ghost watcher subscribe). */
+/** v1.3.7 — preload bridge (IPC formatting + ghost watcher subscribe). */
 function msc_formatCaughtForPreload(reason) {
   if (reason == null) return 'Unknown failure';
   if (typeof reason === 'string') return reason;
@@ -36,6 +36,10 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   runBuild: (projectId) => ipcRenderer.invoke('vpe:run-build', projectId),
   nukeProject: (projectId) => ipcRenderer.invoke('vpe:nuke-project', projectId),
   saveSettings: (payload) => ipcRenderer.invoke('vpe:save-settings', payload),
+  getAppSettings: () => ipcRenderer.invoke('vpe:get-app-settings'),
+  updateAppSettings: (payload) => ipcRenderer.invoke('vpe:update-app-settings', payload),
+  updateSettingLaunchStartup: (value) =>
+    ipcRenderer.invoke('vpe:update-setting-launch-startup', value),
   addProject: (payload) => ipcRenderer.invoke('vpe:add-project', payload),
   autoFixProjectPort: (projectId) =>
     ipcRenderer.invoke('vpe:auto-fix-port', projectId),
@@ -124,7 +128,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.3.5',
+  version: '1.3.7',
   hardware: '9700x Tuned',
 });
 

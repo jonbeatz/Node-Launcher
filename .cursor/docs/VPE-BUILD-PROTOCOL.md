@@ -4,15 +4,17 @@
 
 **Authority note:** Executable script strings and Electron-builder knobs live in **`package.json`**. If this document ever diverges from **`package.json`**, **`package.json` wins** — update this file in the same change.
 
-**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.3.5** (TopBar add, flat Dashboard, Vault + Sandbox, Engineer accordion), **Build v1.3.4** (top bar badge, Strategist accordion), **Build v1.3.3** (Strategist tabs + Vault **`type`**), **Build v1.3.2** (ghost UX), **Build v1.3.1** (CI / branch), **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
+**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.3.7** (ASAR **`asarUnpack`** natives), **Build v1.3.6** (settings IPC, defaults, tray close, auto-start), **Build v1.3.5** (TopBar add, flat Dashboard, Vault + Sandbox, Engineer accordion), **Build v1.3.4** (top bar badge, Strategist accordion), **Build v1.3.3** (Strategist tabs + Vault **`type`**), **Build v1.3.2** (ghost UX), **Build v1.3.1** (CI / branch), **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
 
-**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.3.5**).
+**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.3.7**).
 
 ### Permanent product notes (v1.2.9+)
 
 - Integrated Playwright E2E for automated Electron data validation.
 - Implemented Scorched Earth global cleanup for 0x2740 socket recovery.
 - Standardized 12px Paperclip indicators for documented projects.
+- **v1.3.7:** **Packaging** — **`build.asarUnpack`** includes **`better-sqlite3`**, **`node-pty`**, **`pm2`** so native addons ship under **`app.asar.unpacked`** (not inside **`app.asar`**).
+- **v1.3.6:** **Settings** — main IPC **`vpe:get-app-settings`** / **`vpe:update-app-settings`** / **`vpe:update-setting-launch-startup`**; **`app.setLoginItemSettings`**; **minimize to tray** intercepts **close**; **auto-start** restores dev for projects running at boot after reconcile clears dead ports; **`default_view`** **`card`** default → dashboard **grid**. Factory defaults: launch / tray / auto-start **off**.
 - **v1.3.5:** **Top bar** — **+ Add New Project**; catalog count badge **only** by breadcrumb (no duplicate in dashboard filter row). **Sidebar** — **Dashboard** flat; **Engineering** accordion (tactical rows); **Vault** holds Prompt Vault, Repair Logs, **VPE Sandbox**; **Favorites** accordion. **Maintenance** tabs: **Prompt Vault** first. **Sandbox** — **Strategist** + **Engineer** each use **Radix Accordion** for steps.
 - **v1.3.4:** **Top bar** project count badge after breadcrumb; **Sandbox Strategist** = **Radix Accordion** (Brain Bank → Audition → Ship), no “why this exists” wall.
 - **v1.3.3:** **Sandbox** **[Strategist]** | **[Engineer]** tabs (**`#2a2a2a`** active); **Prompt Vault** action categorization (**`type`**, **[CMD]** / **[DIR]** / **[SNP]** badges, **Prime AI Assistant**). **GitHub CI** lint step relaxed: **`npm run lint -- --fix || true`**.
@@ -82,7 +84,7 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ---
 
-## 4. In-app tooling (v1.1.0+ reference; UI through **v1.3.5**)
+## 4. In-app tooling (v1.1.0+ reference; UI through **v1.3.7**)
 
 These are **UX / ops** features in the packaged or dev UI; they do not replace **`package.json`** scripts:
 
@@ -95,4 +97,4 @@ These are **UX / ops** features in the packaged or dev UI; they do not replace *
 
 ---
 
-*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.3.5.”*
+*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.3.7.”*

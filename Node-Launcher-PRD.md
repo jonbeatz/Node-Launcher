@@ -4,7 +4,11 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.3.5** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
+**Shipped desktop build (npm / `package.json` `version`):** **1.3.7** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
+
+**v1.3.7 (native / ASAR):** **`asarUnpack`** in **`package.json`** **`build`** for **`better-sqlite3`**, **`node-pty`**, and **`pm2`** so native binaries load from **`app.asar.unpacked`**.
+
+**v1.3.6 (settings + boot):** App-level settings IPC (**launch at login**, **minimize to tray**, **auto-start** after boot reconcile, **`default_view`**); factory defaults off for non-critical toggles; tray **close** hides when minimize-to-tray enabled.
 
 **v1.3.5 (nav + maintenance):** **Top bar** — single catalog project badge (no duplicate in dashboard filter row); **+ Add New Project** in header. **Sidebar** — flat **Dashboard**; **Engineering** accordion (tactical rows); **Vault** holds Prompt Vault, Repair Logs, and **VPE Sandbox** (no standalone Sandbox section). **Maintenance** UI tabs: **Prompt Vault** first, **Repair Logs** second; default sub-view **Prompt Vault**. **Sandbox Engineer** tab uses **Radix Accordion** per step (matches Strategist pattern).
 

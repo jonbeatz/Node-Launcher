@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutGrid, List, FolderPlus } from 'lucide-react'
 import { AppSidebar } from '@/components/app-sidebar';
@@ -36,6 +36,7 @@ import {
 } from '@/lib/project-tactical-filter'
 import {
   useDashboardPersistedSettings,
+  VPE_DASHBOARD_VIEW_LS_KEY,
   type DashboardActiveFilter,
 } from '@/state/useSettings'
 
@@ -213,6 +214,8 @@ function DashboardContent() {
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null)
 
+  const appliedBootDefaultView = useRef(false)
+
   const refreshProjects = useCallback(async () => {
     const api = getVpeApi()
     if (!api?.getProjects) {
@@ -246,6 +249,40 @@ function DashboardContent() {
       setProjectsReady(true)
     })()
   }, [clientReady, refreshProjects])
+
+  /** v1.3.7 — main `default_view`: card → grid; ignore stale session list when default is card. */
+  useEffect(() => {
+    if (!clientReady || !projectsReady || appliedBootDefaultView.current) return
+    const api = getVpeApi()
+    if (!api?.getAppSettings) {
+      appliedBootDefaultView.current = true
+      return
+    }
+    let cancelled = false
+    void api
+      .getAppSettings()
+      .then((s) => {
+        if (cancelled) return
+        appliedBootDefaultView.current = true
+        const dv = s?.default_view
+        if (dv === 'list') {
+          setViewMode('list')
+        } else {
+          try {
+            localStorage.setItem(VPE_DASHBOARD_VIEW_LS_KEY, 'grid')
+          } catch {
+            /* */
+          }
+          setViewMode('grid')
+        }
+      })
+      .catch(() => {
+        if (!cancelled) appliedBootDefaultView.current = true
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [clientReady, projectsReady, setViewMode])
 
   useEffect(() => {
     if (!clientReady) return

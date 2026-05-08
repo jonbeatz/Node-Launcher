@@ -18,6 +18,54 @@ const isDev = require('electron-is-dev');
 let msc_vpeIpcRegistered = false;
 /** Node-Launcher UI port; managed projects must avoid this port. */
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
+
+/** v1.3.7 — sync Windows login-item with persisted `launch_at_login`. */
+function msc_applyLoginStartupFromStore(store) {
+  try {
+    if (typeof store.getSettings !== 'function') return;
+    const s = store.getSettings();
+    const open = s.launch_at_login === true || s.launch_at_login === 1;
+    app.setLoginItemSettings({ openAtLogin: Boolean(open) });
+  } catch (e) {
+    console.warn('VPE: setLoginItemSettings', e?.message ?? e);
+  }
+}
+
+/**
+ * After boot reconcile, optionally start dev for rows still marked `running` when the user enabled auto-start.
+ * @param {import('./db/persistent-store').SqlitePersistence | import('./db/persistent-store').JsonPersistence} store
+ * @param {import('./project-runner')} projectRunner
+ */
+/**
+ * After reconcile: restore dev for projects that were `running` at boot but became `stopped`
+ * (no HTTP on port). Skips rows still `running` (external server already listening).
+ * @param {any} store
+ * @param {import('./project-runner')} projectRunner
+ * @param {string[]} priorRunningProjectIds IDs with `status === 'running'` before reconcile
+ */
+async function msc_runAutoStartProjectsIfEnabled(store, projectRunner, priorRunningProjectIds) {
+  if (!projectRunner || typeof store.getSettings !== 'function') return;
+  const s = store.getSettings();
+  if (!(s.auto_start_projects === true || s.auto_start_projects === 1)) return;
+  const ids = Array.isArray(priorRunningProjectIds) ? priorRunningProjectIds : [];
+  if (!ids.length) return;
+  for (const id of ids) {
+    if (id == null || String(id).trim() === '') continue;
+    let row;
+    try {
+      row = typeof store.getProject === 'function' ? store.getProject(String(id)) : null;
+    } catch (_) {
+      row = null;
+    }
+    if (!row) continue;
+    if (row.status === 'running') continue;
+    try {
+      await projectRunner.startDev(row);
+    } catch (e) {
+      console.warn(`VPE: auto-start skipped for ${id}`, e?.message ?? e);
+    }
+  }
+}
 const MAX_THUMB_EDGE = 960;
 const MAX_THUMB_BYTES = 512 * 1024;
 const VPE_CATALOG_VERSION = 1;
@@ -81,7 +129,7 @@ function msc_promptVaultPath() {
   return path.join(app.getPath('userData'), 'prompt-vault.json');
 }
 
-/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.3.5: master `versionLabel` MSC line. */
+/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.3.7: master `versionLabel` MSC line. */
 function msc_promptVaultMasterItems() {
   const updatedAt = new Date().toISOString();
   return [
@@ -89,7 +137,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.5',
+      versionLabel: 'MSC Media Engine v1.3.7',
       description: 'Full production build: wipe dist, verify dev, ship the Windows installer.',
       updatedAt,
       bodyMd:
@@ -100,7 +148,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.5',
+      versionLabel: 'MSC Media Engine v1.3.7',
       description: 'Everyday Electron + Next stack; closes clean when you quit the window.',
       updatedAt,
       bodyMd:
@@ -111,7 +159,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.5',
+      versionLabel: 'MSC Media Engine v1.3.7',
       description: 'Block until dev exits, then run forge chain (snapshot → guard → build).',
       updatedAt,
       bodyMd:
@@ -122,7 +170,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.5',
+      versionLabel: 'MSC Media Engine v1.3.7',
       description: 'Version bump path with dist reset before dev + forge.',
       updatedAt,
       bodyMd:
@@ -133,7 +181,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.5',
+      versionLabel: 'MSC Media Engine v1.3.7',
       description: 'Heavy Node purge + launcher port recovery (use from System Health when stuck).',
       updatedAt,
       bodyMd:
@@ -1115,6 +1163,41 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
 
   if (msc_vpeIpcRegistered) return;
   msc_vpeIpcRegistered = true;
+
+  ipcMain.handle('vpe:get-app-settings', () => {
+    try {
+      return typeof store.getSettings === 'function' ? store.getSettings() : {};
+    } catch (e) {
+      console.warn('VPE: get-app-settings', e?.message ?? e);
+      return {};
+    }
+  });
+
+  ipcMain.handle('vpe:update-app-settings', (_evt, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('VPE: Invalid app settings payload.');
+    }
+    if (typeof store.updateAppSettings !== 'function') {
+      throw new Error('VPE: updateAppSettings not available on store.');
+    }
+    const next = store.updateAppSettings(payload);
+    msc_applyLoginStartupFromStore(store);
+    return { ok: true, settings: next };
+  });
+
+  ipcMain.handle('vpe:update-setting-launch-startup', (_evt, value) => {
+    const v =
+      value === true ||
+      value === 1 ||
+      value === '1' ||
+      String(value).toLowerCase() === 'true';
+    if (typeof store.updateAppSettings !== 'function') {
+      throw new Error('VPE: updateAppSettings not available on store.');
+    }
+    const next = store.updateAppSettings({ launch_at_login: v });
+    msc_applyLoginStartupFromStore(store);
+    return { ok: true, settings: next };
+  });
 
   const msc_emitProjectsUpdated = () => {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -2100,4 +2183,9 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
   }
 }
 
-module.exports = { msc_registerVpeIpc, msc_onDevExitCompanionSweep };
+module.exports = {
+  msc_registerVpeIpc,
+  msc_onDevExitCompanionSweep,
+  msc_applyLoginStartupFromStore,
+  msc_runAutoStartProjectsIfEnabled,
+};

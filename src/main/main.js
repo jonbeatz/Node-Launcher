@@ -6,7 +6,12 @@ const MSC_PM2Manager = require('./pm2-manager');
 const MSC_TrayManager = require('./tray-manager');
 const { msc_createDatabase, msc_getDatabase } = require('./db/database');
 const MSC_ProjectRunner = require('./project-runner');
-const { msc_registerVpeIpc, msc_onDevExitCompanionSweep } = require('./vpe-ipc');
+const {
+  msc_registerVpeIpc,
+  msc_onDevExitCompanionSweep,
+  msc_applyLoginStartupFromStore,
+  msc_runAutoStartProjectsIfEnabled,
+} = require('./vpe-ipc');
 const { msc_archiveLegacyProjectsJson } = require('./legacy-projects-archive');
 const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile');
 const { msc_startGhostWatcher } = require('./vpe-orchestrator');
@@ -21,7 +26,7 @@ console.log(
   `[VPE Main] Remote debugging port enabled on http://127.0.0.1:${MSC_VPE_REMOTE_DEBUG_PORT}`,
 );
 
-/** v1.3.5 — mute noisy DevTools/socket stderr unless `--verbose` is present; ghost watcher post-reconcile. */
+/** v1.3.7 — mute noisy DevTools/socket stderr unless `--verbose` is present; ghost watcher post-reconcile. */
 const MSC_VPE_VERBOSE_LOG = process.argv.includes('--verbose');
 if (!MSC_VPE_VERBOSE_LOG && !global.__vpe_stderr_filter_registered) {
   global.__vpe_stderr_filter_registered = true;
@@ -105,6 +110,8 @@ let mainWindow;
 let pm2Manager;
 let trayManager;
 let projectRunner;
+/** True during `app.quit()` / tray Exit so `close` is not intercepted for tray hide. */
+let msc_vpeAppQuitting = false;
 /** Ghost port watcher (`vpe:ghost-detected` IPC). */
 let msc_ghostWatcher;
 
@@ -233,14 +240,33 @@ function msc_attachEngineAfterWindow(mainWin) {
       );
       console.log('Vader Shield: PM2 Manager & Tray synchronized.');
 
-      void msc_reconcileStaleRunningProjects({ store, projectRunner }).catch(
-        (err) => {
+      const priorRunningIds = (typeof store.listProjectsAlphabetical === 'function'
+        ? store.listProjectsAlphabetical()
+        : []
+      )
+        .filter((p) => p && p.status === 'running')
+        .map((p) => p.id);
+
+      void (async () => {
+        try {
+          await msc_reconcileStaleRunningProjects({ store, projectRunner });
+        } catch (err) {
           console.warn(
             'VPE: Boot running reconcile failed:',
             err?.message ?? err,
           );
-        },
-      );
+        }
+        try {
+          msc_applyLoginStartupFromStore(store);
+        } catch (e) {
+          console.warn('VPE: apply launch-at-login', e?.message ?? e);
+        }
+        try {
+          await msc_runAutoStartProjectsIfEnabled(store, projectRunner, priorRunningIds);
+        } catch (e) {
+          console.warn('VPE: auto-start projects', e?.message ?? e);
+        }
+      })();
 
       try {
         if (!msc_ghostWatcher) {
@@ -368,6 +394,22 @@ function msc_createWindow() {
     }
   });
 
+  mainWindow.on('close', (e) => {
+    if (msc_vpeAppQuitting) return;
+    try {
+      const db = msc_getDatabase();
+      const settings = typeof db.getSettings === 'function' ? db.getSettings() : {};
+      const minimizeToTray =
+        settings.minimize_to_tray === true || settings.minimize_to_tray === 1;
+      if (minimizeToTray) {
+        e.preventDefault();
+        if (!mainWindow.isDestroyed()) mainWindow.hide();
+      }
+    } catch (_) {
+      /* */
+    }
+  });
+
   mainWindow.on('closed', () => {
     try {
       msc_ghostWatcher?.stop();
@@ -419,6 +461,7 @@ app.on('will-finish-launching', () => {
   try {
     msc_createDatabase();
     msc_archiveLegacyProjectsJson();
+    msc_applyLoginStartupFromStore(msc_getDatabase());
   } catch (err) {
     console.error('VPE: SQLite init failed:', err?.message ?? err);
   }
@@ -427,6 +470,7 @@ app.on('will-finish-launching', () => {
 app.on('ready', msc_createWindow);
 
 app.on('before-quit', () => {
+  msc_vpeAppQuitting = true;
   if (isDev) {
     msc_onDevExitCompanionSweep();
   }

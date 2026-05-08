@@ -158,7 +158,7 @@ export interface VpePurgeLauncherPortsResult {
   forgeReady?: boolean
 }
 
-/** v1.3.5 — Prompt Vault row categorization (UI badges: CMD / DIR / SNP). */
+/** v1.3.7 — Prompt Vault row categorization (UI badges: CMD / DIR / SNP). */
 export type VpePromptVaultEntryType = 'Command' | 'Directive' | 'Snippet'
 
 export interface VpePromptVaultItem {
@@ -199,6 +199,16 @@ export interface VpeGhostPresenceEvent {
   active: boolean
   ports?: number[]
   at?: number
+}
+
+/** App-level settings from `vpe:get-app-settings` (SQLite `settings` row). */
+export interface VpeAppSettings {
+  launch_at_login: boolean
+  minimize_to_tray: boolean
+  auto_start_projects: boolean
+  /** `card` → dashboard grid layout in renderer. */
+  default_view: 'card' | 'list'
+  theme_accent?: string
 }
 
 export interface VpeApi {
@@ -253,6 +263,13 @@ export interface VpeApi {
   runBuild: (projectId: string) => Promise<{ ok?: boolean }>
   nukeProject: (projectId: string) => Promise<{ ok?: boolean; id?: string }>
   saveSettings: (payload: SaveSettingsPayload) => Promise<{ ok?: boolean }>
+  getAppSettings?: () => Promise<VpeAppSettings>
+  updateAppSettings?: (
+    payload: Partial<VpeAppSettings>,
+  ) => Promise<{ ok?: boolean; settings?: VpeAppSettings }>
+  updateSettingLaunchStartup?: (
+    value: boolean,
+  ) => Promise<{ ok?: boolean; settings?: VpeAppSettings }>
   addProject: (payload: AddProjectPayload) => Promise<{ ok?: boolean; id?: string }>
   deleteProject: (projectId: string) => Promise<{ ok?: boolean }>
   /** Reassign port + refresh detected scripts/package manager after preflight failure. */
