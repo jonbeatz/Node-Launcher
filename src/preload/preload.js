@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-/** v1.2.6 — preload bridge (IPC formatting + bootstrap subscribe). */
+/** v1.3.0 — preload bridge (IPC formatting + bootstrap subscribe). */
 function msc_formatCaughtForPreload(reason) {
   if (reason == null) return 'Unknown failure';
   if (typeof reason === 'string') return reason;
@@ -43,6 +43,14 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   openDirectory: () => ipcRenderer.invoke('vpe:open-directory'),
   inspectProject: (projectPath) =>
     ipcRenderer.invoke('vpe:inspect-project', projectPath),
+  vaultAddFile: (projectId) => ipcRenderer.invoke('vpe:vault-add-file', projectId),
+  vaultListFiles: (projectId) =>
+    ipcRenderer.invoke('vpe:vault-list-files', projectId),
+  vaultOpenFolder: (projectId) =>
+    ipcRenderer.invoke('vpe:vault-open-folder', projectId),
+  /** Only when main registers `vpe:e2e-vault-copy-from-path` (`VPE_E2E=1`). */
+  e2eVaultCopyFromPath: (projectId, srcPath) =>
+    ipcRenderer.invoke('vpe:e2e-vault-copy-from-path', { projectId, srcPath }),
   pickThumbnail: (projectId) =>
     ipcRenderer.invoke('vpe:pick-thumbnail', projectId),
   openProjectUrl: (url) => ipcRenderer.invoke('vpe:open-project-url', url),
@@ -90,8 +98,11 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     ipcRenderer.invoke('vpe:delete-repair-run', repairId),
   getLauncherPortHealth: () => ipcRenderer.invoke('vpe:launcher-port-health'),
   purgeLauncherPorts: () => ipcRenderer.invoke('vpe:purge-launcher-ports'),
+  scorchedEarth: () => ipcRenderer.invoke('vpe:scorched-earth'),
+  runForgeDiagnostics: () => ipcRenderer.invoke('vpe:run-diagnostics'),
   promptVaultRead: () => ipcRenderer.invoke('vpe:prompt-vault-read'),
   promptVaultWrite: (data) => ipcRenderer.invoke('vpe:prompt-vault-write', data),
+  updateVaultItem: (payload) => ipcRenderer.invoke('vpe:update-vault-item', payload),
   subscribeRepairRunsChanged: (callback) => {
     const listener = () => callback();
     ipcRenderer.on('vpe:repair-runs-changed', listener);
@@ -101,7 +112,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.2.6',
+  version: '1.3.0',
   hardware: '9700x Tuned',
 });
 

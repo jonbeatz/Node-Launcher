@@ -16,6 +16,7 @@ import {
   Hammer,
   ExternalLink,
   Loader2,
+  Paperclip,
 } from 'lucide-react'
 
 interface Project {
@@ -33,6 +34,8 @@ interface Project {
   health_checked_at?: string | null
   health_reachable?: boolean | null
   shield_project_type?: string | null
+  notes?: string | null
+  vault_has_files?: boolean
 }
 
 function msc_healthCell(project: Project): { text: string; className: string } {
@@ -279,14 +282,30 @@ export function ProjectListView({
                   <td className="px-3">
                     <div className="relative flex items-center gap-2 min-w-0">
                       <span
-                        className="h-3 w-3 rounded-full shrink-0"
+                        className="rounded-full shrink-0"
                         title={project.shield_project_type ?? 'unknown'}
                         style={{
+                          width: 10,
+                          height: 10,
                           backgroundColor: msc_shieldColorHex(
                             project.shield_project_type ?? undefined,
                           ),
                         }}
                       />
+                      {((project.notes?.trim().length ?? 0) > 0 ||
+                        project.vault_has_files === true) && (
+                        <span
+                          className="inline-flex shrink-0"
+                          title="Notes or vault reference files"
+                        >
+                          <Paperclip
+                            size={12}
+                            className="text-[#c8c8c8]"
+                            strokeWidth={2}
+                            aria-hidden
+                          />
+                        </span>
+                      )}
                       <button
                         onClick={() => onSettings(project.id)}
                         className={`font-sans text-[13px] font-bold hover:text-[#4fde82] transition-colors truncate text-left ${isError ? 'text-[#e02b20]' : 'text-white'}`}

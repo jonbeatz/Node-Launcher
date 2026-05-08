@@ -88,7 +88,8 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
-      versionLabel: 'MSC Media Engine v1.2.6',
+      versionLabel: 'MSC Media Engine v1.3.0',
+      description: 'Full production build: wipe dist, verify dev, ship the Windows installer.',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:clean-sync`\n\n' +
@@ -97,7 +98,8 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
-      versionLabel: 'MSC Media Engine v1.2.6',
+      versionLabel: 'MSC Media Engine v1.3.0',
+      description: 'Everyday Electron + Next stack; closes clean when you quit the window.',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:dev`\n\n' +
@@ -106,7 +108,8 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
-      versionLabel: 'MSC Media Engine v1.2.6',
+      versionLabel: 'MSC Media Engine v1.3.0',
+      description: 'Block until dev exits, then run forge chain (snapshot → guard → build).',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:sync`\n\n' +
@@ -115,7 +118,8 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
-      versionLabel: 'MSC Media Engine v1.2.6',
+      versionLabel: 'MSC Media Engine v1.3.0',
+      description: 'Version bump path with dist reset before dev + forge.',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:clean-sync`\n\n' +
@@ -124,11 +128,28 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
-      versionLabel: 'MSC Media Engine v1.2.6',
+      versionLabel: 'MSC Media Engine v1.3.0',
+      description: 'Heavy Node purge + launcher port recovery (use from System Health when stuck).',
       updatedAt,
       bodyMd:
-        '**Command:** `npm run vpe:force-clear`\n\n' +
-        '**Emergency purge:** Kills project-root Node processes over 1GB RSS (matches `vpe:force-clear` filter). Use with care.',
+        '**npm (filter):** `npm run vpe:force-clear`\n\n' +
+        '**In-app:** System Health → Scorched Earth (`vpe:scorched-earth`) for global cleanup / `0x2740` socket recovery. **Use with care.**',
+    },
+    {
+      id: 'vpe-master-electron-e2e',
+      title: 'Electron E2E Suite',
+      versionLabel: 'v1.2.8',
+      description: 'Builds renderer and runs Playwright smoke tests for Vault/Notes.',
+      updatedAt,
+      bodyMd: 'npm run test:e2e:electron',
+    },
+    {
+      id: 'vpe-master-playwright-manual',
+      title: 'Playwright Manual',
+      versionLabel: 'v1.2.8',
+      description: 'Directly triggers the E2E test runner with process-kill teardown.',
+      updatedAt,
+      bodyMd: 'npx playwright test --config=playwright.electron.config.ts',
     },
   ];
 }
@@ -596,6 +617,7 @@ function msc_rowToCatalogPayload(row) {
     project_type: row.project_type ?? null,
     is_archived:
       row.is_archived === true || row.is_archived === 1 ? true : false,
+    notes: row.notes == null || typeof row.notes === 'undefined' ? null : String(row.notes),
     node_modules_missing: row.node_modules_missing ?? null,
   };
 }
@@ -786,6 +808,150 @@ function msc_userDataMediaThumbnailsDir() {
     /* non-Electron */
   }
   return path.join(process.cwd(), 'media', 'thumbnails');
+}
+
+/** Sanitized single path segment for vault: `userData/media/vault/<this>/` */
+function msc_safeVaultFolderName(name) {
+  const raw = String(name || 'project')
+    .replace(/[<>:"/\\|?*\x00-\x1f]+/g, '_')
+    .trim();
+  const s = raw.replace(/^\.+/, '').replace(/\.+$/, '') || 'project';
+  return s.slice(0, 120);
+}
+
+/** Per-project reference files: `userData/media/vault/<safe project name>/` */
+function msc_userDataMediaVaultProjectDir(projectName) {
+  const leaf = msc_safeVaultFolderName(projectName);
+  try {
+    if (typeof app?.getPath === 'function') {
+      return path.join(app.getPath('userData'), 'media', 'vault', leaf);
+    }
+  } catch (_) {
+    /* */
+  }
+  return path.join(process.cwd(), 'media', 'vault', leaf);
+}
+
+/** @param {string} destDir @param {string} filename */
+function msc_vault_destPathNoCollision(destDir, filename) {
+  const base = path.basename(filename) || 'file';
+  let dest = path.join(destDir, base);
+  let i = 1;
+  const ext = path.extname(base);
+  const stem = path.basename(base, ext) || 'file';
+  while (fs.existsSync(dest)) {
+    dest = path.join(destDir, `${stem}_${i}${ext}`);
+    i += 1;
+  }
+  return dest;
+}
+
+/**
+ * Secure copy of an arbitrary file into the project vault directory.
+ * @param {string} projectDisplayName Registry `name` (folder key)
+ * @param {string} srcPath Absolute source file path
+ * @returns {string} Absolute destination path
+ */
+function msc_vault_copyFile(projectDisplayName, srcPath) {
+  const abs = path.resolve(srcPath);
+  if (!fs.existsSync(abs)) throw new Error('VPE: Source file does not exist.');
+  const st = fs.statSync(abs);
+  if (!st.isFile()) throw new Error('VPE: Vault accepts files only.');
+  const destDir = msc_userDataMediaVaultProjectDir(projectDisplayName);
+  fs.mkdirSync(destDir, { recursive: true });
+  const dest = msc_vault_destPathNoCollision(destDir, path.basename(abs));
+  fs.copyFileSync(abs, dest);
+  return dest;
+}
+
+/** Whether this project's vault folder has at least one file (documentation indicator). */
+function msc_vaultDirHasFiles(projectDisplayName) {
+  try {
+    const dir = msc_userDataMediaVaultProjectDir(projectDisplayName);
+    if (!fs.existsSync(dir)) return false;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    return entries.some((e) => e.isFile());
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Scorched Earth (Windows): clear ghost Node + orphaned Electron shells outside our PID tree.
+ * Step 1: `taskkill /F /IM node.exe /T` (Forge protocol). Step 2: kill electron.exe NOT in subtree of `process.pid`.
+ * Wrapped in exec try/catch; ignores "process not found" failures.
+ */
+function msc_utf16LeBase64ForPs(script) {
+  return Buffer.from(script, 'utf16le').toString('base64');
+}
+
+async function msc_scorchedEarthWin32Steps() {
+  const { exec } = require('child_process');
+  const execIgnore = (cmd) =>
+    new Promise((resolve) => {
+      exec(cmd, { windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (err) => resolve({ err }));
+    });
+
+  /** @type {string[]} */
+  const log = [];
+  const r1 = await execIgnore('taskkill /F /IM node.exe /T');
+  log.push(`node_exe_tree: ${r1.err ? String(r1.err.message || r1.err) : 'ok'}`);
+
+  const rootPid = process.pid;
+  const ps = `
+$procsList = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name)
+$root = ${rootPid}
+$keep = [System.Collections.Generic.HashSet[int]]::new()
+[void]$keep.Add([int]$root)
+$dirty = $true
+while ($dirty) {
+  $dirty = $false
+  foreach ($x in $procsList) {
+    $pidVal = [int]$x.ProcessId
+    $ppidVal = [int]$x.ParentProcessId
+    if ($keep.Contains($ppidVal) -and -not $keep.Contains($pidVal)) {
+      [void]$keep.Add($pidVal)
+      $dirty = $true
+    }
+  }
+}
+Get-CimInstance Win32_Process -Filter "Name='electron.exe'" | ForEach-Object {
+  $ePid = [int]$_.ProcessId
+  if (-not $keep.Contains($ePid)) { $ePid }
+}
+`.trim();
+  const encoded = msc_utf16LeBase64ForPs(ps);
+
+  /** @type {number[]} */
+  const orphanElectronPids = [];
+  await new Promise((resolve) => {
+    exec(
+      `powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${encoded}`,
+      { windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+      (err, stdout) => {
+        if (stdout) {
+          const lines = String(stdout).split(/\r?\n/);
+          for (const ln of lines) {
+            const t = ln.trim();
+            if (/^\d+$/.test(t)) orphanElectronPids.push(Number(t));
+          }
+        }
+        if (err && !stdout) log.push(`ps_orphan_scan:${String(err.message || err)}`);
+        resolve(undefined);
+      },
+    );
+  });
+
+  let killedElectron = 0;
+  for (const pidVal of orphanElectronPids) {
+    if (!Number.isFinite(pidVal) || pidVal <= 0) continue;
+    await execIgnore(`taskkill /F /PID ${pidVal} /T`);
+    killedElectron += 1;
+  }
+  log.push(`orphan_electron_attempted: ${orphanElectronPids.length}`);
+  log.push(`orphan_electron_taskkills: ${killedElectron}`);
+
+  return { ok: true, log };
 }
 
 /** @param {unknown} err */
@@ -985,8 +1151,34 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   };
 
   ipcMain.handle('vpe:getProjects', () =>
-    store.listProjectsAlphabetical().map((row) => msc_ipcEnrichProjectsRow(row)),
+    store.listProjectsAlphabetical().map((row) => {
+      const enriched = msc_ipcEnrichProjectsRow(row);
+      return {
+        ...enriched,
+        vault_has_files: msc_vaultDirHasFiles(row.name),
+      };
+    }),
   );
+
+  ipcMain.handle('vpe:run-diagnostics', () => {
+    const { msc_runForgeDiagnostics } = require('./tests/forge-diagnostics');
+    return msc_runForgeDiagnostics(store);
+  });
+
+  ipcMain.handle('vpe:scorched-earth', async () => {
+    if (process.platform !== 'win32') {
+      return { ok: true, skipped: 'non_win32' };
+    }
+    try {
+      const r = await msc_scorchedEarthWin32Steps();
+      msc_emitProjectsUpdated();
+      return r;
+    } catch (err) {
+      const m =
+        err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
+      return { ok: false, error: m };
+    }
+  });
 
   ipcMain.handle('vpe:get-repair-runs', (_event, limit) => {
     const n = Number(limit);
@@ -1116,6 +1308,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       is_archived:
         row.is_archived === true ||
         row.is_archived === 1,
+      notes: row.notes == null || typeof row.notes === 'undefined' ? null : String(row.notes),
     });
     msc_emitProjectsUpdated();
     return { ok: true, port: newPort, start_script: det.start_script };
@@ -1221,6 +1414,12 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       is_archived = v === true || v === 1;
     }
 
+    let notes = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'notes')) {
+      const n = payload.notes;
+      notes = n == null ? null : String(n);
+    }
+
     store.updateProject({
       id,
       name,
@@ -1232,6 +1431,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       pkg_manager: det.pkg_manager,
       ...(project_type !== undefined ? { project_type } : {}),
       ...(is_archived !== undefined ? { is_archived } : {}),
+      ...(notes !== undefined ? { notes } : {}),
     });
     msc_emitProjectsUpdated();
     return { ok: true, detection: det };
@@ -1369,6 +1569,11 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
           raw.is_archived === undefined
             ? undefined
             : msc_normalizeCatalogArchived(raw.is_archived);
+        let catNotes = undefined;
+        if (Object.prototype.hasOwnProperty.call(raw, 'notes')) {
+          const nv = raw.notes;
+          catNotes = nv == null ? null : String(nv);
+        }
 
         const existing = store.getProject(id);
         if (mode === 'merge' && existing) {
@@ -1382,13 +1587,11 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
             build_script,
             pkg_manager,
           };
-          const merged =
+          let merged =
             catPt !== undefined ? { ...base, project_type: catPt } : base;
-          store.updateProject(
-            catArchived !== undefined
-              ? { ...merged, is_archived: catArchived }
-              : merged,
-          );
+          if (catArchived !== undefined) merged = { ...merged, is_archived: catArchived };
+          if (catNotes !== undefined) merged = { ...merged, notes: catNotes };
+          store.updateProject(merged);
         } else {
           store.insertProject({
             id,
@@ -1403,6 +1606,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
             project_type: catPt ?? null,
             is_archived:
               catArchived !== undefined ? catArchived : false,
+            ...(catNotes !== undefined ? { notes: catNotes } : {}),
           });
         }
         imported += 1;
@@ -1470,6 +1674,51 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     const mime = mimeByExt[path.extname(dest).toLowerCase()] || 'image/png';
     const b64 = fs.readFileSync(dest).toString('base64');
     return `data:${mime};base64,${b64}`;
+  });
+
+  ipcMain.handle('vpe:vault-add-file', async (event, projectId) => {
+    const id = projectId != null ? String(projectId) : '';
+    if (!id) throw new Error('VPE: Missing project id');
+    const row = store.getProject(id);
+    if (!row) throw new Error('VPE: Project not found');
+    const win =
+      BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+    const picked = await dialog.showOpenDialog(win || undefined, {
+      title: 'Add file to Project Vault',
+      properties: ['openFile'],
+    });
+    if (picked.canceled || !picked.filePaths?.[0]) return { ok: false, canceled: true };
+    const dest = msc_vault_copyFile(row.name, picked.filePaths[0]);
+    return { ok: true, dest, name: path.basename(dest) };
+  });
+
+  ipcMain.handle('vpe:vault-list-files', (_event, projectId) => {
+    const id = projectId != null ? String(projectId) : '';
+    if (!id) throw new Error('VPE: Missing project id');
+    const row = store.getProject(id);
+    if (!row) throw new Error('VPE: Project not found');
+    const dir = msc_userDataMediaVaultProjectDir(row.name);
+    if (!fs.existsSync(dir)) return { ok: true, dir, files: [] };
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const files = entries
+      .filter((e) => e.isFile())
+      .map((e) => ({
+        name: e.name,
+        path: path.join(dir, e.name),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { ok: true, dir, files };
+  });
+
+  ipcMain.handle('vpe:vault-open-folder', async (_event, projectId) => {
+    const id = projectId != null ? String(projectId) : '';
+    if (!id) throw new Error('VPE: Missing project id');
+    const row = store.getProject(id);
+    if (!row) throw new Error('VPE: Project not found');
+    const dir = msc_userDataMediaVaultProjectDir(row.name);
+    fs.mkdirSync(dir, { recursive: true });
+    await shell.openPath(dir);
+    return { ok: true, dir };
   });
 
   ipcMain.handle('vpe:open-project-url', async (_event, url) => {
@@ -1740,6 +1989,63 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
     return { ok: true };
   });
 
+  /** Patch one vault row by id (JSON under userData); merges masters if file missing/corrupt. */
+  ipcMain.handle('vpe:update-vault-item', (_event, payload) => {
+    if (!payload || typeof payload !== 'object' || !payload.id) {
+      throw new Error('VPE: update-vault-item requires id');
+    }
+    const filePath = msc_promptVaultPath();
+    const dir = path.dirname(filePath);
+
+    let data;
+    if (!fs.existsSync(filePath)) {
+      data = { v: 1, items: msc_promptVaultMasterItems() };
+    } else {
+      let parsed = {};
+      try {
+        parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      } catch (_) {
+        parsed = {};
+      }
+      const { data: merged, injected } = msc_mergePromptVaultMasters(parsed);
+      data = merged;
+      if (injected) {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+      }
+    }
+
+    const id = String(payload.id);
+    const idx = data.items.findIndex((i) => i && String(i.id) === id);
+    if (idx < 0) throw new Error(`VPE: vault item not found: ${id}`);
+
+    const cur = data.items[idx];
+    const next = { ...cur };
+
+    if (typeof payload.title === 'string') {
+      const t = payload.title.trim();
+      if (t) next.title = t;
+    }
+    if (typeof payload.versionLabel === 'string') {
+      const v = payload.versionLabel.trim();
+      if (v) next.versionLabel = v;
+    }
+    if (typeof payload.bodyMd === 'string') next.bodyMd = payload.bodyMd;
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+      const d = payload.description;
+      if (d == null || String(d).trim() === '') delete next.description;
+      else next.description = String(d);
+    }
+
+    next.updatedAt = new Date().toISOString();
+    data.items[idx] = next;
+
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    return { ok: true, item: next };
+  });
+
   ipcMain.handle('vpe:kill-process-on-port', async (_event, port) => {
     const { execSync } = require('child_process');
     const mainPid = String(process.pid);
@@ -1763,6 +2069,21 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
       return { ok: false, message: `Failed to clear port ${port}: ${err.message}` };
     }
   });
+
+  /** Playwright / automation only — invokes `msc_vault_copyFile` without a native file dialog */
+  if (process.env.VPE_E2E === '1') {
+    ipcMain.handle('vpe:e2e-vault-copy-from-path', (_event, payload) => {
+      if (!payload || typeof payload !== 'object') throw new Error('VPE E2E: Invalid payload.');
+      const projectId = payload.projectId != null ? String(payload.projectId) : '';
+      const srcPath = payload.srcPath != null ? String(payload.srcPath) : '';
+      if (!projectId) throw new Error('VPE E2E: Missing project id.');
+      if (!srcPath) throw new Error('VPE E2E: Missing srcPath.');
+      const row = store.getProject(projectId);
+      if (!row) throw new Error('VPE: Project not found');
+      const dest = msc_vault_copyFile(row.name, srcPath);
+      return { ok: true, dest, name: path.basename(dest) };
+    });
+  }
 }
 
 module.exports = { msc_registerVpeIpc, msc_onDevExitCompanionSweep };

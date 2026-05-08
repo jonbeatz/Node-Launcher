@@ -1,7 +1,18 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Activity, RefreshCw, AlertTriangle, XCircle, Loader2, Zap, Trash2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  Activity,
+  RefreshCw,
+  AlertTriangle,
+  XCircle,
+  Loader2,
+  Zap,
+  Trash2,
+  Flame,
+  Ghost,
+  Stethoscope,
+} from 'lucide-react'
 import { useVpeSystemStats } from '@/hooks/use-vpe-system-stats'
 import { getVpeApi } from '@/lib/vpe-bridge'
 
@@ -19,10 +30,20 @@ interface SystemHealthPanelProps {
 
 export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
   const [runningCheck, setRunningCheck] = useState(false)
+  const [runningForgeDiag, setRunningForgeDiag] = useState(false)
+  const [forgeDiagText, setForgeDiagText] = useState<string | null>(null)
+  const [scorchedBurn, setScorchedBurn] = useState(false)
+  const [scorchedCleaning, setScorchedCleaning] = useState(false)
+
   const { stats: systemStats, refetch: refetchSystemStats } =
     useVpeSystemStats(isOpen, 3000)
   /** Only real diagnostics; populated when wired to engine checks */
   const [warnings, setWarnings] = useState<Warning[]>([])
+
+  const ghostSignalCount = useMemo(
+    () => warnings.filter((w) => w.id.startsWith('port-')).length,
+    [warnings],
+  )
 
   const handleKillPort = useCallback(async (port: number) => {
     const api = getVpeApi()
@@ -34,30 +55,43 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
     }
   }, [refetchSystemStats])
 
-  // Detect orphaned ports from projects list
+  const refreshGhostWarnings = useCallback(async () => {
+    const api = getVpeApi()
+    if (!api?.getProjects) return
+    const projects = await api.getProjects()
+    const newWarnings: Warning[] = []
+    projects.forEach((p) => {
+      if (p.status === 'stopped' && p.health_reachable) {
+        newWarnings.push({
+          id: `port-${p.port}`,
+          severity: 'warning',
+          message: `Port ${p.port} (${p.name}) is occupied by an orphaned Node process.`,
+          action: {
+            label: 'KILL PROCESS & CLAIM PORT',
+            onClick: () => handleKillPort(p.port),
+          },
+        })
+      }
+    })
+    setWarnings((prev) => {
+      const others = prev.filter((w) => !w.id.startsWith('port-'))
+      return [...others, ...newWarnings]
+    })
+  }, [handleKillPort])
+
+  useEffect(() => {
+    if (!isOpen) return
+    void refreshGhostWarnings()
+  }, [isOpen, refreshGhostWarnings])
+
   useEffect(() => {
     if (!isOpen) return
     const api = getVpeApi()
-    if (!api) return
-    api.getProjects().then(projects => {
-      const newWarnings: Warning[] = []
-      projects.forEach(p => {
-        // If the database says it's stopped, but the health check says something is listening
-        if (p.status === 'stopped' && p.health_reachable) {
-          newWarnings.push({
-            id: `port-${p.port}`,
-            severity: 'warning',
-            message: `Port ${p.port} (${p.name}) is occupied by an orphaned Node process.`,
-            action: { label: 'KILL PROCESS & CLAIM PORT', onClick: () => handleKillPort(p.port) }
-          })
-        }
-      })
-      setWarnings(prev => {
-        const others = prev.filter(w => !w.id.startsWith('port-'))
-        return [...others, ...newWarnings]
-      })
+    if (!api?.subscribeProjectsUpdated) return
+    return api.subscribeProjectsUpdated(() => {
+      void refreshGhostWarnings()
     })
-  }, [isOpen, handleKillPort])
+  }, [isOpen, refreshGhostWarnings])
 
   const handleQuickCheck = async () => {
     setRunningCheck(true)
@@ -67,6 +101,51 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
       }
     } finally {
       setRunningCheck(false)
+    }
+  }
+
+  const handleForgeDiagnostics = async () => {
+    const api = getVpeApi()
+    if (!api?.runForgeDiagnostics) return
+    setRunningForgeDiag(true)
+    setForgeDiagText(null)
+    try {
+      const r = await api.runForgeDiagnostics()
+      const lines =
+        r.checks
+          ?.map(
+            (c) =>
+              `${c.ok ? '[ok]' : '[fail]'} ${c.id}${c.detail ? ` — ${c.detail}` : ''}`,
+          )
+          .join('\n') ?? ''
+      setForgeDiagText(
+        `${lines}\n\n${r.ok ? 'Forge validator: all checks passed.' : 'Forge validator: one or more checks failed.'}`,
+      )
+    } catch (e) {
+      setForgeDiagText(
+        e && typeof e === 'object' && 'message' in e
+          ? String((e as { message?: string }).message)
+          : 'Forge diagnostics failed.',
+      )
+    } finally {
+      setRunningForgeDiag(false)
+    }
+  }
+
+  const handleScorchedEarth = async () => {
+    const api = getVpeApi()
+    if (!api?.scorchedEarth) return
+    setScorchedBurn(true)
+    setScorchedCleaning(true)
+    try {
+      await api.scorchedEarth()
+      await refetchSystemStats()
+      await refreshGhostWarnings()
+    } catch {
+      /* toast optional — panel still refreshes */
+    } finally {
+      setScorchedCleaning(false)
+      window.setTimeout(() => setScorchedBurn(false), 1600)
     }
   }
 
@@ -106,7 +185,9 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
       />
       
       {/* Panel - Squared 4px radius */}
-      <div className="absolute top-12 right-4 z-50 w-96 bg-[#1c1c1c] border border-[#333333] rounded shadow-xl overflow-hidden">
+      <div
+        className={`absolute top-12 right-4 z-50 w-96 bg-[#1c1c1c] border border-[#333333] rounded shadow-xl overflow-hidden ${scorchedBurn ? 'vpe-scorched-burn' : ''}`}
+      >
         {/* Header */}
         <div className="px-4 py-3 border-b border-[#333333] flex items-center gap-2">
           <Activity size={16} className="text-[#e02b20]" />
@@ -168,6 +249,21 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
             </span>
             <span className="font-sans text-sm text-white text-right min-w-0 break-words">
               {resourcesLine}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between rounded border border-[#333333] bg-[#0a0a0a] px-3 py-2">
+            <div className="flex items-center gap-2">
+              <Ghost size={14} className="text-[#A0A0A0]" />
+              <span className="font-sans text-xs text-[#A0A0A0] uppercase tracking-wide">
+                Ghost signals
+              </span>
+            </div>
+            <span
+              className="font-mono text-sm text-[#ffcc00]"
+              title="Stale registry vs live port (stopped but still listening)."
+            >
+              {ghostSignalCount}
             </span>
           </div>
 
@@ -255,7 +351,8 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
 
           {/* Quick Check Button - VPE Green primary */}
           <button
-            onClick={handleQuickCheck}
+            type="button"
+            onClick={() => void handleQuickCheck()}
             disabled={runningCheck}
             className="w-full h-10 rounded bg-[#4fde82] hover:bg-[#3fcf72] disabled:opacity-50 font-sans text-sm text-black font-medium transition-colors vader-focus flex items-center justify-center gap-2"
           >
@@ -272,8 +369,53 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
             )}
           </button>
 
+          <button
+            type="button"
+            onClick={() => void handleForgeDiagnostics()}
+            disabled={runningForgeDiag}
+            className="w-full h-10 rounded bg-[#2a2a2a] hover:bg-[#333333] border border-[#333333] disabled:opacity-50 font-sans text-sm text-[#eaeaea] font-medium transition-colors vader-focus flex items-center justify-center gap-2"
+          >
+            {runningForgeDiag ? (
+              <>
+                <Loader2 size={16} className="animate-spin text-[#4fde82]" />
+                VALIDATING...
+              </>
+            ) : (
+              <>
+                <Stethoscope size={16} className="text-[#4fde82]" />
+                FORGE VALIDATOR
+              </>
+            )}
+          </button>
+
+          {forgeDiagText ? (
+            <pre className="max-h-32 overflow-y-auto rounded border border-[#333333] bg-[#0a0a0a] p-2 font-mono text-[10px] text-[#c8c8c8] whitespace-pre-wrap leading-snug">
+              {forgeDiagText}
+            </pre>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => void handleScorchedEarth()}
+            disabled={scorchedCleaning}
+            className="w-full min-h-[2.75rem] rounded-lg border-2 border-[#e02b20] bg-[#0a0a0a] hover:bg-[#1a0606] disabled:opacity-60 font-sans text-xs font-bold text-[#ffb4ad] uppercase tracking-[0.12em] transition-colors vader-focus flex items-center justify-center gap-2 shadow-[inset_0_0_0_1px_rgba(224,43,32,0.35)]"
+          >
+            {scorchedCleaning ? (
+              <>
+                <Loader2 size={18} className="animate-spin text-[#e02b20]" />
+                Cleaning…
+              </>
+            ) : (
+              <>
+                <Flame size={18} className="text-[#e02b20]" />
+                <Ghost size={14} className="text-[#A0A0A0]" />
+                SCORCHED EARTH
+              </>
+            )}
+          </button>
+
         <p className="font-sans text-[10px] text-[#555555] text-center pt-2">
-          Powered by the MSC Media Engine v1.0.8
+          Powered by the MSC Media Engine v1.3.0
         </p>
         </div>
       </div>

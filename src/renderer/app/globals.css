@@ -20,6 +20,8 @@
   --secondary-foreground: #FFFFFF;
   --muted: #1c1c1c;
   --muted-foreground: #A0A0A0;
+  /** Sidebar / tab selected surface (renderer nav); accent green stays for CTAs/forms. */
+  --vpe-nav-selected: #2a2a2a;
   --accent: #4fde82;
   --accent-foreground: #000000;
   --destructive: #e02b20;
@@ -270,8 +272,27 @@
 }
 
 /* v1.2.4 — redundant outer scrollbar: only `.vpe-terminal-scrollbar` scrolls */
+/* v1.2.7 — kill horizontal jitter on the log drawer column */
 .vpe-log-drawer-root {
   overflow: hidden !important;
+  overflow-x: hidden !important;
+  min-width: 0;
+}
+
+/* v1.2.8 — Scorched Earth “digital burn” on system health panel */
+@keyframes vpe-digital-burn {
+  0%, 100% {
+    filter: brightness(1);
+    box-shadow: inset 0 0 0 transparent;
+  }
+  50% {
+    filter: brightness(1.32) saturate(0.35) contrast(1.08);
+    box-shadow: inset 0 0 52px rgba(224, 43, 32, 0.22);
+  }
+}
+
+.vpe-scorched-burn {
+  animation: vpe-digital-burn 0.45s ease-in-out 3;
 }
 
 /* boxBling Effect */

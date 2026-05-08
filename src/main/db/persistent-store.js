@@ -81,6 +81,7 @@ function rowFromTuple(tuple) {
     health_checked_at: null,
     health_reachable: null,
     is_archived: 0,
+    notes: null,
   };
 }
 
@@ -137,11 +138,20 @@ class SqlitePersistence {
         payload.is_archived === true || payload.is_archived === 1 ? 1 : 0;
     }
 
+    let notesBind = found.notes != null ? String(found.notes) : null;
+    if (Object.prototype.hasOwnProperty.call(payload, 'notes')) {
+      const nv = payload.notes;
+      notesBind =
+        nv == null
+          ? null
+          : String(nv);
+    }
+
     this._db
       .prepare(
         `
       UPDATE projects
-      SET name = ?, path = ?, port = ?, thumbnail_url = ?, start_script = ?, build_script = ?, pkg_manager = ?, project_type = ?, is_archived = ?
+      SET name = ?, path = ?, port = ?, thumbnail_url = ?, start_script = ?, build_script = ?, pkg_manager = ?, project_type = ?, is_archived = ?, notes = ?
       WHERE id = ?
     `,
       )
@@ -155,6 +165,7 @@ class SqlitePersistence {
         payload.pkg_manager,
         projectTypeBind,
         isArchivedBind,
+        notesBind,
         payload.id,
       );
   }
@@ -166,11 +177,15 @@ class SqlitePersistence {
         : null;
     const isArc =
       payload.is_archived === true || payload.is_archived === 1 ? 1 : 0;
+    const notesIns =
+      payload.notes != null && String(payload.notes).trim() !== ''
+        ? String(payload.notes)
+        : null;
     this._db
       .prepare(
         `
-      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -185,6 +200,7 @@ class SqlitePersistence {
         payload.pkg_manager,
         pt,
         isArc,
+        notesIns,
       );
   }
 
@@ -371,6 +387,10 @@ class JsonPersistence {
         p.is_archived = false;
         changed = true;
       }
+      if (p.notes === undefined) {
+        p.notes = null;
+        changed = true;
+      }
     }
     const list = Object.values(this._data.projects);
     for (const p of list) {
@@ -501,6 +521,10 @@ class JsonPersistence {
     ) {
       p.is_archived = Boolean(payload.is_archived);
     }
+    if (Object.prototype.hasOwnProperty.call(payload, 'notes')) {
+      const nv = payload.notes;
+      p.notes = nv == null ? null : String(nv);
+    }
     this.save();
   }
 
@@ -509,10 +533,15 @@ class JsonPersistence {
       payload.project_type != null && String(payload.project_type).trim() !== ''
         ? String(payload.project_type).trim()
         : null;
+    const notesIni =
+      payload.notes != null && String(payload.notes).trim() !== ''
+        ? String(payload.notes)
+        : null;
     this._data.projects[payload.id] = {
       ...payload,
       project_type: pt,
       is_archived: Boolean(payload.is_archived),
+      notes: notesIni,
       health_http_code: null,
       health_checked_at: null,
       health_reachable: null,
@@ -747,6 +776,14 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
       );
     }
     ver = 7;
+  }
+
+  if (ver < 8) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('notes')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN notes TEXT`);
+    }
+    ver = 8;
   }
 
   db.pragma(`user_version = ${ver}`);

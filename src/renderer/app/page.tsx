@@ -18,9 +18,9 @@ import { ProjectSettingsModal } from '@/components/project-settings-modal'
 import { DeleteConfirmModal } from '@/components/delete-confirm-modal'
 import { ContextMenu } from '@/components/context-menu'
 import { AppSettingsModal } from '@/components/app-settings-modal'
-import { SystemHealthPanel } from '@/components/system-health-panel'
+import { SystemHealthPanel } from '@/components/SystemHealth'
 import { MaintenanceSection, type MaintenanceTab } from '@/components/maintenance-section'
-import { VpeSandboxPanel } from '@/components/vpe-sandbox-panel'
+import { Sandbox } from '@/components/Sandbox'
 import { type RepairHistoryRow } from '@/components/repair-history-view'
 import { QuickActionsBar } from '@/components/quick-actions-bar'
 import { ToastProvider, useToast } from '@/components/vader-toast'
@@ -73,6 +73,8 @@ interface Project {
     | 'node'
     | 'unknown'
   is_archived?: boolean
+  notes?: string | null
+  vault_has_files?: boolean
 }
 
 /** Browser fallback when `window.vpeAPI` is unavailable (Next standalone). */
@@ -965,13 +967,13 @@ function DashboardContent() {
                   onRemoveEntry={handleRemoveRepairEntry}
                 />
               ) : activeNav === 'sandbox' ? (
-                <VpeSandboxPanel />
+                <Sandbox />
               ) : (
                 <>
                   <div className="shrink-0">
                     {/* Filter Pills Bar */}
                     <div className="px-6 py-3 flex items-center justify-between">
-                      {/* Left: Filter Pills - VPE Green primary */}
+                      {/* Left: status filter pills — neutral active (matches sidebar / tactical tabs). */}
                       <div className="flex items-center gap-2">
                         {FILTERS.map((filter) => (
                           <button
@@ -980,8 +982,8 @@ function DashboardContent() {
                             className={`
                               h-7 px-4 rounded font-sans text-[11px] font-medium uppercase tracking-[0.05em] transition-all vader-focus
                               ${activeFilter === filter.id
-                                ? 'bg-[#4fde82] text-black'
-                                : 'bg-transparent text-[#A0A0A0] border border-[#333333] hover:border-[#4fde82]'
+                                ? 'bg-[#2a2a2a] text-white'
+                                : 'bg-transparent text-[#A0A0A0] border border-[#333333] hover:text-white hover:border-[#444444]'
                               }
                             `}
                           >
@@ -994,23 +996,23 @@ function DashboardContent() {
                       <span className="font-sans text-[11px] text-[#A0A0A0] uppercase tracking-[0.05em]">
                         {projectCount} PROJECT{projectCount !== 1 ? 'S' : ''}
                         {commandSearchActive && commandSearchTerm.trim() ? (
-                          <span className="ml-2 text-[#4fde82]">(jump)</span>
+                          <span className="ml-2 text-[#d4d4d4]">(jump)</span>
                         ) : null}
                         {searchTerm.trim() &&
                         !(commandSearchActive && commandSearchTerm.trim()) ? (
-                          <span className="ml-2 text-[#4fde82]">(filtered)</span>
+                          <span className="ml-2 text-[#d4d4d4]">(filtered)</span>
                         ) : null}
                       </span>
 
-                      {/* Right: View Toggle - VPE Green */}
+                      {/* Right: grid / list toggle */}
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => setViewMode('grid')}
                           className={`
-                            w-7 h-7 rounded flex items-center justify-center transition-all
+                            w-7 h-7 rounded flex items-center justify-center transition-all border border-transparent vader-focus
                             ${viewMode === 'grid' 
-                              ? 'bg-[#4fde82] text-black' 
-                              : 'bg-transparent text-[#A0A0A0] hover:text-white'
+                              ? 'bg-[#2a2a2a] text-white border-[#444444]' 
+                              : 'bg-transparent text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]/50'
                             }
                           `}
                         >
@@ -1019,10 +1021,10 @@ function DashboardContent() {
                         <button
                           onClick={() => setViewMode('list')}
                           className={`
-                            w-7 h-7 rounded flex items-center justify-center transition-all
+                            w-7 h-7 rounded flex items-center justify-center transition-all border border-transparent vader-focus
                             ${viewMode === 'list' 
-                              ? 'bg-[#4fde82] text-black' 
-                              : 'bg-transparent text-[#A0A0A0] hover:text-white'
+                              ? 'bg-[#2a2a2a] text-white border-[#444444]' 
+                              : 'bg-transparent text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]/50'
                             }
                           `}
                         >
@@ -1031,7 +1033,7 @@ function DashboardContent() {
                       </div>
                     </div>
 
-                    <div className="px-6 pb-3 border-b border-[#252525]">
+                    <div className="px-6 pb-3 border-b border-[#2a2a2a]">
                       <Msc_ProjectFilterNav
                         activeFilter={tacticalProjectFilter}
                         onFilterChange={setTacticalProjectFilter}
@@ -1064,7 +1066,7 @@ function DashboardContent() {
                                 setCommandSearchTerm('')
                                 setCommandSearchActive(false)
                               }}
-                              className="font-sans text-sm text-[#4fde82] hover:underline"
+                              className="font-sans text-sm text-[#eaeaea] hover:underline"
                               type="button"
                             >
                               Clear jump search
@@ -1077,7 +1079,7 @@ function DashboardContent() {
                             </p>
                             <button
                               onClick={() => setSearchTerm('')}
-                              className="font-sans text-sm text-[#4fde82] hover:underline"
+                              className="font-sans text-sm text-[#eaeaea] hover:underline"
                               type="button"
                             >
                               Clear search
@@ -1089,7 +1091,7 @@ function DashboardContent() {
                             <p className="font-sans text-sm text-[#555555] mb-4">Add your first project to get started</p>
                             <button
                               onClick={() => setAddProjectModalOpen(true)}
-                              className="h-9 px-6 rounded bg-[#4fde82] hover:bg-[#3fcf72] font-sans text-sm font-medium text-black transition-colors vader-focus"
+                              className="h-9 px-6 rounded bg-[#2a2a2a] hover:bg-[#333333] border border-[#555555] font-sans text-sm font-medium text-white transition-colors vader-focus"
                             >
                               ADD PROJECT
                             </button>
@@ -1154,6 +1156,10 @@ function DashboardContent() {
                             )}
                             shieldProjectType={
                               project.shield_project_type ?? 'unknown'
+                            }
+                            hasDocumentationReferences={
+                              (project.notes?.trim().length ?? 0) > 0 ||
+                              Boolean(project.vault_has_files)
                             }
                           />
                             </motion.div>
@@ -1398,6 +1404,9 @@ function DashboardContent() {
         }
         isArchived={
           projects.find((p) => p.id === selectedProjectId)?.is_archived ?? false
+        }
+        projectNotes={
+          projects.find((p) => p.id === selectedProjectId)?.notes ?? null
         }
         detectedProjectType={
           projects.find((p) => p.id === selectedProjectId)?.detected_project_type ??

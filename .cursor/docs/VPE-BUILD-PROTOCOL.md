@@ -1,12 +1,26 @@
-# VPE Build & Command Protocol (master; includes v1.2.3 build-chain deltas + v1.2.6 registry/UI notes)
+# VPE Build & Command Protocol (master; includes v1.2.3 build-chain deltas + v1.2.6 registry + v1.3.0 UI density / nav notes)
 
 **Purpose:** Source of truth for **build sequencing**, **terminal command logic**, and **Windows packaging posture** on Vader Project Engine — so dev sessions stay clean (no orphaned dev servers on **3000**), and release builds stay predictable.
 
 **Authority note:** Executable script strings and Electron-builder knobs live in **`package.json`**. If this document ever diverges from **`package.json`**, **`package.json` wins** — update this file in the same change.
 
-**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — section **Build v1.2.6** (**`is_archived`**, Ctrl+K jump search, catalog **`is_archived`**).
+**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
 
-**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.2.6**).
+**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.3.0**).
+
+### Permanent product notes (v1.2.9+)
+
+- Integrated Playwright E2E for automated Electron data validation.
+- Implemented Scorched Earth global cleanup for 0x2740 socket recovery.
+- Standardized 12px Paperclip indicators for documented projects.
+
+### Skills (v1.3.0+)
+
+- Implemented UI Density protocols using Radix Accordions for complex input forms and instructional onboarding.
+
+### Standards (v1.3.0+)
+
+- Navigation selection color is strictly locked to **#2a2a2a** (neutral gray) to maintain the Studio Dark aesthetic.
 
 ---
 
@@ -60,16 +74,16 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ---
 
-## 4. In-app tooling (v1.1.0+ reference, UI refresh through v1.1.8)
+## 4. In-app tooling (v1.1.0+ reference; UI through **v1.3.0**)
 
 These are **UX / ops** features in the packaged or dev UI; they do not replace **`package.json`** scripts:
 
 - **System Health / diagnostics:** **Closed** by default on load; open from TopBar. **CPU temperature:** **not collected**; **v1.1.7** removed all thermal UI (**no `Temp:` line**; **`cpuTemp`** dropped from IPC types). **System Log** drawer **collapsed** by default (`logDrawerExpanded` / user expand); **`terminal-prefs`** does not persist drawer open state. Log lines strip **ANSI / CSI** and **CLIXML** for plain HTML (not a full xterm).
-- **Sidebar:** **Add New Project** sits directly under **Dashboard** (no **REGISTRY** section label).
+- **Sidebar:** **Add New Project** sits directly under **Dashboard** (no **REGISTRY** section label). **v1.3.0+:** sidebar **navigation** active/hover surfaces use **`#2a2a2a`** (**Add**, **STOP ALL**, tactical rows, Maintenance, Sandbox, Settings) — Studio Dark neutrality; tactical row **shield dots** keep type colors for recognition only.
 - **Footer “Net” LED + Purge:** IPC reports **`p3000` / `p3001` / `p9222`**, whether listeners are **node/electron-only** (**`ok`**), and **`forgeReady`** (3000/3001 free). **Green** = **`forgeReady`** — **9222** is **always** reported idle for LED purposes (**v1.1.8** purge + forced row — see §2); **amber** = dev stack on **3000** and/or **3001**; **red** = foreign process on **3000/3001**. **Purge env (`msc_purgeLauncherPorts`):** optional **`chrome.exe`** kill when window title matches **`VPE*`**; **`taskkill /F /PID`** only (**no `/T`**) for listeners on **3000**, **3001**, **9222**, always skipping **`process.pid`** and **`process.ppid`**; second-pass **9222** clears remaining non-protected listeners; **`stdio: 'ignore'`**; **500ms** settle before port re-check.
-- **Maintenance → Prompt Vault:** Markdown templates with **version labels** stored under **`userData` / `prompt-vault.json`**.
-- **Sandbox:** **react-live** panel for pasting v0-style React snippets against **Studio Dark** (**`#121212`**) preview.
+- **Maintenance → Prompt Vault:** Templates with **title / versionLabel / optional description / body** under **`userData` / `prompt-vault.json`**; stable-id **master** rows merged on read (**`vpe-ipc.js`**). **v1.2.9+:** row **Accordion** in UI; **Edit** persists via **`vpe:update-vault-item`**. **v1.3.0+:** **create** composer is a **collapsed-by-default** Accordion (**+ Create New Master Directive**).
+- **Sandbox:** **v1.2.9+** — top instructional **Accordion** (**How to use the VPE Sandbox & Vault**). **react-live** panel for pasting v0-style React snippets against **Studio Dark** (**`#121212`**) preview.
 
 ---
 
-*My Studio Channel (MSC). “Powered by the MSC Media Engine.”*
+*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.3.0.”*

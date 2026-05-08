@@ -16,6 +16,11 @@ dist/
 # build/ = electron-builder `buildResources` (optional NSIS assets); app icon lives in media/icon.ico.
 coverage/
 
+# playwright (electron e2e)
+/test-results/
+/playwright-report/
+/blob-report/
+
 # electron / bundler caches
 .turbo/
 .cache/

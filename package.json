@@ -1,7 +1,7 @@
 {
   "name": "vader-project-engine",
-  "version": "1.2.6",
-  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.2.6",
+  "version": "1.3.0",
+  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.3.0",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {
@@ -26,6 +26,7 @@
     "build:renderer": "next build src/renderer",
     "lint": "next lint src/renderer",
     "test:e2e": "playwright test",
+    "test:e2e:electron": "npm run build:renderer && playwright test --config=playwright.electron.config.ts",
     "repair:ast": "node scripts/vpe-repair-stub.cjs",
     "rebuild:natives": "electron-rebuild -f -o better-sqlite3"
   },
@@ -143,6 +144,7 @@
       "!src/renderer/.next{,/**/*}",
       "!e2e{,/**/*}",
       "!playwright.config.ts",
+      "!playwright.electron.config.ts",
       "!scripts{,/**/*}",
       "!mcps{,/**/*}",
       "!.cursor{,/**/*}",

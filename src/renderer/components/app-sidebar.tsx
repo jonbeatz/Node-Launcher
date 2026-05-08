@@ -12,7 +12,6 @@ import {
   Star,
   ChevronDown,
   FlaskConical,
-  Shield,
 } from 'lucide-react'
 
 import {
@@ -75,7 +74,7 @@ export function AppSidebar({
       <div className="p-2 border-b border-[#333333]">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-center p-2 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all"
+          className="w-full flex items-center justify-center p-2 rounded text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a] transition-all"
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -87,11 +86,9 @@ export function AppSidebar({
           <div>
             <button
               onClick={onAddProject}
-              onMouseEnter={() => setHoveredItem('add-project')}
-              onMouseLeave={() => setHoveredItem(null)}
               className={`
                 w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
-                bg-[#4fde82] hover:bg-[#3fcf72] text-black
+                border border-[#444444] bg-[#1c1c1c] text-[#eaeaea] hover:bg-[#2a2a2a] hover:text-white
                 ${collapsed ? 'justify-center' : ''}
               `}
               title={collapsed ? 'Add New Project' : undefined}
@@ -125,9 +122,9 @@ export function AppSidebar({
             </button>
           </div>
 
-          {/* Tactical project shields (dashboard filter) */}
-          <div>
-            {!collapsed && (
+          {/* Tactical filters — dots; hidden entirely when sidebar collapsed (v1.2.7) */}
+          {!collapsed && (
+            <div>
               <button
                 type="button"
                 onClick={() => setProjectsNavOpen(!projectsNavOpen)}
@@ -141,60 +138,56 @@ export function AppSidebar({
                   className={`text-[#A0A0A0] transition-transform shrink-0 ${projectsNavOpen ? '' : '-rotate-90'}`}
                 />
               </button>
-            )}
-            {(projectsNavOpen || collapsed) && (
-              <div
-                className={`space-y-0.5 ${collapsed ? 'flex flex-col items-stretch gap-1' : 'pl-1'}`}
-              >
-                {VPE_TACTICAL_NAV_META.map((item) => {
-                  const n = tc[item.countKey]
-                  const isOn = tacticalActive === item.id
-                  const tint = msc_sidebarShieldTint(item.id)
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onNavigate?.(`tactical:${item.id}`)}
-                      onMouseEnter={() => setHoveredItem(`tactical-${item.id}`)}
-                      onMouseLeave={() => setHoveredItem(null)}
-                      title={`${item.label} (${n})`}
-                      className={`
-                        flex items-center rounded transition-all duration-200 vader-focus font-sans
-                        ${collapsed ? 'justify-center px-1 py-1.5' : 'w-full gap-2 px-2 py-1.5 text-xs'}
+              {projectsNavOpen && (
+                <div className="space-y-0.5 pl-1">
+                  {VPE_TACTICAL_NAV_META.map((item) => {
+                    const n = tc[item.countKey]
+                    const isOn = tacticalActive === item.id
+                    const tint = msc_sidebarShieldTint(item.id)
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => onNavigate?.(`tactical:${item.id}`)}
+                        onMouseEnter={() => setHoveredItem(`tactical-${item.id}`)}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        title={`${item.label} (${n})`}
+                        className={`
+                        flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs transition-all duration-200 vader-focus font-sans
                         ${
                           isOn
                             ? 'bg-[#2a2a2a] text-white'
                             : hoveredItem === `tactical-${item.id}`
-                              ? 'bg-[#2a2a2a]/90 text-white'
-                              : 'text-[#E8E8E8] hover:bg-[#252525]/80 hover:text-white'
+                              ? 'bg-[#2a2a2a] text-white'
+                              : 'text-[#E8E8E8] hover:bg-[#2a2a2a] hover:text-white'
                         }
                       `}
-                    >
-                      <Shield
-                        size={collapsed ? 16 : 14}
-                        strokeWidth={2.4}
-                        className="shrink-0"
-                        style={{ color: tint }}
-                      />
-                      {!collapsed ? (
-                        <>
-                          <span className="truncate flex-1 text-left font-medium">
-                            {item.label}
-                          </span>
-                          <span
-                            className="shrink-0 tabular-nums text-[var(--text-muted,#A0A0A0)]"
-                            style={{ fontSize: '0.7rem' }}
-                          >
-                            ({n})
-                          </span>
-                        </>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+                      >
+                        <span
+                          className="shrink-0 rounded-full"
+                          style={{
+                            width: 10,
+                            height: 10,
+                            backgroundColor: tint,
+                          }}
+                          aria-hidden
+                        />
+                        <span className="truncate flex-1 text-left font-medium">
+                          {item.label}
+                        </span>
+                        <span
+                          className="shrink-0 tabular-nums text-[var(--text-muted,#A0A0A0)]"
+                          style={{ fontSize: '0.7rem' }}
+                        >
+                          ({n})
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             {!collapsed && (
@@ -280,7 +273,7 @@ export function AppSidebar({
                     <button
                       key={fav.id}
                       onClick={() => onNavigate?.(`favorite:${fav.id}`)}
-                      className="w-full flex items-center gap-3 p-2 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all vader-focus group"
+                      className="w-full flex items-center gap-3 p-2 rounded text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a] transition-all vader-focus group"
                       title={collapsed ? fav.name : undefined}
                     >
                       <div className="w-1.5 h-1.5 rounded-full bg-[#333333] group-hover:bg-[#ffcc00] shrink-0" />
@@ -310,7 +303,8 @@ export function AppSidebar({
           onMouseLeave={() => setHoveredItem(null)}
           className={`
             w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
-            bg-[#2a2a2a] border border-[#555555] text-[#A0A0A0] hover:border-[#e02b20] hover:text-[#e02b20] hover:bg-[#e02b20]/10
+            bg-[#1c1c1c] border border-[#444444] text-[#eaeaea]
+            hover:bg-[#2a2a2a] hover:text-white hover:border-[#555555]
             ${collapsed ? 'justify-center' : ''}
           `}
           title={collapsed ? 'Stop All Projects' : undefined}
@@ -331,9 +325,9 @@ export function AppSidebar({
             w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
             ${
               activeItem === 'settings'
-                ? 'bg-[#252525] text-white'
+                ? 'bg-[#2a2a2a] text-white'
                 : hoveredItem === 'settings'
-                  ? 'bg-[#252525] text-white'
+                  ? 'bg-[#2a2a2a] text-white'
                   : 'text-[#A0A0A0]'
             }
           `}

@@ -4,7 +4,7 @@
 
 **Cursor ↔ Google (Vertex AI) via LiteLLM + ngrok** (paths, ports, Cursor settings, post-restart checklist): [API-SetUp-Master.md](API-SetUp-Master.md)
 
-**Build & terminal command sequencing** (`vader:dev`, **`VPE_LAUNCHER_FORGE`** [reserved flag; no thermal polling in main as of **v1.1.6**], **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vader:force-forge`**, **`vader:sync`**, **`vader:clean-sync`**, `&&` gates, **`vpe-forge-pause`**, snapshot, syntax guard, **`dist/`** artifacts): [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (includes **v1.2.3** managed-project bootstrap; forge hardening still **v1.1.8**). **Product / registry (v1.2.6):** see **Build v1.2.6** in [Checkpoint.md](Checkpoint.md).
+**Build & terminal command sequencing** (`vader:dev`, **`VPE_LAUNCHER_FORGE`** [reserved flag; no thermal polling in main as of **v1.1.6**], **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vader:force-forge`**, **`vader:sync`**, **`vader:clean-sync`**, `&&` gates, **`vpe-forge-pause`**, snapshot, syntax guard, **`dist/`** artifacts): [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (includes **v1.2.3** managed-project bootstrap; forge hardening still **v1.1.8**). **Product / UX:** **Build v1.3.0** (current) + **Build v1.2.9** + **Build v1.2.6** archive/jump baseline in [Checkpoint.md](Checkpoint.md).
 
 **Shipped app version:** root **`package.json` → `"version"`** (align with preload / footer / **`layout.tsx`**) drives shipped labels — see [Custom-Commands.md — Update Docs](Custom-Commands.md#update-docs) after each release.
 
@@ -24,7 +24,7 @@ When starting a new session, verify the local environment:
 ## 3. Communication Protocol
 - **Strict Prefixing:** All functions `msc_`, all classes `msc-`.
 - **Security First:** No direct Node imports in renderer; use the `vader` IPC bridge.
-- **Aesthetic:** Background #121212, Surface #1c1c1c, Accent #e02b20.
+- **Aesthetic:** Background **#121212**, surface **#1c1c1c**; Vader accent **#e02b20** for brand/CTAs outside nav. **Navigation selection** (sidebar + maintenance tabs, dashboard pills where applicable): **#2a2a2a** — see [VPE-BUILD-PROTOCOL — Standards](VPE-BUILD-PROTOCOL.md) (v1.3.0+).
 
 ## 4. Current Objectives
 - [ ] Initialize Electron/Next.js foundation.

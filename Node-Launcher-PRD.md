@@ -4,9 +4,11 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.2.6** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata should match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts, **`vader:clean-sync`** (Node launcher + 10s dev window → forge), NET dev override (**v1.2.3+**), shield classification (**v1.2.4**), tactical project filters + sidebar nav (**v1.2.5**), **archive registry + jump search + UI hardening** (**v1.2.6**).
+**Shipped desktop build (npm / `package.json` `version`):** **1.3.0** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
 
-**v1.2.6 (product):** **`projects.is_archived`** in SQLite/JSON; **ARCHIVE** filter on dashboard; **Project Settings → Archive project**; **Ctrl+K / Cmd+K** opens header **jump** search (all projects, ignores active filters); **Add Project** type dropdown defaults to **`inspectProject.project_type`**; sidebar **Add New Project** first, tactical shields with palette colors; list view **12px** shield dot; **`.vpe-system-log-viewport`** horizontal overflow clamped; catalog import/export carries **`is_archived`**.
+**v1.2.6 (product baseline):** **`projects.is_archived`** in SQLite/JSON; **ARCHIVE** filter; **Project Settings → Archive project**; **Ctrl+K / Cmd+K** jump search; **Add Project** type from **`inspectProject`**; tactical sidebar shields; list **12px** shield dot; catalog **`is_archived`**.
+
+**v1.2.9–v1.3.0 (UX):** Maintenance **Prompt Vault** — accordion rows, **`vpe:update-vault-item`** edit path, optional row **description**, sandbox onboarding accordion, neutral **`#2a2a2a`** selection on dashboard pills / shell nav where specified; **v1.3.0** — collapsed **+ Create New Master Directive** composer; **`PromptVault`** imported directly from **`@/components/PromptVault`** (no **`prompt-vault-panel`** proxy).
 
 ---
 

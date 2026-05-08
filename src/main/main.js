@@ -10,10 +10,41 @@ const { msc_registerVpeIpc, msc_onDevExitCompanionSweep } = require('./vpe-ipc')
 const { msc_archiveLegacyProjectsJson } = require('./legacy-projects-archive');
 const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile');
 
-// Vader Protocol: Enable Remote Debugging Port for automated Cursor MCP testing.
-app.commandLine.appendSwitch('remote-debugging-port', '9222');
+// Vader Protocol: Remote debugging for MCP / Playwright CDP (override with VPE_REMOTE_DEBUG_PORT).
+const MSC_VPE_REMOTE_DEBUG_PORT = String(
+  process.env.VPE_REMOTE_DEBUG_PORT || '9222',
+).replace(/[^\d]/g, '') || '9222';
+app.commandLine.appendSwitch('remote-debugging-port', MSC_VPE_REMOTE_DEBUG_PORT);
 app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
-console.log('[VPE Main] Remote debugging port enabled on http://127.0.0.1:9222');
+console.log(
+  `[VPE Main] Remote debugging port enabled on http://127.0.0.1:${MSC_VPE_REMOTE_DEBUG_PORT}`,
+);
+
+/** v1.3.0 — mute noisy DevTools/socket stderr unless `--verbose` is present. */
+const MSC_VPE_VERBOSE_LOG = process.argv.includes('--verbose');
+if (!MSC_VPE_VERBOSE_LOG && !global.__vpe_stderr_filter_registered) {
+  global.__vpe_stderr_filter_registered = true;
+  const _stderrWrite = process.stderr.write.bind(process.stderr);
+  process.stderr.write = function msc_filteredStderr(chunk, encoding, cb) {
+    let enc = encoding;
+    let cbFn = cb;
+    if (typeof enc === 'function') {
+      cbFn = enc;
+      enc = undefined;
+    }
+    const s =
+      typeof chunk === 'string'
+        ? chunk
+        : Buffer.isBuffer(chunk)
+          ? chunk.toString('utf8')
+          : String(chunk);
+    if (/\b0x2740\b|DevTools.*socket|devtools.*\bsocket\b/i.test(s)) {
+      if (typeof cbFn === 'function') cbFn();
+      return true;
+    }
+    return _stderrWrite(chunk, enc, cbFn);
+  };
+}
 
 function msc_ipcLegacyProjectRows(store) {
   return store.getProjects().map((row) => ({
@@ -85,6 +116,31 @@ function msc_getRendererIndexPath() {
 const msc_vpeRuntime = { pm2Manager: null };
 
 function msc_configureWritablePaths() {
+  /** Isolated profile for Playwright Electron e2e (`test:e2e:electron`). */
+  if (process.env.VPE_E2E_USER_DATA) {
+    const userDataDir = path.resolve(process.env.VPE_E2E_USER_DATA);
+    const cacheDir = path.join(userDataDir, 'cache');
+    const sessionDataDir = path.join(userDataDir, 'session-data');
+    const gpuCacheDir = path.join(cacheDir, 'GPUCache');
+    try {
+      fs.mkdirSync(userDataDir, { recursive: true });
+      fs.mkdirSync(cacheDir, { recursive: true });
+      fs.mkdirSync(sessionDataDir, { recursive: true });
+      fs.mkdirSync(gpuCacheDir, { recursive: true });
+      app.setPath('userData', userDataDir);
+      app.setPath('cache', cacheDir);
+      app.setPath('sessionData', sessionDataDir);
+      app.commandLine.appendSwitch('disk-cache-dir', cacheDir);
+      app.commandLine.appendSwitch('gpu-shader-disk-cache-path', gpuCacheDir);
+    } catch (err) {
+      console.warn(
+        'VPE: Failed to apply VPE_E2E_USER_DATA paths, using defaults.',
+        err?.message ?? err,
+      );
+    }
+    return;
+  }
+
   const localAppData =
     process.env.LOCALAPPDATA ||
     path.join(process.env.USERPROFILE || process.cwd(), 'AppData', 'Local');

@@ -1,7 +1,7 @@
 'use client'
 
 import { RepairHistoryView, type RepairHistoryRow } from '@/components/repair-history-view'
-import { PromptVaultPanel } from '@/components/prompt-vault-panel'
+import { PromptVault } from '@/components/PromptVault'
 
 export type MaintenanceTab = 'logs' | 'vault'
 
@@ -32,8 +32,8 @@ export function MaintenanceSection({
           onClick={() => onMaintenanceTab('logs')}
           className={`h-8 px-4 rounded-t font-sans text-[11px] font-medium uppercase tracking-wide vader-focus transition-colors ${
             maintenanceTab === 'logs'
-              ? 'bg-[#252525] text-white border border-b-0 border-[#333333]'
-              : 'text-[#A0A0A0] hover:text-white'
+              ? 'bg-[#2a2a2a] text-white border border-b-0 border-[#333333]'
+              : 'text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]'
           }`}
         >
           Repair Logs
@@ -43,8 +43,8 @@ export function MaintenanceSection({
           onClick={() => onMaintenanceTab('vault')}
           className={`h-8 px-4 rounded-t font-sans text-[11px] font-medium uppercase tracking-wide vader-focus transition-colors ${
             maintenanceTab === 'vault'
-              ? 'bg-[#252525] text-white border border-b-0 border-[#333333]'
-              : 'text-[#A0A0A0] hover:text-white'
+              ? 'bg-[#2a2a2a] text-white border border-b-0 border-[#333333]'
+              : 'text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]'
           }`}
         >
           Prompt Vault
@@ -60,7 +60,7 @@ export function MaintenanceSection({
             onRemoveEntry={onRemoveEntry}
           />
         ) : (
-          <PromptVaultPanel />
+          <PromptVault />
         )}
       </div>
     </div>

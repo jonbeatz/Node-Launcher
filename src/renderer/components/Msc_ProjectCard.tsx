@@ -14,10 +14,11 @@ import {
   ExternalLink,
   Star,
   Loader2,
-  Shield,
+  Paperclip,
 } from 'lucide-react'
 
 import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
+import { msc_shieldColorHex, msc_shieldTypeTitle } from '@/lib/shield-colors'
 
 export type { VpeShieldProjectType }
 
@@ -55,25 +56,8 @@ interface Msc_ProjectCardProps {
   devInstallInProgress?: boolean
   /** v1.2.4 — resolved shield (manual override or auto classifier). */
   shieldProjectType?: VpeShieldProjectType
-}
-
-function msc_shieldBadge(t?: VpeShieldProjectType): {
-  title: string
-  stroke: string
-  fill?: string
-} {
-  switch (t) {
-    case 'v0':
-      return { title: 'v0 (components/ui)', stroke: '#2563eb', fill: '#2563eb' }
-    case 'electron':
-      return { title: 'Electron', stroke: '#a855f7', fill: '#a855f7' }
-    case 'web':
-      return { title: 'Web (Next/React)', stroke: '#4fde82', fill: '#4fde82' }
-    case 'node':
-      return { title: 'Node', stroke: '#737373', fill: '#737373' }
-    default:
-      return { title: 'Unknown manifest', stroke: '#f59e0b', fill: '#f59e0b' }
-  }
+  /** Notes or vault attachments (12px paperclip by status dot). */
+  hasDocumentationReferences?: boolean
 }
 
 export function Msc_ProjectCard({
@@ -104,8 +88,10 @@ export function Msc_ProjectCard({
   onViewErrorConsole,
   devInstallInProgress,
   shieldProjectType,
+  hasDocumentationReferences = false,
 }: Msc_ProjectCardProps) {
-  const shield = msc_shieldBadge(shieldProjectType)
+  const dotTitle = msc_shieldTypeTitle(shieldProjectType)
+  const dotHex = msc_shieldColorHex(shieldProjectType)
   const isRunning = status === 'running'
   const runUrl = `http://localhost:${port}`
   const isError = status === 'error'
@@ -214,16 +200,26 @@ export function Msc_ProjectCard({
         )}
 
         <div
-          className="absolute left-2 top-2 z-20 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
-          title={shield.title}
+          className="absolute left-2 top-2 z-20 flex items-center gap-1 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
           aria-hidden
         >
-          <Shield
-            size={22}
-            className="opacity-95"
-            stroke={shield.stroke}
-            fill={shield.fill}
+          <span
+            className="block rounded-full border-0 shrink-0"
+            title={dotTitle}
+            style={{
+              width: 10,
+              height: 10,
+              backgroundColor: dotHex,
+            }}
           />
+          {hasDocumentationReferences && (
+            <span
+              className="inline-flex shrink-0"
+              title="Notes or vault reference files"
+            >
+              <Paperclip size={12} className="text-[#d0d0d0]" strokeWidth={2} />
+            </span>
+          )}
         </div>
 
         <div className="absolute top-2 right-2 flex items-start justify-end gap-2 z-10 pointer-events-none">

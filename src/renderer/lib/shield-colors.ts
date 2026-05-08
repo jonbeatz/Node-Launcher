@@ -1,4 +1,5 @@
-/** Shield accent colors — sidebar, list dot, tactical nav (VPE v1.2.6). */
+/** Solid-dot colors for tactical indicators (sidebar, cards, pills) — VPE v1.2.7 dot system */
+
 export function msc_shieldColorHex(t?: string | null): string {
   switch (t) {
     case 'v0':
@@ -11,5 +12,20 @@ export function msc_shieldColorHex(t?: string | null): string {
       return '#737373'
     default:
       return '#f59e0b'
+  }
+}
+
+export function msc_shieldTypeTitle(t?: string | null): string {
+  switch (t) {
+    case 'v0':
+      return 'v0 (components/ui)'
+    case 'electron':
+      return 'Electron'
+    case 'web':
+      return 'Web (Next/React)'
+    case 'node':
+      return 'Node'
+    default:
+      return 'Unknown manifest'
   }
 }

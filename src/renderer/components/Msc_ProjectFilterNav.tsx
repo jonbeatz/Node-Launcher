@@ -5,6 +5,7 @@ import {
   type VpeTacticalCounts,
   type VpeTacticalProjectFilter,
 } from '@/lib/project-tactical-filter'
+import { msc_shieldColorHex } from '@/lib/shield-colors'
 
 export interface Msc_ProjectFilterNavProps {
   activeFilter: VpeTacticalProjectFilter
@@ -12,7 +13,7 @@ export interface Msc_ProjectFilterNavProps {
   counts: VpeTacticalCounts
 }
 
-/** Horizontal tactical filter pills — v1.2.5 (Vader red active state). */
+/** Horizontal tactical pills — v1.2.7 neutral active + dot indicators */
 export function Msc_ProjectFilterNav({
   activeFilter,
   onFilterChange,
@@ -23,6 +24,8 @@ export function Msc_ProjectFilterNav({
       {VPE_TACTICAL_NAV_META.map((pill) => {
         const isActive = activeFilter === pill.id
         const n = counts[pill.countKey]
+        const dot =
+          pill.id === 'all' ? '#737373' : msc_shieldColorHex(pill.id)
         return (
           <button
             key={pill.id}
@@ -30,18 +33,26 @@ export function Msc_ProjectFilterNav({
             onClick={() => onFilterChange(pill.id)}
             title={`${pill.label} (${n})`}
             className={`
-              group inline-flex items-baseline gap-1.5 rounded-t px-3 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors vader-focus
-              border-b-2
+              group inline-flex items-center gap-2 rounded-t px-3 py-2 font-sans text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors vader-focus
               ${
                 isActive
-                  ? 'border-[var(--msc-accent)] bg-[rgba(224,43,32,0.2)] text-white'
-                  : 'border-transparent text-[#A0A0A0] hover:text-white hover:bg-[#252525]/60'
+                  ? 'bg-[#2a2a2a] text-[#D4D4D4]'
+                  : 'bg-transparent text-[#A0A0A0] hover:text-[#E0E0E0] hover:bg-[#252525]/60'
               }
             `}
           >
+            <span
+              className="rounded-full shrink-0"
+              style={{
+                width: 10,
+                height: 10,
+                backgroundColor: dot,
+              }}
+              aria-hidden
+            />
             <span>{pill.label}</span>
             <span
-              className="font-sans font-medium normal-case tracking-normal tabular-nums text-[var(--text-muted,#A0A0A0)] opacity-90"
+              className="font-sans font-medium normal-case tracking-normal tabular-nums text-[#A0A0A0] opacity-90"
               style={{ fontSize: '0.7rem' }}
             >
               ({n})

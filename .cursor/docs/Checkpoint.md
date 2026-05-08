@@ -1,5 +1,20 @@
 # VPE Checkpoint (2026-05-08)
 
+## Build v1.3.0 — UI density, sidebar neutralization & import cleanup
+
+- **Version:** **`1.3.0`** — shipped labels (`package.json`, preload **`vpeInfo.version`**, footer, **`layout.tsx`**); Prompt Vault **master** rows **`MSC Media Engine v1.3.0`** in **`vpe-ipc.js`** (**Electron E2E Suite** / **Playwright Manual** presets keep **`v1.2.8`** labels).
+- **Prompt Vault — UI density:** entire **New Master Directive / Build Protocol** create form wrapped in Radix **`Accordion`**; **default collapsed**; trigger copy **+ Create New Master Directive** (**`PromptVault.tsx`**). Vault **list** remains accordion rows + Copy / Edit modal + **`vpe:update-vault-item`** (from **v1.2.9**).
+- **Architecture:** **`maintenance-section.tsx`** imports **`PromptVault`** from **`@/components/PromptVault`**; removed **`prompt-vault-panel.tsx`** proxy.
+- **Sidebar:** active/hover chrome for Dashboard, tactical **Projects** rows, Maintenance, Sandbox, Settings uses **`bg-[#2a2a2a]`**; **Add New Project** and **STOP ALL** use neutral gray surfaces (**no green primary / no red danger hover** on those nav-adjacent controls).
+- **Docs / standards:** [.cursor/docs/VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) — **Skills** (accordion UI density), **Standards** (nav **`#2a2a2a`** lock).
+
+## Build v1.2.9 — Prompt Vault accordion list, Sandbox onboarding, IPC edit
+
+- **Version:** **`1.2.9`** — superseded shipped label by **v1.3.0** for **`package.json`**; retain for history / merge notes.
+- **Prompt Vault:** list UI as **Accordion** (collapsed: title + version + actions; expanded: description + body); **Edit** (pencil) → preload **`updateVaultItem`** / IPC **`vpe:update-vault-item`**; items support optional **`description`**; master presets include **Electron E2E Suite** and **Playwright Manual** (`npm run test:e2e:electron`, `npx playwright test --config=playwright.electron.config.ts`).
+- **Sandbox:** top instructional **Accordion** (**How to use the VPE Sandbox & Vault**); live preview unchanged (**react-live**).
+- **Dashboard:** status filter pills + grid/list toggles switched to **`#2a2a2a`** active styling (neutral Studio Dark).
+
 ## Build v1.2.6 — Archive, jump search & UI hardening
 
 - **Version:** **`1.2.6`** — shipped label (`package.json`, preload **`vpeInfo.version`**, footer, **`layout.tsx`**, **`msc-cleanup-dist`**); Prompt Vault master rows **`versionLabel`** **`MSC Media Engine v1.2.6`** in **`vpe-ipc.js`**.
@@ -187,7 +202,7 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 - `brave-search` will stay in error state until `BRAVE_API_KEY` is replaced with a real key.
 - Several MCP smoke tests show terminal `exit_code=4294967295` because processes were intentionally stopped after successful startup verification.
 
-**Last doc update:** 2026-05-08 — **v1.2.6** archive flag, Ctrl+K jump search, sidebar/tactical polish, Add Project type default, list/grid/log UI fixes (see **Build v1.2.6** above). Earlier: **v1.2.3** managed-project **install + dev** bootstrap; **v1.2.2** UI depth + vault + **v1.2.x** icon **`media/`** path. **Active branch:** confirm with **`git status`**. Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer; **custom `.exe` icon** via **`afterPack` + `rcedit`**. **Current optimized packaging mode:** `build.asar = true`.
+**Last doc update:** 2026-05-08 — **v1.3.0** vault create accordion + sidebar neutral CTAs + direct **`PromptVault`** import; **v1.2.9** vault list accordion / **`vpe:update-vault-item`** / Sandbox onboarding / neutral dashboard pills. Earlier: **v1.2.6** archive, Ctrl+K jump search; **v1.2.3** managed-project **install + dev** bootstrap; **v1.2.2** vault seed + **`media/`** icon path. **Active branch:** confirm with **`git status`**. Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer; **custom `.exe` icon** via **`afterPack` + `rcedit`**. **Current optimized packaging mode:** `build.asar = true`.
 
 ## Current project status (snapshot)
 
@@ -204,7 +219,8 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 | **PM2 daemon badge behavior** | System Health `PM2 Daemon` now reads **Online** only when PM2 RPC is connected **and** at least one workspace project is currently `running` (prevents misleading Online while all cards are stopped). |
 | **Runner stability / ghost ports** | `project-runner` startup preflight force-sweeps occupied target ports on Windows (`netstat -ano | findstr :<port>` + `taskkill /F /PID ...`; fallback `taskkill /F /IM node.exe` if still blocked), preventing 2s self-stop from orphaned Next.js listeners. |
 | **Managed dev bootstrap (v1.2.3+)** | Missing **`node_modules`** + present **`package.json`** → single shell **`install && dev`**. **`v0-prototype`** heuristic: **`components/ui`** without **`node_modules`**. See [Custom-Commands — Managed project dev](Custom-Commands.md#managed-project-dev-v123). |
-| **Archive & jump search (v1.2.6)** | **`is_archived`** on project rows; **ARCHIVE** dashboard filter; **Ctrl+K** header jump search; **Project Settings** archive toggle. Details: opening section **Build v1.2.6** below. |
+| **Archive & jump search (v1.2.6)** | **`is_archived`** on project rows; **ARCHIVE** dashboard filter; **Ctrl+K** header jump search; **Project Settings** archive toggle. Details: **Build v1.2.6** below. |
+| **Vault / Sandbox UX (v1.2.9–v1.3.0)** | Accordion vault list + **`vpe:update-vault-item`**; Sandbox “how to use” accordion; **v1.3.0** collapsed create row (**+ Create New Master Directive**). **Checkpoint:** **Build v1.2.9**, **Build v1.3.0**. |
 | **Next packaging step** | Tell the agent **rebuild exe** (see [Custom-Commands](Custom-Commands.md#rebuild-exe)): icon staging → **`build:renderer`** → **`rebuild:natives`** → lint → E2E (`CI=true`) → clean **`dist/`** → **`build:main`** → remove blockmap / `builder-debug.yml` / `latest.yml`. Icons: [`package.json`](../../package.json) **`build.*`** + **[`media/icon.ico`](../../media/icon.ico)** from **`VPE.ico`** via **`msc-copy-release-icon`**. |
 
 **Context — health line on cards:** `GET /` probe does not follow redirects. **HTTP 307** on a project = server responded with redirect (e.g. Next middleware); browser **OPEN** still works. Green **“Active — HTTP 200”** only for **2xx** (see [`Msc_ProjectCard.tsx`](../../src/renderer/components/Msc_ProjectCard.tsx) `getHealthLine`).

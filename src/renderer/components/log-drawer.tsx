@@ -549,16 +549,16 @@ export function LogDrawer({
         </div>
 
         {/* Floating Terminal Area */}
-        <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
+        <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
           <div 
             ref={terminalRef}
-            className="absolute inset-0 z-10 vpe-system-log-viewport overflow-y-auto overscroll-y-contain pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
+            className="absolute inset-0 z-10 vpe-system-log-viewport overflow-x-hidden overflow-y-auto overscroll-y-contain min-w-0 pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
             style={{ opacity: 1 }}
             onClick={() => inputRef.current?.focus()}
           >
-            <div className="relative z-30 space-y-0.5" style={{ fontSize: logFontPx }}>
+            <div className="relative z-30 space-y-0.5 min-w-0 overflow-x-hidden" style={{ fontSize: logFontPx }}>
               {logs.map((log, index) => (
-                <div key={index} className="flex font-sans leading-relaxed">
+                <div key={index} className="flex font-sans leading-relaxed min-w-0">
                   {log.time && (
                     <span className="text-[#444444] mr-2 select-none shrink-0">[{log.time}]</span>
                   )}
@@ -726,18 +726,18 @@ export function LogDrawer({
           </div>
 
           {/* Terminal Area — left-1 clears resize gutter; log lines z-30 above scrollbar (z-10) */}
-          <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
+          <div className="flex-1 min-h-0 min-w-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
             <div 
               ref={terminalRef}
-              className="absolute inset-y-0 right-0 left-1 z-10 vpe-system-log-viewport overflow-y-auto overscroll-y-contain pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
+              className="absolute inset-y-0 right-0 left-1 z-10 vpe-system-log-viewport overflow-x-hidden overflow-y-auto overscroll-y-contain min-w-0 pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
               style={{ opacity: 1 }}
               onClick={() => inputRef.current?.focus()}
             >
-              <div className="relative z-30 space-y-0.5" style={{ fontSize: logFontPx }}>
+              <div className="relative z-30 space-y-0.5 min-w-0 overflow-x-hidden" style={{ fontSize: logFontPx }}>
                 {logs.map((log, index) => (
                   <div
                     key={`${log.time}:${index}:${log.message.slice(0, 16)}`}
-                    className="flex font-sans leading-relaxed"
+                    className="flex font-sans leading-relaxed min-w-0"
                   >
                     {log.time && (
                       <span className="text-[#444444] mr-2 select-none shrink-0">[{log.time}]</span>

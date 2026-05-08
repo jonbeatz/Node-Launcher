@@ -31,6 +31,10 @@ export interface VpeProjectRow {
   is_favorite?: number | boolean | null
   /** SQLite v7+ — hidden from default dashboard until Archive filter */
   is_archived?: number | boolean | null
+  /** SQLite v8+ — Project Settings notes */
+  notes?: string | null
+  /** Renderer enrich: reference vault has ≥1 file */
+  vault_has_files?: boolean
   node_modules_missing?: boolean
 }
 
@@ -67,6 +71,7 @@ export interface SaveSettingsPayload {
   /** `auto` clears override → classifier decides from disk each session. */
   project_type?: 'auto' | VpeShieldProjectType | string | null
   is_archived?: boolean
+  notes?: string | null
 }
 
 export interface AddProjectPayload {
@@ -158,8 +163,18 @@ export interface VpePromptVaultItem {
   title: string
   /** e.g. "Vader Protocol v1.0.8" */
   versionLabel: string
+  /** Optional subtitle shown in expanded accordion / edit modal */
+  description?: string
   bodyMd: string
   updatedAt: string
+}
+
+export interface VpeUpdateVaultItemPayload {
+  id: string
+  title?: string
+  versionLabel?: string
+  description?: string
+  bodyMd?: string
 }
 
 export interface VpePromptVaultData {
@@ -229,6 +244,31 @@ export interface VpeApi {
     projectId: string,
   ) => Promise<{ ok?: boolean; port: number; start_script?: string }>
   openDirectory: () => Promise<string | null>
+  vaultAddFile?: (
+    projectId: string,
+  ) => Promise<{
+    ok: boolean
+    canceled?: boolean
+    dest?: string
+    name?: string
+    error?: string
+  }>
+  vaultListFiles?: (
+    projectId: string,
+  ) => Promise<{
+    ok: boolean
+    dir?: string
+    files?: { name: string; path: string }[]
+    error?: string
+  }>
+  vaultOpenFolder?: (
+    projectId: string,
+  ) => Promise<{ ok: boolean; dir?: string; error?: string }>
+  /** Main registers `vpe:e2e-vault-copy-from-path` only when `VPE_E2E=1` (Playwright). */
+  e2eVaultCopyFromPath?: (
+    projectId: string,
+    absoluteSourcePath: string,
+  ) => Promise<{ ok: boolean; dest?: string; name?: string }>
   pickThumbnail: (projectId: string) => Promise<string | null>
   openProjectUrl: (url: string) => Promise<{ ok?: boolean }>
   /** Listen for live stdout/stderr / engine lines (main → renderer). */
@@ -259,8 +299,21 @@ export interface VpeApi {
   deleteRepairRun?: (repairId: string) => Promise<{ ok: boolean }>
   getLauncherPortHealth?: () => Promise<VpeLauncherPortHealth>
   purgeLauncherPorts?: () => Promise<VpePurgeLauncherPortsResult>
+  scorchedEarth?: () => Promise<{
+    ok: boolean
+    skipped?: string
+    log?: string[]
+    error?: string
+  }>
+  runForgeDiagnostics?: () => Promise<{
+    ok: boolean
+    checks: { id: string; ok: boolean; detail?: string }[]
+  }>
   promptVaultRead?: () => Promise<{ ok: boolean; data?: VpePromptVaultData; error?: string }>
   promptVaultWrite?: (data: VpePromptVaultData) => Promise<{ ok: boolean }>
+  updateVaultItem?: (
+    payload: VpeUpdateVaultItemPayload,
+  ) => Promise<{ ok: boolean; item?: VpePromptVaultItem }>
   subscribeRepairRunsChanged?: (callback: () => void) => () => void
 }
 
@@ -329,6 +382,8 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   detected_project_type?: VpeShieldProjectType
   shield_project_type?: VpeShieldProjectType
   is_archived?: boolean
+  notes?: string | null
+  vault_has_files?: boolean
 } {
   const pm =
     row.pkg_manager === 'yarn' || row.pkg_manager === 'pnpm'
@@ -367,5 +422,10 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
     shield_project_type:
       row.shield_project_type ?? row.detected_project_type ?? 'unknown',
     is_archived: row.is_archived === true || row.is_archived === 1,
+    notes:
+      row.notes == null || typeof row.notes === 'undefined'
+        ? null
+        : String(row.notes),
+    vault_has_files: row.vault_has_files === true,
   }
 }
