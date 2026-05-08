@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { X, Camera, Upload, FolderOpen, Play, Trash, Terminal, AlertTriangle, Check, Loader2, Stethoscope } from 'lucide-react'
 import { useToast } from '@/components/vader-toast'
+import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
 
 export interface ProjectSettingsPayload {
   name: string
@@ -12,6 +13,9 @@ export interface ProjectSettingsPayload {
   start_script: string
   build_script: string
   thumbnail_url?: string | null
+  /** `null` or omitted = auto classifier; concrete only when overridden. */
+  project_type?: string | null
+  is_archived?: boolean
 }
 
 interface ProjectSettingsModalProps {
@@ -24,6 +28,11 @@ interface ProjectSettingsModalProps {
   startScript?: string
   buildScript?: string
   thumbnailUrl?: string | null
+  /** Persisted classifier override (`null`/empty = auto). */
+  projectTypePersisted?: string | null
+  /** Registry archive flag — hidden from dashboard until ARCHIVE tab. */
+  isArchived?: boolean
+  detectedProjectType?: VpeShieldProjectType
   onClose: () => void
   onSave?: (payload: ProjectSettingsPayload) => Promise<void> | void
   onDelete?: () => void
@@ -48,6 +57,9 @@ export function ProjectSettingsModal({
   startScript = 'dev',
   buildScript = 'build',
   thumbnailUrl: initialThumbnailUrl = null,
+  projectTypePersisted = null,
+  isArchived = false,
+  detectedProjectType = 'unknown',
   onClose,
   onSave,
   onDelete,
@@ -68,6 +80,12 @@ export function ProjectSettingsModal({
   const [runningDiagnostics, setRunningDiagnostics] = useState(false)
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[] | null>(null)
 
+  /** `auto` = follow scanner; concrete string = persisted override */
+  const [projectTypeSelect, setProjectTypeSelect] = useState<
+    'auto' | VpeShieldProjectType
+  >('auto')
+  const [archived, setArchived] = useState(isArchived)
+
   useEffect(() => {
     if (!isOpen || !projectId) return
     setName(projectName)
@@ -77,6 +95,22 @@ export function ProjectSettingsModal({
     setBuild(buildScript)
     setDiagnostics(null)
     setThumbnailUrl(initialThumbnailUrl ?? null)
+    const allowed: VpeShieldProjectType[] = [
+      'v0',
+      'electron',
+      'web',
+      'node',
+      'unknown',
+    ]
+    const p = projectTypePersisted
+    const lower =
+      typeof p === 'string' && p.trim() !== ''
+        ? (String(p).trim().toLowerCase() as VpeShieldProjectType)
+        : null
+    setProjectTypeSelect(
+      lower && allowed.includes(lower) ? lower : 'auto',
+    )
+    setArchived(Boolean(isArchived))
   }, [
     isOpen,
     projectId,
@@ -86,6 +120,8 @@ export function ProjectSettingsModal({
     startScript,
     buildScript,
     initialThumbnailUrl,
+    projectTypePersisted,
+    isArchived,
   ])
 
   const handleSave = async () => {
@@ -101,6 +137,9 @@ export function ProjectSettingsModal({
         start_script: script,
         build_script: build,
         thumbnail_url: thumbnailUrl,
+        project_type:
+          projectTypeSelect === 'auto' ? ('auto' as const) : projectTypeSelect,
+        is_archived: archived,
       }
       if (window.vpeAPI?.saveSettings) {
         await window.vpeAPI.saveSettings(payload)
@@ -200,6 +239,61 @@ export function ProjectSettingsModal({
               className="w-full px-3 py-2 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-[13px] text-white focus:outline-none focus:border-[#4fde82] transition-colors"
               placeholder="Enter project name..."
             />
+          </section>
+
+          {/* Project type (shields) */}
+          <section>
+            <h3 className="font-sans text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">
+              PROJECT TYPE
+            </h3>
+            <select
+              value={projectTypeSelect}
+              onChange={(e) =>
+                setProjectTypeSelect(
+                  e.target.value === 'auto'
+                    ? 'auto'
+                    : (e.target.value as VpeShieldProjectType),
+                )
+              }
+              className="w-full px-3 py-2 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-[13px] text-white focus:outline-none focus:border-[#4fde82] transition-colors"
+            >
+              <option value="auto">Auto (detect from package.json)</option>
+              <option value="v0">v0 (components/ui)</option>
+              <option value="electron">Electron</option>
+              <option value="web">Web (Next / React)</option>
+              <option value="node">Node (plain manifest)</option>
+              <option value="unknown">Unknown (no usable manifest)</option>
+            </select>
+            <p className="mt-2 font-sans text-[11px] text-[#555555] leading-relaxed">
+              Scanner currently sees{' '}
+              <span className="text-[#A0A0A0]">{detectedProjectType}</span>
+              {' — '}pick <span className="text-[#A0A0A0]">Auto</span> to follow disk
+              after every launch, or lock a shield label by choosing a fixed type (
+              persists in SQLite / JSON store).
+            </p>
+          </section>
+
+          {/* Archive */}
+          <section>
+            <h3 className="font-sans text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">
+              ARCHIVE
+            </h3>
+            <label className="flex items-center justify-between gap-4 cursor-pointer rounded border border-[#333333] bg-[#0a0a0a] px-3 py-2.5">
+              <div>
+                <span className="font-sans text-[13px] text-white block">
+                  Archive project
+                </span>
+                <span className="font-sans text-[11px] text-[#555555]">
+                  Hides this entry from the main dashboard — open the ARCHIVE tab to manage it.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={archived}
+                onChange={(e) => setArchived(e.target.checked)}
+                className="w-4 h-4 rounded border-[#333333] bg-[#2a2a2a] checked:bg-[#4fde82] checked:border-[#4fde82] shrink-0"
+              />
+            </label>
           </section>
 
           {/* Thumbnail Section */}
@@ -426,7 +520,7 @@ export function ProjectSettingsModal({
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[#333333] flex flex-col gap-2 sticky bottom-0 bg-[#1c1c1c]">
         <span className="font-sans text-[10px] text-[#555555] text-center">
-          Powered by the MSC Media Engine v1.0.8
+          Powered by the MSC Media Engine v1.2.6
         </span>
           <div className="flex items-center justify-end gap-3">
             <button

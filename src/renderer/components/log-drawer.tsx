@@ -495,7 +495,7 @@ export function LogDrawer({
 
   if (!expandedProp && !isDetached) {
     return (
-      <div className="h-full flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 w-8">
+      <div className="vpe-log-drawer-root h-full flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 w-8">
         <button
           type="button"
           onClick={() => onExpandedChange?.(true)}
@@ -513,7 +513,7 @@ export function LogDrawer({
     return (
       <div
         ref={floatingRef}
-        className="fixed z-[100] flex flex-col bg-[#1c1c1c] border border-[#333333] rounded shadow-2xl"
+        className="vpe-log-drawer-root fixed z-[100] flex flex-col bg-[#1c1c1c] border border-[#333333] rounded shadow-2xl"
         style={{
           left: floatingPosition.x,
           top: floatingPosition.y,
@@ -632,7 +632,7 @@ export function LogDrawer({
 
   return (
     <div 
-      className="relative h-full min-h-0 flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 transition-all duration-200"
+      className="vpe-log-drawer-root relative h-full min-h-0 flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 transition-all duration-200"
       style={{ width, borderRadius: '4px 0 0 4px' }}
     >
       {/* Resize Handle — above terminal hit target; terminal content inset with left-1 */}

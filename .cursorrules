@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## 1. Project Context & Identity
 - **Project Name:** Vader Project Engine (VPE)
-- **Current Version:** v1.2.3 (see root `package.json` if disputed)
+- **Current Version:** v1.2.6 (see root `package.json` if disputed)
 - **Target Hardware:** AMD Ryzen 9700x / Gigabyte B650 (Optimized for high-performance I/O)
 - **OS Focus:** Windows 11 25H2 (Native optimizations for Defender/Antivirus paths)
 - **Branding:** My Studio Channel (MSC) / Vader Protocol
@@ -107,7 +107,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Port Management:** Implement auto-increment logic (up to 10 attempts) for occupied ports; if exhausted, show toast notification
 - **Footer Net / Purge:** **Net** LED + **Purge env** reflect **3000** / **3001** / **9222** (green = **`forgeReady`** all idle; amber = **node/electron** only, incl. CDP; red = foreign); bounded (~**500ms**) port-health probe after purge; **`vpe:purge-launcher-ports`** uses **`taskkill /F /PID`** only (no **`/T`**) and skips **`process.pid`** / **`process.ppid`**
 - **Nuke Action:** Ensure `nuke` deletes `node_modules` and `.next` before executing the specific `<detectedPackageManager> install`
-- **Signature:** Every footer must include "Powered by the MSC Media Engine" with the **current** release version string (e.g. **v1.2.3** — match `package.json` / preload `vpeInfo.version`).
+- **Signature:** Every footer must include "Powered by the MSC Media Engine" with the **current** release version string (e.g. **v1.2.6** — match `package.json` / preload `vpeInfo.version`).
 
 ## 9. Error Handling & Feedback States
 - **Toasts:** Top-right corner, dark background with red left accent border, auto-dismiss after 4 seconds; used for start, stop, nuke, and port-lock failures

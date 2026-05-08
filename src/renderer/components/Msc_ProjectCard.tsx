@@ -14,7 +14,12 @@ import {
   ExternalLink,
   Star,
   Loader2,
+  Shield,
 } from 'lucide-react'
+
+import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
+
+export type { VpeShieldProjectType }
 
 interface Msc_ProjectCardProps {
   id: string
@@ -48,6 +53,27 @@ interface Msc_ProjectCardProps {
   onViewErrorConsole?: () => void
   /** v1.2.3 — dependency auto-install before dev is still running. */
   devInstallInProgress?: boolean
+  /** v1.2.4 — resolved shield (manual override or auto classifier). */
+  shieldProjectType?: VpeShieldProjectType
+}
+
+function msc_shieldBadge(t?: VpeShieldProjectType): {
+  title: string
+  stroke: string
+  fill?: string
+} {
+  switch (t) {
+    case 'v0':
+      return { title: 'v0 (components/ui)', stroke: '#2563eb', fill: '#2563eb' }
+    case 'electron':
+      return { title: 'Electron', stroke: '#a855f7', fill: '#a855f7' }
+    case 'web':
+      return { title: 'Web (Next/React)', stroke: '#4fde82', fill: '#4fde82' }
+    case 'node':
+      return { title: 'Node', stroke: '#737373', fill: '#737373' }
+    default:
+      return { title: 'Unknown manifest', stroke: '#f59e0b', fill: '#f59e0b' }
+  }
 }
 
 export function Msc_ProjectCard({
@@ -77,7 +103,9 @@ export function Msc_ProjectCard({
   health_reachable,
   onViewErrorConsole,
   devInstallInProgress,
+  shieldProjectType,
 }: Msc_ProjectCardProps) {
+  const shield = msc_shieldBadge(shieldProjectType)
   const isRunning = status === 'running'
   const runUrl = `http://localhost:${port}`
   const isError = status === 'error'
@@ -184,6 +212,19 @@ export function Msc_ProjectCard({
             <span className="font-sans text-xs text-[#333333] uppercase tracking-wider">THUMBNAIL</span>
           </div>
         )}
+
+        <div
+          className="absolute left-2 top-2 z-20 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+          title={shield.title}
+          aria-hidden
+        >
+          <Shield
+            size={22}
+            className="opacity-95"
+            stroke={shield.stroke}
+            fill={shield.fill}
+          />
+        </div>
 
         <div className="absolute top-2 right-2 flex items-start justify-end gap-2 z-10 pointer-events-none">
           <div className="flex items-center gap-1 pointer-events-auto">

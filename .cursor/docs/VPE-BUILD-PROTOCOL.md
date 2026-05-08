@@ -1,10 +1,12 @@
-# VPE Build & Command Protocol (master; includes v1.2.3 deltas)
+# VPE Build & Command Protocol (master; includes v1.2.3 build-chain deltas + v1.2.6 registry/UI notes)
 
 **Purpose:** Source of truth for **build sequencing**, **terminal command logic**, and **Windows packaging posture** on Vader Project Engine — so dev sessions stay clean (no orphaned dev servers on **3000**), and release builds stay predictable.
 
 **Authority note:** Executable script strings and Electron-builder knobs live in **`package.json`**. If this document ever diverges from **`package.json`**, **`package.json` wins** — update this file in the same change.
 
-**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap).
+**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — section **Build v1.2.6** (**`is_archived`**, Ctrl+K jump search, catalog **`is_archived`**).
+
+**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.2.6**).
 
 ---
 

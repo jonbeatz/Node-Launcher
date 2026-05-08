@@ -5,7 +5,12 @@ const path = require('path');
 const net = require('net');
 const os = require('os');
 const { msc_launcherRendererPort } = require('./launcher-port');
-const { msc_detectProjectScripts } = require('./project-detection');
+const {
+  msc_detectProjectScripts,
+  msc_classifyProjectType,
+  msc_allowedShieldType,
+  msc_ipcEnrichProjectsRow,
+} = require('./project-detection');
 const { msc_validateProjectPath } = require('./path-guard');
 const { msc_patchPackageJsonStripScriptPorts } = require('./package-json-script-patch');
 const isDev = require('electron-is-dev');
@@ -83,7 +88,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
-      versionLabel: 'MSC Media Engine v1.2.3',
+      versionLabel: 'MSC Media Engine v1.2.6',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:clean-sync`\n\n' +
@@ -92,7 +97,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
-      versionLabel: 'MSC Media Engine v1.2.3',
+      versionLabel: 'MSC Media Engine v1.2.6',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:dev`\n\n' +
@@ -101,7 +106,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
-      versionLabel: 'MSC Media Engine v1.2.3',
+      versionLabel: 'MSC Media Engine v1.2.6',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:sync`\n\n' +
@@ -110,7 +115,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
-      versionLabel: 'MSC Media Engine v1.2.3',
+      versionLabel: 'MSC Media Engine v1.2.6',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:clean-sync`\n\n' +
@@ -119,7 +124,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
-      versionLabel: 'MSC Media Engine v1.2.3',
+      versionLabel: 'MSC Media Engine v1.2.6',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vpe:force-clear`\n\n' +
@@ -571,6 +576,12 @@ async function msc_purgeLauncherPorts() {
   };
 }
 
+function msc_normalizeCatalogProjectType(raw) {
+  if (raw == null || raw === '') return undefined;
+  const s = String(raw).trim().toLowerCase();
+  return msc_allowedShieldType(s) ? s : undefined;
+}
+
 function msc_rowToCatalogPayload(row) {
   return {
     id: row.id,
@@ -581,8 +592,21 @@ function msc_rowToCatalogPayload(row) {
     start_script: row.start_script,
     build_script: row.build_script,
     pkg_manager: row.pkg_manager,
+    /** User override persisted in SQLite; omit on older exports (null → auto-detect). */
+    project_type: row.project_type ?? null,
+    is_archived:
+      row.is_archived === true || row.is_archived === 1 ? true : false,
     node_modules_missing: row.node_modules_missing ?? null,
   };
+}
+
+function msc_normalizeCatalogArchived(raw) {
+  if (raw == null || raw === '') return false;
+  if (typeof raw === 'boolean') return raw;
+  const n = Number(raw);
+  if (n === 1) return true;
+  const s = String(raw).trim().toLowerCase();
+  return s === 'true' || s === '1' || s === 'yes';
 }
 
 function msc_parseCatalogJson(text) {
@@ -923,7 +947,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win?.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
         win.webContents.send('vpe:projects-updated', {
-          projects: store.getProjects(),
+          projects: store.listProjectsAlphabetical().map((row) => msc_ipcEnrichProjectsRow(row)),
         });
       }
     }
@@ -960,14 +984,9 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     }
   };
 
-  ipcMain.handle('vpe:getProjects', () => store.listProjectsAlphabetical().map(row => {
-    const root = msc_validateProjectPath(row.path);
-    const det = msc_detectProjectScripts(root);
-    return {
-      ...row,
-      node_modules_missing: det.node_modules_missing
-    };
-  }));
+  ipcMain.handle('vpe:getProjects', () =>
+    store.listProjectsAlphabetical().map((row) => msc_ipcEnrichProjectsRow(row)),
+  );
 
   ipcMain.handle('vpe:get-repair-runs', (_event, limit) => {
     const n = Number(limit);
@@ -1093,6 +1112,10 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       start_script: det.start_script,
       build_script: det.build_script,
       pkg_manager: det.pkg_manager,
+      project_type: row.project_type ?? null,
+      is_archived:
+        row.is_archived === true ||
+        row.is_archived === 1,
     });
     msc_emitProjectsUpdated();
     return { ok: true, port: newPort, start_script: det.start_script };
@@ -1101,11 +1124,13 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   ipcMain.handle('vpe:inspect-project', async (_event, projectPath) => {
     const root = msc_validateProjectPath(projectPath);
     const det = msc_detectProjectScripts(root);
+    const project_type = msc_classifyProjectType(root);
     const suggestedPort = await msc_findAvailablePort(msc_managedPortFloor(), null, det.is_nextjs);
     return {
       ok: true,
       path: root,
       detection: det,
+      project_type,
       suggestedPort,
       reservedPort: MSC_VPE_RENDERER_PORT,
     };
@@ -1167,6 +1192,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       start_script,
       build_script,
       thumbnail_url,
+      project_type: projectTypeIncoming,
     } = payload;
     if (!id) throw new Error('VPE: Missing project id');
 
@@ -1174,6 +1200,26 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     const det = msc_detectProjectScripts(root);
     const start = (start_script || det.start_script || 'dev').toString();
     const build = (build_script || det.build_script || 'build').toString();
+
+    let project_type = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'project_type')) {
+      if (
+        projectTypeIncoming == null ||
+        String(projectTypeIncoming).trim() === '' ||
+        String(projectTypeIncoming).trim().toLowerCase() === 'auto'
+      ) {
+        project_type = null;
+      } else {
+        const cand = String(projectTypeIncoming).trim().toLowerCase();
+        project_type = msc_allowedShieldType(cand) ? cand : null;
+      }
+    }
+
+    let is_archived = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'is_archived')) {
+      const v = payload.is_archived;
+      is_archived = v === true || v === 1;
+    }
 
     store.updateProject({
       id,
@@ -1184,6 +1230,8 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       start_script: start,
       build_script: build,
       pkg_manager: det.pkg_manager,
+      ...(project_type !== undefined ? { project_type } : {}),
+      ...(is_archived !== undefined ? { is_archived } : {}),
     });
     msc_emitProjectsUpdated();
     return { ok: true, detection: det };
@@ -1198,6 +1246,22 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       rawPort != null && Number.isFinite(Number(rawPort))
         ? Number(rawPort)
         : await msc_findAvailablePort(msc_managedPortFloor(), id, det.is_nextjs);
+
+    let project_type = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'project_type')) {
+      const incoming = payload.project_type;
+      if (
+        incoming == null ||
+        String(incoming).trim() === '' ||
+        String(incoming).trim().toLowerCase() === 'auto'
+      ) {
+        project_type = null;
+      } else {
+        const cand = String(incoming).trim().toLowerCase();
+        project_type = msc_allowedShieldType(cand) ? cand : null;
+      }
+    }
+
     store.insertProject({
       id,
       name: payload.name,
@@ -1208,6 +1272,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       start_script: det.start_script,
       build_script: det.build_script,
       pkg_manager: det.pkg_manager,
+      ...(project_type !== undefined ? { project_type } : {}),
     });
     msc_emitProjectsUpdated();
     return { ok: true, id };
@@ -1299,10 +1364,15 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
           raw.thumbnail_url === undefined || raw.thumbnail_url === null
             ? null
             : String(raw.thumbnail_url);
+        const catPt = msc_normalizeCatalogProjectType(raw.project_type);
+        const catArchived =
+          raw.is_archived === undefined
+            ? undefined
+            : msc_normalizeCatalogArchived(raw.is_archived);
 
         const existing = store.getProject(id);
         if (mode === 'merge' && existing) {
-          store.updateProject({
+          const base = {
             id,
             name,
             path: root,
@@ -1311,7 +1381,14 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
             start_script,
             build_script,
             pkg_manager,
-          });
+          };
+          const merged =
+            catPt !== undefined ? { ...base, project_type: catPt } : base;
+          store.updateProject(
+            catArchived !== undefined
+              ? { ...merged, is_archived: catArchived }
+              : merged,
+          );
         } else {
           store.insertProject({
             id,
@@ -1323,6 +1400,9 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
             start_script,
             build_script,
             pkg_manager,
+            project_type: catPt ?? null,
+            is_archived:
+              catArchived !== undefined ? catArchived : false,
           });
         }
         imported += 1;

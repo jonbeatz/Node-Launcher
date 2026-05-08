@@ -76,9 +76,11 @@ function rowFromTuple(tuple) {
     start_script: tuple[6],
     build_script: tuple[7],
     pkg_manager: tuple[8],
+    project_type: null,
     health_http_code: null,
     health_checked_at: null,
     health_reachable: null,
+    is_archived: 0,
   };
 }
 
@@ -117,16 +119,29 @@ class SqlitePersistence {
   }
 
   updateProject(payload) {
-    const found = this._db
-      .prepare(`SELECT id FROM projects WHERE id = ?`)
-      .get(payload.id);
+    const found = this._db.prepare(`SELECT * FROM projects WHERE id = ?`).get(payload.id);
     if (!found) throw new Error('VPE: Project not found');
+    /** @type {string | null} */
+    let projectTypeBind = found.project_type ?? null;
+    if (Object.prototype.hasOwnProperty.call(payload, 'project_type')) {
+      const v = payload.project_type;
+      projectTypeBind =
+        v == null || v === ''
+          ? null
+          : String(v).trim() || null;
+    }
+
+    let isArchivedBind = found.is_archived === 1 || found.is_archived === true ? 1 : 0;
+    if (Object.prototype.hasOwnProperty.call(payload, 'is_archived')) {
+      isArchivedBind =
+        payload.is_archived === true || payload.is_archived === 1 ? 1 : 0;
+    }
 
     this._db
       .prepare(
         `
       UPDATE projects
-      SET name = ?, path = ?, port = ?, thumbnail_url = ?, start_script = ?, build_script = ?, pkg_manager = ?
+      SET name = ?, path = ?, port = ?, thumbnail_url = ?, start_script = ?, build_script = ?, pkg_manager = ?, project_type = ?, is_archived = ?
       WHERE id = ?
     `,
       )
@@ -138,16 +153,24 @@ class SqlitePersistence {
         payload.start_script,
         payload.build_script,
         payload.pkg_manager,
+        projectTypeBind,
+        isArchivedBind,
         payload.id,
       );
   }
 
   insertProject(payload) {
+    const pt =
+      payload.project_type != null && String(payload.project_type).trim() !== ''
+        ? String(payload.project_type).trim()
+        : null;
+    const isArc =
+      payload.is_archived === true || payload.is_archived === 1 ? 1 : 0;
     this._db
       .prepare(
         `
-      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -160,6 +183,8 @@ class SqlitePersistence {
         payload.start_script,
         payload.build_script,
         payload.pkg_manager,
+        pt,
+        isArc,
       );
   }
 
@@ -338,6 +363,14 @@ class JsonPersistence {
         p.health_reachable = null;
         changed = true;
       }
+      if (p.project_type === undefined) {
+        p.project_type = null;
+        changed = true;
+      }
+      if (p.is_archived === undefined) {
+        p.is_archived = false;
+        changed = true;
+      }
     }
     const list = Object.values(this._data.projects);
     for (const p of list) {
@@ -454,12 +487,32 @@ class JsonPersistence {
     p.start_script = payload.start_script;
     p.build_script = payload.build_script;
     p.pkg_manager = payload.pkg_manager;
+    if (
+      Object.prototype.hasOwnProperty.call(payload, 'project_type') &&
+      typeof payload.project_type !== 'undefined'
+    ) {
+      const v = payload.project_type;
+      p.project_type =
+        v == null || v === '' ? null : String(v);
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(payload, 'is_archived') &&
+      typeof payload.is_archived !== 'undefined'
+    ) {
+      p.is_archived = Boolean(payload.is_archived);
+    }
     this.save();
   }
 
   insertProject(payload) {
+    const pt =
+      payload.project_type != null && String(payload.project_type).trim() !== ''
+        ? String(payload.project_type).trim()
+        : null;
     this._data.projects[payload.id] = {
       ...payload,
+      project_type: pt,
+      is_archived: Boolean(payload.is_archived),
       health_http_code: null,
       health_checked_at: null,
       health_reachable: null,
@@ -676,6 +729,24 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
       )
     `);
     ver = 5;
+  }
+
+  if (ver < 6) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('project_type')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN project_type TEXT`);
+    }
+    ver = 6;
+  }
+
+  if (ver < 7) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('is_archived')) {
+      db.exec(
+        `ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0`,
+      );
+    }
+    ver = 7;
   }
 
   db.pragma(`user_version = ${ver}`);

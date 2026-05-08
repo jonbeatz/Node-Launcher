@@ -5,6 +5,7 @@ const net = require('net');
 const path = require('path');
 const treeKill = require('tree-kill');
 const { msc_validateProjectPath } = require('./path-guard');
+const { msc_ipcEnrichProjectsRow } = require('./project-detection');
 const { msc_probeHttpHealth } = require('./health-probe');
 const { msc_launcherRendererPort } = require('./launcher-port');
 const { msc_healthPollDelayMs, MSC_HEALTH_FIRST_MS } = require('./health-scheduler');
@@ -92,8 +93,12 @@ class MSC_ProjectRunner extends EventEmitter {
   }
 
   _emitProjectsRefresh() {
+    const rows =
+      typeof this.store.listProjectsAlphabetical === 'function'
+        ? this.store.listProjectsAlphabetical()
+        : this.store.getProjects();
     this._broadcast('vpe:projects-updated', {
-      projects: this.store.getProjects(),
+      projects: rows.map((row) => msc_ipcEnrichProjectsRow(row)),
     });
   }
 

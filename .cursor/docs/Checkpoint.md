@@ -1,5 +1,15 @@
 # VPE Checkpoint (2026-05-08)
 
+## Build v1.2.6 — Archive, jump search & UI hardening
+
+- **Version:** **`1.2.6`** — shipped label (`package.json`, preload **`vpeInfo.version`**, footer, **`layout.tsx`**, **`msc-cleanup-dist`**); Prompt Vault master rows **`versionLabel`** **`MSC Media Engine v1.2.6`** in **`vpe-ipc.js`**.
+- **Registry:** SQLite migration **`user_version = 7`** adds **`is_archived INTEGER NOT NULL DEFAULT 0`**; **JsonPersistence** mirrors field; **`vpe:save-settings`** persists archive flag; **`vpe:add-project`** accepts optional **`project_type`**; catalog JSON **`is_archived`** on export/import merge.
+- **Dashboard:** **ARCHIVE** pill shows archived rows only; all other pills hide **`is_archived`** projects. Tactical sidebar counts (**`msc_computeTacticalCounts`**) use **non-archived** rows only.
+- **Search:** **`Ctrl+K` / `Cmd+K`** (**`top-bar.tsx`**) — **jump** mode: substring match on name/path/port across **all** projects, ignores status + tactical filters until cleared. Magnifying glass = narrow search in current view (**`page.tsx`** **`searchTerm`**).
+- **Sidebar:** **Add New Project** at top of nav content; **Projects** tactical block below **Dashboard**; selected/hover **`bg-[#2a2a2a]`**; **Shield** icons tinted (**`src/renderer/lib/shield-colors.ts`**); removed red tactical highlight / green inset bar.
+- **Add Project modal:** After folder pick, **`vpe:inspect-project`** drives default **Project Type** select (override or **Auto**).
+- **List / grid / log:** List name row **12px** shield circle (**`project-list-view.tsx`**); grid cards wrapped in **`motion.div`** + **`AnimatePresence`** (**`page.tsx`**); **`.vpe-system-log-viewport`** **`overflow-x: hidden !important`** (**`globals.css`**).
+
 ## Build v1.2.3 — v0 workflow & auto-dependency injection
 
 - **Version:** **`1.2.3`** — shipped label (`package.json`, preload **`vpeInfo.version`**, footer, **`layout.tsx`**, **`msc-cleanup-dist`** log); Prompt Vault master rows **`versionLabel`** aligned.
@@ -177,7 +187,7 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 - `brave-search` will stay in error state until `BRAVE_API_KEY` is replaced with a real key.
 - Several MCP smoke tests show terminal `exit_code=4294967295` because processes were intentionally stopped after successful startup verification.
 
-**Last doc update:** 2026-05-08 — **v1.2.3** managed-project **install + dev** bootstrap in **`project-runner`**, IPC **`installing` / `projectKind`**, UI installing state, **10s** first health probe for bootstrap; **v1.2.2** UI depth + vault + **v1.2.x** icon **`media/`** path (see sections above). **Active branch:** confirm with **`git status`**. Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer; **custom `.exe` icon** via **`afterPack` + `rcedit`**. **Current optimized packaging mode:** `build.asar = true`.
+**Last doc update:** 2026-05-08 — **v1.2.6** archive flag, Ctrl+K jump search, sidebar/tactical polish, Add Project type default, list/grid/log UI fixes (see **Build v1.2.6** above). Earlier: **v1.2.3** managed-project **install + dev** bootstrap; **v1.2.2** UI depth + vault + **v1.2.x** icon **`media/`** path. **Active branch:** confirm with **`git status`**. Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer; **custom `.exe` icon** via **`afterPack` + `rcedit`**. **Current optimized packaging mode:** `build.asar = true`.
 
 ## Current project status (snapshot)
 
@@ -194,6 +204,7 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 | **PM2 daemon badge behavior** | System Health `PM2 Daemon` now reads **Online** only when PM2 RPC is connected **and** at least one workspace project is currently `running` (prevents misleading Online while all cards are stopped). |
 | **Runner stability / ghost ports** | `project-runner` startup preflight force-sweeps occupied target ports on Windows (`netstat -ano | findstr :<port>` + `taskkill /F /PID ...`; fallback `taskkill /F /IM node.exe` if still blocked), preventing 2s self-stop from orphaned Next.js listeners. |
 | **Managed dev bootstrap (v1.2.3+)** | Missing **`node_modules`** + present **`package.json`** → single shell **`install && dev`**. **`v0-prototype`** heuristic: **`components/ui`** without **`node_modules`**. See [Custom-Commands — Managed project dev](Custom-Commands.md#managed-project-dev-v123). |
+| **Archive & jump search (v1.2.6)** | **`is_archived`** on project rows; **ARCHIVE** dashboard filter; **Ctrl+K** header jump search; **Project Settings** archive toggle. Details: opening section **Build v1.2.6** below. |
 | **Next packaging step** | Tell the agent **rebuild exe** (see [Custom-Commands](Custom-Commands.md#rebuild-exe)): icon staging → **`build:renderer`** → **`rebuild:natives`** → lint → E2E (`CI=true`) → clean **`dist/`** → **`build:main`** → remove blockmap / `builder-debug.yml` / `latest.yml`. Icons: [`package.json`](../../package.json) **`build.*`** + **[`media/icon.ico`](../../media/icon.ico)** from **`VPE.ico`** via **`msc-copy-release-icon`**. |
 
 **Context — health line on cards:** `GET /` probe does not follow redirects. **HTTP 307** on a project = server responded with redirect (e.g. Next middleware); browser **OPEN** still works. Green **“Active — HTTP 200”** only for **2xx** (see [`Msc_ProjectCard.tsx`](../../src/renderer/components/Msc_ProjectCard.tsx) `getHealthLine`).

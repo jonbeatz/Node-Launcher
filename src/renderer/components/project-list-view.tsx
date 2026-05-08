@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { msc_shieldColorHex } from '@/lib/shield-colors'
 import {
   Play,
   Square,
@@ -30,6 +32,7 @@ interface Project {
   health_http_code?: number | null
   health_checked_at?: string | null
   health_reachable?: boolean | null
+  shield_project_type?: string | null
 }
 
 function msc_healthCell(project: Project): { text: string; className: string } {
@@ -82,11 +85,17 @@ interface ProjectListViewProps {
   onToggleCompact?: () => void
   /** Per-project installing state (npm install embedded in dev start). */
   devInstallByProjectId?: Record<string, boolean>
+  /** v1.2.5 — tactical shield filter; animates list on change. */
+  tacticalMotionKey?: string
 }
 
 type SortField = 'name' | 'port' | 'path'
 type SortDirection = 'asc' | 'desc'
 
+/**
+ * List view — status/search/tactical filters run in `app/page.tsx`; `tacticalMotionKey` triggers
+ * Framer Motion opacity when the tactical shield filter changes (v1.2.5).
+ */
 export function ProjectListView({
   projects,
   selectedIds,
@@ -101,6 +110,7 @@ export function ProjectListView({
   onUnregister,
   onOpenInBrowser,
   devInstallByProjectId = {},
+  tacticalMotionKey = 'all',
 }: ProjectListViewProps) {
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -146,7 +156,13 @@ export function ProjectListView({
   const allSelected = projects.length > 0 && selectedIds.length === projects.length
 
   return (
-    <div className="w-full bg-[#1c1c1c] border border-[#333333] rounded overflow-hidden">
+    <motion.div
+      key={tacticalMotionKey}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.22 }}
+      className="w-full bg-[#1c1c1c] border border-[#333333] rounded overflow-hidden"
+    >
       {/* Bulk Actions Bar - Dark grey with lighter grey buttons */}
       {selectedIds.length > 0 && (
         <div className="bg-[#2a2a2a] h-10 flex items-center justify-between px-4 rounded-t border-b border-[#333333]">
@@ -261,10 +277,20 @@ export function ProjectListView({
                     <div className={`w-2 h-2 rounded-full mx-auto ${statusLed}`} />
                   </td>
                   <td className="px-3">
-                    <div className="relative">
-                      <button 
+                    <div className="relative flex items-center gap-2 min-w-0">
+                      <span
+                        className="h-3 w-3 rounded-full shrink-0"
+                        title={project.shield_project_type ?? 'unknown'}
+                        style={{
+                          backgroundColor: msc_shieldColorHex(
+                            project.shield_project_type ?? undefined,
+                          ),
+                        }}
+                      />
+                      <button
                         onClick={() => onSettings(project.id)}
-                        className={`font-sans text-[13px] font-bold hover:text-[#4fde82] transition-colors ${isError ? 'text-[#e02b20]' : 'text-white'}`}
+                        className={`font-sans text-[13px] font-bold hover:text-[#4fde82] transition-colors truncate text-left ${isError ? 'text-[#e02b20]' : 'text-white'}`}
+                        type="button"
                       >
                         {project.name}
                       </button>
@@ -407,6 +433,6 @@ export function ProjectListView({
           </tbody>
         </table>
       </div>
-    </div>
+    </motion.div>
   )
 }

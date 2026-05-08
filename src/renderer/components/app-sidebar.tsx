@@ -12,7 +12,15 @@ import {
   Star,
   ChevronDown,
   FlaskConical,
+  Shield,
 } from 'lucide-react'
+
+import {
+  VPE_TACTICAL_NAV_META,
+  type VpeTacticalCounts,
+  type VpeTacticalProjectFilter,
+} from '@/lib/project-tactical-filter'
+import { msc_shieldColorHex } from '@/lib/shield-colors'
 
 interface AppSidebarProps {
   activeItem?: string
@@ -20,6 +28,9 @@ interface AppSidebarProps {
   onAddProject?: () => void
   onStopAll?: () => void
   favorites?: { id: string; name: string }[]
+  /** v1.2.5 tactical filter (mirrors dashboard pills). */
+  tacticalActive?: VpeTacticalProjectFilter
+  tacticalCounts?: VpeTacticalCounts
 }
 
 export function AppSidebar({
@@ -28,17 +39,34 @@ export function AppSidebar({
   onAddProject,
   onStopAll,
   favorites = [],
+  tacticalActive = 'all',
+  tacticalCounts,
 }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const [maintenanceOpen, setMaintenanceOpen] = useState(false)
   const [favoritesOpen, setFavoritesOpen] = useState(false)
+  const [projectsNavOpen, setProjectsNavOpen] = useState(true)
+
+  const tc: VpeTacticalCounts = tacticalCounts ?? {
+    all: 0,
+    v0: 0,
+    electron: 0,
+    web: 0,
+    node: 0,
+    unknown: 0,
+  }
 
   const sidebarWidth = collapsed ? 'w-12' : 'w-[220px]'
 
   const dashboardActive = activeItem === 'dashboard'
   const maintenanceActive = activeItem === 'maintenance'
   const sandboxActive = activeItem === 'sandbox'
+
+  const msc_sidebarShieldTint = (
+    tacticalId: VpeTacticalProjectFilter,
+  ): string =>
+    tacticalId === 'all' ? '#737373' : msc_shieldColorHex(tacticalId)
 
   return (
     <aside
@@ -58,28 +86,6 @@ export function AppSidebar({
         <div className="space-y-4">
           <div>
             <button
-              onClick={() => onNavigate?.('dashboard')}
-              onMouseEnter={() => setHoveredItem('dashboard')}
-              onMouseLeave={() => setHoveredItem(null)}
-              className={`
-                w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
-                ${
-                  dashboardActive
-                    ? 'bg-[#252525] text-white'
-                    : hoveredItem === 'dashboard'
-                      ? 'bg-[#252525] text-white'
-                      : 'text-[#A0A0A0]'
-                }
-              `}
-              title={collapsed ? 'Dashboard' : undefined}
-            >
-              <LayoutDashboard size={18} />
-              {!collapsed && <span className="font-sans text-sm font-medium">Dashboard</span>}
-            </button>
-          </div>
-
-          <div>
-            <button
               onClick={onAddProject}
               onMouseEnter={() => setHoveredItem('add-project')}
               onMouseLeave={() => setHoveredItem(null)}
@@ -91,8 +97,103 @@ export function AppSidebar({
               title={collapsed ? 'Add New Project' : undefined}
             >
               <Plus size={18} />
-              {!collapsed && <span className="font-sans text-sm font-medium">Add New Project</span>}
+              {!collapsed && (
+                <span className="font-sans text-sm font-medium">Add New Project</span>
+              )}
             </button>
+          </div>
+
+          <div>
+            <button
+              onClick={() => onNavigate?.('dashboard')}
+              onMouseEnter={() => setHoveredItem('dashboard')}
+              onMouseLeave={() => setHoveredItem(null)}
+              className={`
+                w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
+                ${
+                  dashboardActive
+                    ? 'bg-[#2a2a2a] text-white'
+                    : hoveredItem === 'dashboard'
+                      ? 'bg-[#2a2a2a] text-white'
+                      : 'text-[#A0A0A0]'
+                }
+              `}
+              title={collapsed ? 'Dashboard' : undefined}
+            >
+              <LayoutDashboard size={18} />
+              {!collapsed && <span className="font-sans text-sm font-medium">Dashboard</span>}
+            </button>
+          </div>
+
+          {/* Tactical project shields (dashboard filter) */}
+          <div>
+            {!collapsed && (
+              <button
+                type="button"
+                onClick={() => setProjectsNavOpen(!projectsNavOpen)}
+                className="w-full px-2 mb-2 flex items-center justify-between group"
+              >
+                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left">
+                  Projects
+                </span>
+                <ChevronDown
+                  size={10}
+                  className={`text-[#A0A0A0] transition-transform shrink-0 ${projectsNavOpen ? '' : '-rotate-90'}`}
+                />
+              </button>
+            )}
+            {(projectsNavOpen || collapsed) && (
+              <div
+                className={`space-y-0.5 ${collapsed ? 'flex flex-col items-stretch gap-1' : 'pl-1'}`}
+              >
+                {VPE_TACTICAL_NAV_META.map((item) => {
+                  const n = tc[item.countKey]
+                  const isOn = tacticalActive === item.id
+                  const tint = msc_sidebarShieldTint(item.id)
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onNavigate?.(`tactical:${item.id}`)}
+                      onMouseEnter={() => setHoveredItem(`tactical-${item.id}`)}
+                      onMouseLeave={() => setHoveredItem(null)}
+                      title={`${item.label} (${n})`}
+                      className={`
+                        flex items-center rounded transition-all duration-200 vader-focus font-sans
+                        ${collapsed ? 'justify-center px-1 py-1.5' : 'w-full gap-2 px-2 py-1.5 text-xs'}
+                        ${
+                          isOn
+                            ? 'bg-[#2a2a2a] text-white'
+                            : hoveredItem === `tactical-${item.id}`
+                              ? 'bg-[#2a2a2a]/90 text-white'
+                              : 'text-[#E8E8E8] hover:bg-[#252525]/80 hover:text-white'
+                        }
+                      `}
+                    >
+                      <Shield
+                        size={collapsed ? 16 : 14}
+                        strokeWidth={2.4}
+                        className="shrink-0"
+                        style={{ color: tint }}
+                      />
+                      {!collapsed ? (
+                        <>
+                          <span className="truncate flex-1 text-left font-medium">
+                            {item.label}
+                          </span>
+                          <span
+                            className="shrink-0 tabular-nums text-[var(--text-muted,#A0A0A0)]"
+                            style={{ fontSize: '0.7rem' }}
+                          >
+                            ({n})
+                          </span>
+                        </>
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <div>
@@ -121,9 +222,9 @@ export function AppSidebar({
                     w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
                     ${
                       maintenanceActive
-                        ? 'bg-[#252525] text-white'
+                        ? 'bg-[#2a2a2a] text-white'
                         : hoveredItem === 'maintenance'
-                          ? 'bg-[#252525] text-white'
+                          ? 'bg-[#2a2a2a] text-white'
                           : 'text-[#A0A0A0]'
                     }
                   `}
@@ -140,9 +241,9 @@ export function AppSidebar({
                     w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
                     ${
                       sandboxActive
-                        ? 'bg-[#252525] text-white'
+                        ? 'bg-[#2a2a2a] text-white'
                         : hoveredItem === 'sandbox'
-                          ? 'bg-[#252525] text-white'
+                          ? 'bg-[#2a2a2a] text-white'
                           : 'text-[#A0A0A0]'
                     }
                   `}

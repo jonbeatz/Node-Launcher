@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { X, FolderSearch, Package, Check, Loader2, FolderOpen, Upload, Camera } from 'lucide-react'
+import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
 
 interface AddProjectModalProps {
   isOpen: boolean
@@ -18,6 +19,8 @@ interface ProjectData {
   port: string
   portLock: boolean
   thumbnailUrl?: string | null
+  /** Passed to IPC: `auto` clears registry override (classifier). */
+  projectTypePayload?: 'auto' | VpeShieldProjectType | null
 }
 
 export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalProps) {
@@ -27,6 +30,9 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
       : `project-${Date.now()}`
   const [isScanning, setIsScanning] = useState(false)
   const [scanned, setScanned] = useState(false)
+  const [projectTypeSelect, setProjectTypeSelect] = useState<
+    'auto' | VpeShieldProjectType
+  >('auto')
   const [projectData, setProjectData] = useState<ProjectData>({
     id: createDraftId(),
     name: '',
@@ -36,6 +42,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     port: '3001',
     portLock: false,
     thumbnailUrl: null,
+    projectTypePayload: 'auto',
   })
 
   if (!isOpen) return null
@@ -52,16 +59,22 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     let detectedPackageManager: ProjectData['packageManager'] = 'pnpm'
     let detectedStartScript = 'dev'
     let suggestedPort = '3001'
+    let detectedShield: VpeShieldProjectType = 'unknown'
     try {
       if (window.vpeAPI?.inspectProject) {
         const info = await window.vpeAPI.inspectProject(pickedPath)
         detectedPackageManager = info?.detection?.pkg_manager ?? detectedPackageManager
         detectedStartScript = info?.detection?.start_script ?? detectedStartScript
         suggestedPort = String(info?.suggestedPort ?? suggestedPort)
+        const pt = info?.project_type
+        if (pt === 'v0' || pt === 'electron' || pt === 'web' || pt === 'node' || pt === 'unknown') {
+          detectedShield = pt
+        }
       }
     } catch {
       // Keep modal usable even if inspect IPC fails.
     }
+    setProjectTypeSelect(detectedShield)
     setProjectData({
       id: projectData.id || createDraftId(),
       name: normalizedName,
@@ -71,6 +84,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
       port: String(suggestedPort),
       portLock: false,
       thumbnailUrl: projectData.thumbnailUrl ?? null,
+      projectTypePayload: detectedShield,
     })
     setScanned(true)
     setIsScanning(false)
@@ -91,6 +105,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     onSubmit?.(projectData)
     onClose()
     setScanned(false)
+    setProjectTypeSelect('auto')
     setProjectData({
       id: createDraftId(),
       name: '',
@@ -100,6 +115,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
       port: '3001',
       portLock: false,
       thumbnailUrl: null,
+      projectTypePayload: 'auto',
     })
   }
 
@@ -231,6 +247,40 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
                     <FolderOpen size={16} />
                   </button>
                 </div>
+              </div>
+
+              {/* Project type (shields) */}
+              <div>
+                <label className="block font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] mb-2">
+                  Project Type
+                </label>
+                <select
+                  value={projectTypeSelect === 'auto' ? 'auto' : projectTypeSelect}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    const next =
+                      v === 'auto'
+                        ? 'auto'
+                        : (v as VpeShieldProjectType)
+                    setProjectTypeSelect(next)
+                    setProjectData((prev) => ({
+                      ...prev,
+                      projectTypePayload: next === 'auto' ? 'auto' : next,
+                    }))
+                  }}
+                  className="w-full px-3 py-2 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-[13px] text-white focus:outline-none focus:border-[#4fde82] transition-colors"
+                >
+                  <option value="auto">Auto (detect from folder)</option>
+                  <option value="v0">v0 (components/ui)</option>
+                  <option value="electron">Electron</option>
+                  <option value="web">Web (Next / React)</option>
+                  <option value="node">Node</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+                <p className="mt-2 font-sans text-[11px] text-[#555555]">
+                  Defaults to the scan result — pick <span className="text-[#A0A0A0]">Auto</span>{' '}
+                  to persist no override (classifier decides), or lock a shield type.
+                </p>
               </div>
 
               {/* Package Manager */}

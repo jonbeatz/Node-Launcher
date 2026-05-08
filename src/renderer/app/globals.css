@@ -32,6 +32,8 @@
   --theme-accent: #4fde82;
   --vader-red: #e02b20;
   --vpe-green: #4fde82;
+  /** Tactical filter active underline (v1.2.5+) */
+  --msc-accent: #4fde82;
   --vader-glow: 0 0 15px rgba(79, 222, 130, 0.4);
   --success: #00cc66;
   --error: #ff4444;
@@ -258,12 +260,18 @@
     0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-/* System Log / embedded terminal viewport — glass over canvas */
+/* System Log / embedded terminal — transparent fill fixes compositor black box under blur */
 .vpe-system-log-viewport {
-  background: rgba(20, 20, 20, 0.75);
+  background-color: transparent !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: hidden !important;
+}
+
+/* v1.2.4 — redundant outer scrollbar: only `.vpe-terminal-scrollbar` scrolls */
+.vpe-log-drawer-root {
+  overflow: hidden !important;
 }
 
 /* boxBling Effect */

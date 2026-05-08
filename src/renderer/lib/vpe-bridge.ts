@@ -1,5 +1,12 @@
 /** SQLite / IPC row from main process */
 
+export type VpeShieldProjectType =
+  | 'v0'
+  | 'electron'
+  | 'web'
+  | 'node'
+  | 'unknown'
+
 export interface VpeProjectRow {
   id: string
   name: string
@@ -10,12 +17,20 @@ export interface VpeProjectRow {
   start_script: string
   build_script: string
   pkg_manager: string
+  /** User override (`null`/empty → auto classify). SQLite v6+ */
+  project_type?: string | null
+  /** Live classifier for current path */
+  detected_project_type?: VpeShieldProjectType
+  /** Resolved shield icon on cards (`project_type` or detected). */
+  shield_project_type?: VpeShieldProjectType
   /** Last HTTP status from GET / on project port after dev start; null if unreachable. */
   health_http_code?: number | null
   health_checked_at?: string | null
   /** Whether TCP/HTTP reply was received (vs connection error). SQLite may return 0/1. */
   health_reachable?: boolean | number | null
   is_favorite?: number | boolean | null
+  /** SQLite v7+ — hidden from default dashboard until Archive filter */
+  is_archived?: number | boolean | null
   node_modules_missing?: boolean
 }
 
@@ -49,6 +64,9 @@ export interface SaveSettingsPayload {
   start_script?: string
   build_script?: string
   thumbnail_url?: string | null
+  /** `auto` clears override → classifier decides from disk each session. */
+  project_type?: 'auto' | VpeShieldProjectType | string | null
+  is_archived?: boolean
 }
 
 export interface AddProjectPayload {
@@ -57,6 +75,8 @@ export interface AddProjectPayload {
   path: string
   port?: number
   thumbnail_url?: string | null
+  /** Omit or `auto` → classifier; concrete value persisted in registry. */
+  project_type?: 'auto' | VpeShieldProjectType | string | null
 }
 
 /**
@@ -169,6 +189,7 @@ export interface VpeApi {
       start_script: string
       build_script: string
     }
+    project_type?: VpeShieldProjectType
     suggestedPort: number
     reservedPort: number
   }>
@@ -304,6 +325,10 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   health_reachable?: boolean | null
   is_favorite?: boolean | null
   node_modules_missing?: boolean
+  project_type?: string | null
+  detected_project_type?: VpeShieldProjectType
+  shield_project_type?: VpeShieldProjectType
+  is_archived?: boolean
 } {
   const pm =
     row.pkg_manager === 'yarn' || row.pkg_manager === 'pnpm'
@@ -337,5 +362,10 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
           : null,
     is_favorite: row.is_favorite === true || row.is_favorite === 1,
     node_modules_missing: row.node_modules_missing,
+    project_type: row.project_type ?? null,
+    detected_project_type: row.detected_project_type,
+    shield_project_type:
+      row.shield_project_type ?? row.detected_project_type ?? 'unknown',
+    is_archived: row.is_archived === true || row.is_archived === 1,
   }
 }

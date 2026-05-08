@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutGrid, List, FolderPlus } from 'lucide-react'
 import { AppSidebar } from '@/components/app-sidebar';
 import { TopBar } from '@/components/top-bar';
 import { Footer } from '@/components/footer';
 import { Msc_ProjectCard } from '@/components/Msc_ProjectCard'
+import { Msc_ProjectFilterNav } from '@/components/Msc_ProjectFilterNav'
 import { ProjectListView } from '@/components/project-list-view'
 import { LogDrawer } from '@/components/log-drawer'
 import { RepairModal } from '@/components/repair-modal'
@@ -27,8 +29,13 @@ import {
   msc_formatUnknownIPCError,
   msc_rowToDashboardProject,
 } from '@/lib/vpe-bridge'
+import {
+  msc_applyTacticalProjectFilter,
+  msc_computeTacticalCounts,
+  type VpeTacticalProjectFilter,
+} from '@/lib/project-tactical-filter'
 
-type FilterType = 'ALL' | 'RUNNING' | 'STOPPED' | 'ERRORS'
+type FilterType = 'ALL' | 'RUNNING' | 'STOPPED' | 'ERRORS' | 'ARCHIVE'
 type ViewMode = 'grid' | 'list'
 type NavItem = 'dashboard' | 'maintenance' | 'sandbox' | 'settings'
 
@@ -52,6 +59,20 @@ interface Project {
   health_reachable?: boolean | null
   is_favorite?: boolean
   node_modules_missing?: boolean
+  project_type?: string | null
+  detected_project_type?:
+    | 'v0'
+    | 'electron'
+    | 'web'
+    | 'node'
+    | 'unknown'
+  shield_project_type?:
+    | 'v0'
+    | 'electron'
+    | 'web'
+    | 'node'
+    | 'unknown'
+  is_archived?: boolean
 }
 
 /** Browser fallback when `window.vpeAPI` is unavailable (Next standalone). */
@@ -66,6 +87,7 @@ const FALLBACK_PROJECTS: Project[] = [
     ram: '2.4GB',
     pkgManager: 'npm',
     path: 'C:/Users/Vader/Projects/msc-primary-gate',
+    shield_project_type: 'web',
   },
   { 
     id: '2', 
@@ -77,6 +99,7 @@ const FALLBACK_PROJECTS: Project[] = [
     ram: '12.8GB',
     pkgManager: 'yarn',
     path: 'C:/Users/Vader/Projects/media-pro-render',
+    shield_project_type: 'web',
   },
   { 
     id: '3', 
@@ -88,6 +111,7 @@ const FALLBACK_PROJECTS: Project[] = [
     ram: '0MB',
     pkgManager: 'yarn',
     path: 'C:/Users/Vader/Projects/vader-backup',
+    shield_project_type: 'node',
   },
   { 
     id: '4', 
@@ -100,6 +124,7 @@ const FALLBACK_PROJECTS: Project[] = [
     pkgManager: 'pnpm',
     path: 'C:/Users/Vader/Projects/msc-content-api',
     hasBuilt: false, // No .next folder - shows BUILD button
+    shield_project_type: 'node',
   },
   { 
     id: '5', 
@@ -111,6 +136,7 @@ const FALLBACK_PROJECTS: Project[] = [
     ram: '1.1GB',
     pkgManager: 'npm',
     path: 'C:/Users/Vader/Projects/msc-auth-service',
+    shield_project_type: 'web',
   },
   { 
     id: '6', 
@@ -122,6 +148,7 @@ const FALLBACK_PROJECTS: Project[] = [
     ram: '0MB',
     pkgManager: 'pnpm',
     path: 'C:/Users/Vader/Projects/msc-media-gate',
+    shield_project_type: 'electron',
   },
 ]
 
@@ -130,6 +157,7 @@ const FILTERS: { id: FilterType; label: string }[] = [
   { id: 'RUNNING', label: 'RUNNING' },
   { id: 'STOPPED', label: 'STOPPED' },
   { id: 'ERRORS', label: 'ERRORS' },
+  { id: 'ARCHIVE', label: 'ARCHIVE' },
 ]
 
 function DashboardContent() {
@@ -139,6 +167,9 @@ function DashboardContent() {
   const [projectsReady, setProjectsReady] = useState(false)
   const [activeNav, setActiveNav] = useState<NavItem>('dashboard')
   const [activeFilter, setActiveFilter] = useState<FilterType>('ALL')
+  /** v1.2.5 — tactical shield filter (synced with sidebar + filter nav). */
+  const [tacticalProjectFilter, setTacticalProjectFilter] =
+    useState<VpeTacticalProjectFilter>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('grid') // Card View as default per revision spec
   const [repairModalOpen, setRepairModalOpen] = useState(false)
   const [repairLogRev, setRepairLogRev] = useState(0)
@@ -156,6 +187,8 @@ function DashboardContent() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [compactMode, setCompactMode] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [commandSearchTerm, setCommandSearchTerm] = useState('')
+  const [commandSearchActive, setCommandSearchActive] = useState(false)
   const [nukeOverlay, setNukeOverlay] = useState<
     null | { id: string; name: string; port: number }
   >(null)
@@ -255,12 +288,6 @@ function DashboardContent() {
       setAddProjectModalOpen(true)
     }
 
-    // Ctrl+F - Focus Search
-    if (e.ctrlKey && e.key === 'f') {
-      e.preventDefault()
-      // Search is handled in TopBar
-    }
-
     // Ctrl+1 - Grid View
     if (e.ctrlKey && e.key === '1') {
       e.preventDefault()
@@ -289,7 +316,10 @@ function DashboardContent() {
       else if (appSettingsModalOpen) setAppSettingsModalOpen(false)
       else if (systemHealthOpen) setSystemHealthOpen(false)
       else if (logDrawerExpanded) setLogDrawerExpanded(false)
-      else if (searchTerm) setSearchTerm('')
+      else if (commandSearchActive || commandSearchTerm) {
+        setCommandSearchTerm('')
+        setCommandSearchActive(false)
+      } else if (searchTerm) setSearchTerm('')
     }
 
     // F5 - Refresh all project statuses
@@ -308,6 +338,8 @@ function DashboardContent() {
     systemHealthOpen,
     logDrawerExpanded,
     searchTerm,
+    commandSearchActive,
+    commandSearchTerm,
     addToast,
     refreshProjects,
   ])
@@ -755,6 +787,21 @@ function DashboardContent() {
       setAppSettingsModalOpen(true)
       return
     }
+    if (nav.startsWith('tactical:')) {
+      const raw = nav.slice('tactical:'.length)
+      const allowed: VpeTacticalProjectFilter[] = [
+        'all',
+        'v0',
+        'electron',
+        'web',
+        'node',
+      ]
+      if (allowed.includes(raw as VpeTacticalProjectFilter)) {
+        setTacticalProjectFilter(raw as VpeTacticalProjectFilter)
+        setActiveNav('dashboard')
+      }
+      return
+    }
     if (nav.startsWith('favorite:')) {
       const id = nav.slice('favorite:'.length)
       setActiveNav('dashboard')
@@ -765,25 +812,65 @@ function DashboardContent() {
     setActiveNav(nav as NavItem)
   }
 
-  // Filter and search projects
-  const filteredProjects = projects.filter(project => {
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      if (!project.name.toLowerCase().includes(term) && 
-          !project.port.toString().includes(term) &&
-          !project.path.toLowerCase().includes(term)) {
-        return false
+  const tacticalCounts = useMemo(
+    () =>
+      msc_computeTacticalCounts(
+        projects.filter((p) => !p.is_archived),
+      ),
+    [projects],
+  )
+
+  /** Status / tactical / narrow search — or Ctrl+K jump (ignores filters). */
+  const filteredProjects = useMemo(() => {
+    const cmd = commandSearchTerm.trim().toLowerCase()
+    if (commandSearchActive && cmd) {
+      return projects.filter((project) => {
+        const name = project.name.toLowerCase()
+        const path = project.path.toLowerCase()
+        return (
+          name.includes(cmd) ||
+          path.includes(cmd) ||
+          project.port.toString().includes(cmd)
+        )
+      })
+    }
+
+    let list = projects.filter((project) =>
+      activeFilter === 'ARCHIVE'
+        ? Boolean(project.is_archived)
+        : !project.is_archived,
+    )
+
+    if (activeFilter !== 'ARCHIVE') {
+      if (activeFilter === 'RUNNING') {
+        list = list.filter((p) => p.status === 'running')
+      } else if (activeFilter === 'STOPPED') {
+        list = list.filter((p) => p.status === 'stopped')
+      } else if (activeFilter === 'ERRORS') {
+        list = list.filter((p) => p.status === 'error')
       }
     }
-    
-    // Status filter
-    if (activeFilter === 'ALL') return true
-    if (activeFilter === 'RUNNING') return project.status === 'running'
-    if (activeFilter === 'STOPPED') return project.status === 'stopped'
-    if (activeFilter === 'ERRORS') return project.status === 'error'
-    return true
-  })
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase()
+      list = list.filter((project) => {
+        return (
+          project.name.toLowerCase().includes(term) ||
+          project.port.toString().includes(term) ||
+          project.path.toLowerCase().includes(term)
+        )
+      })
+    }
+
+    return msc_applyTacticalProjectFilter(list, tacticalProjectFilter)
+  }, [
+    projects,
+    searchTerm,
+    activeFilter,
+    tacticalProjectFilter,
+    commandSearchActive,
+    commandSearchTerm,
+  ])
 
   const projectCount = filteredProjects.length
 
@@ -830,16 +917,25 @@ function DashboardContent() {
           onAddProject={() => setAddProjectModalOpen(true)}
           onStopAll={handleStopAll}
           favorites={favorites}
+          tacticalActive={tacticalProjectFilter}
+          tacticalCounts={tacticalCounts}
         />
 
         {/* Main Area */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Top Bar - 48px */}
-          <TopBar 
+          <TopBar
             onOpenSettings={() => setAppSettingsModalOpen(true)}
             onOpenDiagnostics={() => setSystemHealthOpen(!systemHealthOpen)}
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
+            filterSearchTerm={searchTerm}
+            onFilterSearchChange={setSearchTerm}
+            commandSearchTerm={commandSearchTerm}
+            onCommandSearchChange={setCommandSearchTerm}
+            commandSearchActive={commandSearchActive}
+            onCommandSearchActiveChange={(v) => {
+              setCommandSearchActive(v)
+              if (!v) setCommandSearchTerm('')
+            }}
           />
 
           {/* System Health Panel */}
@@ -872,59 +968,75 @@ function DashboardContent() {
                 <VpeSandboxPanel />
               ) : (
                 <>
-                  {/* Filter Pills Bar */}
-                  <div className="px-6 py-3 flex items-center justify-between shrink-0">
-                    {/* Left: Filter Pills - VPE Green primary */}
-                    <div className="flex items-center gap-2">
-                      {FILTERS.map((filter) => (
+                  <div className="shrink-0">
+                    {/* Filter Pills Bar */}
+                    <div className="px-6 py-3 flex items-center justify-between">
+                      {/* Left: Filter Pills - VPE Green primary */}
+                      <div className="flex items-center gap-2">
+                        {FILTERS.map((filter) => (
+                          <button
+                            key={filter.id}
+                            onClick={() => setActiveFilter(filter.id)}
+                            className={`
+                              h-7 px-4 rounded font-sans text-[11px] font-medium uppercase tracking-[0.05em] transition-all vader-focus
+                              ${activeFilter === filter.id
+                                ? 'bg-[#4fde82] text-black'
+                                : 'bg-transparent text-[#A0A0A0] border border-[#333333] hover:border-[#4fde82]'
+                              }
+                            `}
+                          >
+                            {filter.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Center: Project Count */}
+                      <span className="font-sans text-[11px] text-[#A0A0A0] uppercase tracking-[0.05em]">
+                        {projectCount} PROJECT{projectCount !== 1 ? 'S' : ''}
+                        {commandSearchActive && commandSearchTerm.trim() ? (
+                          <span className="ml-2 text-[#4fde82]">(jump)</span>
+                        ) : null}
+                        {searchTerm.trim() &&
+                        !(commandSearchActive && commandSearchTerm.trim()) ? (
+                          <span className="ml-2 text-[#4fde82]">(filtered)</span>
+                        ) : null}
+                      </span>
+
+                      {/* Right: View Toggle - VPE Green */}
+                      <div className="flex items-center gap-1">
                         <button
-                          key={filter.id}
-                          onClick={() => setActiveFilter(filter.id)}
+                          onClick={() => setViewMode('grid')}
                           className={`
-                            h-7 px-4 rounded font-sans text-[11px] font-medium uppercase tracking-[0.05em] transition-all vader-focus
-                            ${activeFilter === filter.id
-                              ? 'bg-[#4fde82] text-black'
-                              : 'bg-transparent text-[#A0A0A0] border border-[#333333] hover:border-[#4fde82]'
+                            w-7 h-7 rounded flex items-center justify-center transition-all
+                            ${viewMode === 'grid' 
+                              ? 'bg-[#4fde82] text-black' 
+                              : 'bg-transparent text-[#A0A0A0] hover:text-white'
                             }
                           `}
                         >
-                          {filter.label}
+                          <LayoutGrid size={16} />
                         </button>
-                      ))}
+                        <button
+                          onClick={() => setViewMode('list')}
+                          className={`
+                            w-7 h-7 rounded flex items-center justify-center transition-all
+                            ${viewMode === 'list' 
+                              ? 'bg-[#4fde82] text-black' 
+                              : 'bg-transparent text-[#A0A0A0] hover:text-white'
+                            }
+                          `}
+                        >
+                          <List size={16} />
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Center: Project Count */}
-                    <span className="font-sans text-[11px] text-[#A0A0A0] uppercase tracking-[0.05em]">
-                      {projectCount} PROJECT{projectCount !== 1 ? 'S' : ''}
-                      {searchTerm && <span className="ml-2 text-[#4fde82]">(filtered)</span>}
-                    </span>
-
-                    {/* Right: View Toggle - VPE Green */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setViewMode('grid')}
-                        className={`
-                          w-7 h-7 rounded flex items-center justify-center transition-all
-                          ${viewMode === 'grid' 
-                            ? 'bg-[#4fde82] text-black' 
-                            : 'bg-transparent text-[#A0A0A0] hover:text-white'
-                          }
-                        `}
-                      >
-                        <LayoutGrid size={16} />
-                      </button>
-                      <button
-                        onClick={() => setViewMode('list')}
-                        className={`
-                          w-7 h-7 rounded flex items-center justify-center transition-all
-                          ${viewMode === 'list' 
-                            ? 'bg-[#4fde82] text-black' 
-                            : 'bg-transparent text-[#A0A0A0] hover:text-white'
-                          }
-                        `}
-                      >
-                        <List size={16} />
-                      </button>
+                    <div className="px-6 pb-3 border-b border-[#252525]">
+                      <Msc_ProjectFilterNav
+                        activeFilter={tacticalProjectFilter}
+                        onFilterChange={setTacticalProjectFilter}
+                        counts={tacticalCounts}
+                      />
                     </div>
                   </div>
 
@@ -942,12 +1054,31 @@ function DashboardContent() {
                       /* Empty State */
                       <div className="h-full flex flex-col items-center justify-center">
                         <FolderPlus size={48} className="text-[#333333] mb-4" />
-                        {searchTerm ? (
+                        {commandSearchActive && commandSearchTerm.trim() ? (
                           <>
-                            <p className="font-sans text-[#A0A0A0] mb-1">No projects match &apos;{searchTerm}&apos;</p>
+                            <p className="font-sans text-[#A0A0A0] mb-1">
+                              No projects match &apos;{commandSearchTerm.trim()}&apos;
+                            </p>
+                            <button
+                              onClick={() => {
+                                setCommandSearchTerm('')
+                                setCommandSearchActive(false)
+                              }}
+                              className="font-sans text-sm text-[#4fde82] hover:underline"
+                              type="button"
+                            >
+                              Clear jump search
+                            </button>
+                          </>
+                        ) : searchTerm.trim() ? (
+                          <>
+                            <p className="font-sans text-[#A0A0A0] mb-1">
+                              No projects match &apos;{searchTerm}&apos;
+                            </p>
                             <button
                               onClick={() => setSearchTerm('')}
                               className="font-sans text-sm text-[#4fde82] hover:underline"
+                              type="button"
                             >
                               Clear search
                             </button>
@@ -967,13 +1098,28 @@ function DashboardContent() {
                       </div>
                     ) : viewMode === 'grid' ? (
                       /* Grid View */
-                      <div 
+                      <motion.div
+                        key={tacticalProjectFilter}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.22 }}
                         className="grid gap-5"
-                        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))' }}
+                        style={{
+                          gridTemplateColumns:
+                            'repeat(auto-fill, minmax(380px, 1fr))',
+                        }}
                       >
-                        {filteredProjects.map((project) => (
+                        <AnimatePresence mode="popLayout">
+                          {filteredProjects.map((project) => (
+                            <motion.div
+                              key={project.id}
+                              layout
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.18 }}
+                            >
                           <Msc_ProjectCard
-                            key={project.id}
                             id={project.id}
                             name={project.name}
                             port={project.port}
@@ -1006,9 +1152,14 @@ function DashboardContent() {
                             devInstallInProgress={Boolean(
                               devInstallUiByProject[project.id],
                             )}
+                            shieldProjectType={
+                              project.shield_project_type ?? 'unknown'
+                            }
                           />
-                        ))}
-                      </div>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </motion.div>
                     ) : (
                       /* List View */
                       <ProjectListView
@@ -1043,6 +1194,7 @@ function DashboardContent() {
                         compact={compactMode}
                         onToggleCompact={() => setCompactMode(!compactMode)}
                         devInstallByProjectId={devInstallUiByProject}
+                        tacticalMotionKey={tacticalProjectFilter}
                       />
                     )}
                   </div>
@@ -1192,6 +1344,7 @@ function DashboardContent() {
                 path: data.path,
                 port: portNum,
                 thumbnail_url: data.thumbnailUrl ?? null,
+                project_type: data.projectTypePayload,
               })
               await refreshProjects()
             } else {
@@ -1239,6 +1392,16 @@ function DashboardContent() {
         }
         thumbnailUrl={
           projects.find((p) => p.id === selectedProjectId)?.thumbnail_url ?? null
+        }
+        projectTypePersisted={
+          projects.find((p) => p.id === selectedProjectId)?.project_type ?? null
+        }
+        isArchived={
+          projects.find((p) => p.id === selectedProjectId)?.is_archived ?? false
+        }
+        detectedProjectType={
+          projects.find((p) => p.id === selectedProjectId)?.detected_project_type ??
+          'unknown'
         }
         onClose={() => setSettingsModalOpen(false)}
         onSave={async () => {

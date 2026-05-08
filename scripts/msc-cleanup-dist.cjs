@@ -15,7 +15,7 @@ const distDir = path.join(root, 'dist');
 function msc_cleanupDist() {
   if (!fs.existsSync(distDir)) {
     console.log('msc-cleanup-dist: no dist/ folder — skip');
-    console.log('[Vader Protocol] v1.2.3 Build Confirmed.');
+    console.log('[Vader Protocol] v1.2.6 Build Confirmed.');
     return { removed: [], skipped: true };
   }
 
@@ -54,7 +54,7 @@ function msc_cleanupDist() {
     console.log('msc-cleanup-dist: nothing to remove (or dist empty)');
   }
   console.log('[Vader Protocol] All Thermal UI artifacts and Ghost PIDs purged.');
-  console.log('[Vader Protocol] v1.2.3 Build Confirmed.');
+  console.log('[Vader Protocol] v1.2.6 Build Confirmed.');
   return { removed };
 }
 

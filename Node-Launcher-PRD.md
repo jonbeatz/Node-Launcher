@@ -4,7 +4,9 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.2.3** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata should match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts, **`vader:clean-sync`** (Node launcher + 10s dev window → forge), NET dev override (**v1.2.3+**).
+**Shipped desktop build (npm / `package.json` `version`):** **1.2.6** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata should match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts, **`vader:clean-sync`** (Node launcher + 10s dev window → forge), NET dev override (**v1.2.3+**), shield classification (**v1.2.4**), tactical project filters + sidebar nav (**v1.2.5**), **archive registry + jump search + UI hardening** (**v1.2.6**).
+
+**v1.2.6 (product):** **`projects.is_archived`** in SQLite/JSON; **ARCHIVE** filter on dashboard; **Project Settings → Archive project**; **Ctrl+K / Cmd+K** opens header **jump** search (all projects, ignores active filters); **Add Project** type dropdown defaults to **`inspectProject.project_type`**; sidebar **Add New Project** first, tactical shields with palette colors; list view **12px** shield dot; **`.vpe-system-log-viewport`** horizontal overflow clamped; catalog import/export carries **`is_archived`**.
 
 ---
 
