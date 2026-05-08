@@ -1,7 +1,8 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const pm2 = require('pm2');
+const { msc_getPm2 } = require('./pm2-client');
+const pm2 = msc_getPm2();
 const treeKill = require('tree-kill');
 const { msc_launcherRendererPort } = require('./launcher-port');
 const { msc_probeHttpHealth } = require('./health-probe');
@@ -460,11 +461,24 @@ class MSC_PM2Manager {
     return { success: true };
   }
 
-  stopAll() {
-    return new Promise((resolve, reject) => {
+  /**
+   * Stop every PM2 process. Ensures RPC is up first (packaged app loads PM2 from asar.unpacked).
+   * Resolves false instead of rejecting so unified stop can still kill runner spawns + SQLite.
+   */
+  async stopAll() {
+    const connected = await this.msc_ensureConnected();
+    if (!connected) {
+      console.warn('[VPE] stopAll: PM2 RPC not connected; skipping pm2.stop(all)');
+      return false;
+    }
+    return new Promise((resolve) => {
       pm2.stop('all', (err) => {
-        if (err) reject(err);
-        else resolve(true);
+        if (err) {
+          console.warn('[VPE] pm2.stop(all):', err?.message ?? err);
+          resolve(false);
+          return;
+        }
+        resolve(true);
       });
     });
   }

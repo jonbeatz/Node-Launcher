@@ -194,7 +194,7 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 **Cause:** With **`build.asar: true`**, native modules cannot execute from inside **`app.asar`**.
 
-**Fix in repo (v1.3.7):** [`package.json`](../../package.json) **`build.asarUnpack`** includes **`**/node_modules/better-sqlite3/**/*`**, **`**/node_modules/node-pty/**/*`**, and **`**/node_modules/pm2/**/*`** so copies land under **`resources/app.asar.unpacked`**. After changing deps, run **`npm install`** so **`node-pty`** is present (electron-builder **`node-pty@undefined`** if missing).
+**Fix in repo (v1.3.7):** [`package.json`](../../package.json) **`build.asarUnpack`** includes **`**/node_modules/better-sqlite3/**/*`**, **`**/node_modules/node-pty/**/*`**, and **`**/node_modules/pm2/**/*`** so copies land under **`resources/app.asar.unpacked`**. Main process must **`require`** PM2 from that tree when **`app.isPackaged`** — see [`pm2-client.js`](../../src/main/pm2-client.js) (**`msc_getPm2`**) used by [`pm2-manager.js`](../../src/main/pm2-manager.js). After changing deps, run **`npm install`** so **`node-pty`** is present (electron-builder **`node-pty@undefined`** if missing).
 
 ---
 

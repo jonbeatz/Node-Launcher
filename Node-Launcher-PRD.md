@@ -6,7 +6,7 @@
 
 **Shipped desktop build (npm / `package.json` `version`):** **1.3.7** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
 
-**v1.3.7 (native / ASAR):** **`asarUnpack`** in **`package.json`** **`build`** for **`better-sqlite3`**, **`node-pty`**, and **`pm2`** so native binaries load from **`app.asar.unpacked`**.
+**v1.3.7 (native / ASAR):** **`asarUnpack`** in **`package.json`** **`build`** for **`better-sqlite3`**, **`node-pty`**, and **`pm2`**. Packaged main must load the PM2 API from **`app.asar.unpacked`** — **`src/main/pm2-client.js`** (**`msc_getPm2`**) used by **`pm2-manager.js`**; **`stopAll`** connects before **`pm2.stop('all')`** and avoids rejecting so unified stop still clears runner + DB.
 
 **v1.3.6 (settings + boot):** App-level settings IPC (**launch at login**, **minimize to tray**, **auto-start** after boot reconcile, **`default_view`**); factory defaults off for non-critical toggles; tray **close** hides when minimize-to-tray enabled.
 
