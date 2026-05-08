@@ -4,7 +4,7 @@
 
 **Cursor ↔ Google (Vertex AI) via LiteLLM + ngrok** (paths, ports, Cursor settings, post-restart checklist): [API-SetUp-Master.md](API-SetUp-Master.md)
 
-**Build & terminal command sequencing** (`vader:dev`, **`VPE_LAUNCHER_FORGE`** [reserved flag; no thermal polling in main as of **v1.1.6**], **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vader:force-forge`**, **`vader:sync`**, **`vader:clean-sync`**, `&&` gates, **`vpe-forge-pause`**, snapshot, syntax guard, **`dist/`** artifacts): [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (includes **v1.2.3** managed-project bootstrap; forge hardening still **v1.1.8**). **Product / UX:** **Build v1.3.0** (current) + **Build v1.2.9** + **Build v1.2.6** archive/jump baseline in [Checkpoint.md](Checkpoint.md).
+**Build & terminal command sequencing** (`vader:dev`, **`VPE_LAUNCHER_FORGE`** [reserved flag; no thermal polling in main as of **v1.1.6**], **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vader:force-forge`**, **`vader:sync`**, **`vader:clean-sync`**, `&&` gates, **`vpe-forge-pause`**, snapshot, syntax guard, **`dist/`** artifacts): [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (includes **v1.2.3** managed-project bootstrap; forge hardening still **v1.1.8**). **Product / UX:** **Build v1.3.1** (current) + **Build v1.3.0** + **Build v1.2.9** + **Build v1.2.6** archive/jump baseline in [Checkpoint.md](Checkpoint.md).
 
 **Shipped app version:** root **`package.json` → `"version"`** (align with preload / footer / **`layout.tsx`**) drives shipped labels — see [Custom-Commands.md — Update Docs](Custom-Commands.md#update-docs) after each release.
 

@@ -1,12 +1,12 @@
-# VPE Build & Command Protocol (master; includes v1.2.3 build-chain deltas + v1.2.6 registry + v1.3.0 UI density / nav notes)
+# VPE Build & Command Protocol (master; includes v1.2.3 build-chain deltas + v1.2.6 registry + v1.3.x UI density / CI notes)
 
 **Purpose:** Source of truth for **build sequencing**, **terminal command logic**, and **Windows packaging posture** on Vader Project Engine — so dev sessions stay clean (no orphaned dev servers on **3000**), and release builds stay predictable.
 
 **Authority note:** Executable script strings and Electron-builder knobs live in **`package.json`**. If this document ever diverges from **`package.json`**, **`package.json` wins** — update this file in the same change.
 
-**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
+**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.3.1** (CI / branch), **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
 
-**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.3.0**).
+**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.3.1**).
 
 ### Permanent product notes (v1.2.9+)
 
@@ -21,6 +21,10 @@
 ### Standards (v1.3.0+)
 
 - Navigation selection color is strictly locked to **#2a2a2a** (neutral gray) to maintain the Studio Dark aesthetic.
+
+### CI (v1.3.1+)
+
+- GitHub **`lint-and-build`** runs **`npm ci`** → **`npm run lint`** → **`npm run build:renderer`** → **`npm run repair:ast`** → Playwright Chromium **`test:e2e`**. **`npm ci` requires `package-lock.json` to match `package.json`** — commit lock updates whenever dependencies change.
 
 ---
 
@@ -74,7 +78,7 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ---
 
-## 4. In-app tooling (v1.1.0+ reference; UI through **v1.3.0**)
+## 4. In-app tooling (v1.1.0+ reference; UI through **v1.3.1**)
 
 These are **UX / ops** features in the packaged or dev UI; they do not replace **`package.json`** scripts:
 
@@ -86,4 +90,4 @@ These are **UX / ops** features in the packaged or dev UI; they do not replace *
 
 ---
 
-*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.3.0.”*
+*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.3.1.”*

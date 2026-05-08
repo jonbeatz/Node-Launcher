@@ -1,5 +1,5 @@
 # 🛸 Vader Project Engine (VPE)
-> **MSC Media Engine — shipped npm `1.3.0`**
+> **MSC Media Engine — shipped npm `1.3.1`**
 > **Master Execution Plan:** Command Center for high-performance Node.js development
 
 The **Vader Project Engine (VPE)** is a tactical desktop command center designed to eliminate terminal clutter and automate repetitive build repairs for the **My Studio Channel (MSC)** workflow. It is engineered specifically for the **Vader** workstation (AMD Ryzen 9700x / Gigabyte B650) to deliver a process-aware interface for modern web development.
@@ -14,7 +14,7 @@ To maintain architectural integrity, all development must follow this strict hie
 4. **Node-Launcher-PRD.md**: Feature and requirement truth.
 5. **package.json**: Authority for executable scripts only.
 
-**Current release (npm):** **`1.3.0`** — follow root **`package.json`** (preload **`vpeInfo.version`**, footer, **`layout.tsx`**). **Foundation (through v1.2.6):** registry **`is_archived`** (SQLite **user_version 7**), **ARCHIVE** filter, **Ctrl+K / Cmd+K** jump search, tactical sidebar + shield dots, **Add Project** type from **`vpe:inspect-project`**, system log viewport clamp, grid **Framer** on cards. **v1.2.9–v1.3.0 UI:** Prompt Vault list as Radix **Accordion** (Copy / **Edit** → **`vpe:update-vault-item`**, optional **description**); Sandbox top **“How to use…”** accordion; dashboard status pills + grid/list toggles use **`#2a2a2a`**; **v1.3.0** vault **create** form behind **+ Create New Master Directive** (default collapsed); **`maintenance-section`** imports **`PromptVault`** directly. **E2E:** **`npm run test:e2e:electron`**. **Packaging:** **`npm run vader:sync`** → **`--success last`** → **`vader:post-dev-forge`** (stall watchdog **`vpe-forge-stall-watchdog.cjs`**, **`vpe-forge-pause`**, snapshot, **`vpe:check-readiness`**, **`build:win`**, **`vpe:cleanup-dist`**). **`vader:dev-to-forge`** without **`rimraf`**; **`vader:clean-sync`** via **`vpe-clean-sync.cjs`**. **`v1.2.3+`** NET LED green in dev (IPC); **`before-quit`** + **Purge env** clear listeners. Full table: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**.
+**Current release (npm):** **`1.3.1`** — follow root **`package.json`** (preload **`vpeInfo.version`**, footer, **`layout.tsx`**). **Foundation (through v1.2.6):** registry **`is_archived`** (SQLite **user_version 7**), **ARCHIVE** filter, **Ctrl+K / Cmd+K** jump search, tactical sidebar + shield dots, **Add Project** type from **`vpe:inspect-project`**, system log viewport clamp, grid **Framer** on cards. **v1.2.9–v1.3.0 UI:** Prompt Vault list as Radix **Accordion** (Copy / **Edit** → **`vpe:update-vault-item`**, optional **description**); Sandbox top **“How to use…”** accordion; dashboard status pills + grid/list toggles use **`#2a2a2a`**; **v1.3.0** vault **create** form behind **+ Create New Master Directive** (default collapsed); **`maintenance-section`** imports **`PromptVault`** directly. **E2E:** **`npm run test:e2e:electron`**. **Packaging:** **`npm run vader:sync`** → **`--success last`** → **`vader:post-dev-forge`** (stall watchdog **`vpe-forge-stall-watchdog.cjs`**, **`vpe-forge-pause`**, snapshot, **`vpe:check-readiness`**, **`build:win`**, **`vpe:cleanup-dist`**). **`vader:dev-to-forge`** without **`rimraf`**; **`vader:clean-sync`** via **`vpe-clean-sync.cjs`**. **`v1.2.3+`** NET LED green in dev (IPC); **`before-quit`** + **Purge env** clear listeners. Full table: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**.
 
 ---
 
@@ -91,5 +91,5 @@ Automated patching for Next.js 15 Suspense boundaries.
 
 ---
 **Author:** Jon Beatz (MSC)  
-**Status:** Approved — release track **`1.3.0`**  
-*Powered by the MSC Media Engine v1.3.0*
+**Status:** Approved — release track **`1.3.1`**  
+*Powered by the MSC Media Engine v1.3.1*

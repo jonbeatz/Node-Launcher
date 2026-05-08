@@ -213,7 +213,7 @@ export function PromptVault() {
             />
             <input
               className="w-full h-9 rounded bg-[#121212] border border-[#333333] px-3 font-sans text-sm text-white placeholder:text-[#555555] vader-focus"
-              placeholder='Version label (e.g. v1.3.0 or "MSC Media Engine v1.3.0")'
+              placeholder='Version label (e.g. v1.3.1 or "MSC Media Engine v1.3.1")'
               value={versionLabel}
               onChange={(e) => setVersionLabel(e.target.value)}
             />

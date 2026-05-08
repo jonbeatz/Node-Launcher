@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-/** v1.3.0 — preload bridge (IPC formatting + bootstrap subscribe). */
+/** v1.3.1 — preload bridge (IPC formatting + bootstrap subscribe). */
 function msc_formatCaughtForPreload(reason) {
   if (reason == null) return 'Unknown failure';
   if (typeof reason === 'string') return reason;
@@ -112,7 +112,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.3.0',
+  version: '1.3.1',
   hardware: '9700x Tuned',
 });
 

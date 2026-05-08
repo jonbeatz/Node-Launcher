@@ -20,7 +20,7 @@ console.log(
   `[VPE Main] Remote debugging port enabled on http://127.0.0.1:${MSC_VPE_REMOTE_DEBUG_PORT}`,
 );
 
-/** v1.3.0 — mute noisy DevTools/socket stderr unless `--verbose` is present. */
+/** v1.3.1 — mute noisy DevTools/socket stderr unless `--verbose` is present. */
 const MSC_VPE_VERBOSE_LOG = process.argv.includes('--verbose');
 if (!MSC_VPE_VERBOSE_LOG && !global.__vpe_stderr_filter_registered) {
   global.__vpe_stderr_filter_registered = true;

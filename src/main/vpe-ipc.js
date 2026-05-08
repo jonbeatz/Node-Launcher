@@ -88,7 +88,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
-      versionLabel: 'MSC Media Engine v1.3.0',
+      versionLabel: 'MSC Media Engine v1.3.1',
       description: 'Full production build: wipe dist, verify dev, ship the Windows installer.',
       updatedAt,
       bodyMd:
@@ -98,7 +98,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
-      versionLabel: 'MSC Media Engine v1.3.0',
+      versionLabel: 'MSC Media Engine v1.3.1',
       description: 'Everyday Electron + Next stack; closes clean when you quit the window.',
       updatedAt,
       bodyMd:
@@ -108,7 +108,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
-      versionLabel: 'MSC Media Engine v1.3.0',
+      versionLabel: 'MSC Media Engine v1.3.1',
       description: 'Block until dev exits, then run forge chain (snapshot → guard → build).',
       updatedAt,
       bodyMd:
@@ -118,7 +118,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
-      versionLabel: 'MSC Media Engine v1.3.0',
+      versionLabel: 'MSC Media Engine v1.3.1',
       description: 'Version bump path with dist reset before dev + forge.',
       updatedAt,
       bodyMd:
@@ -128,7 +128,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
-      versionLabel: 'MSC Media Engine v1.3.0',
+      versionLabel: 'MSC Media Engine v1.3.1',
       description: 'Heavy Node purge + launcher port recovery (use from System Health when stuck).',
       updatedAt,
       bodyMd:

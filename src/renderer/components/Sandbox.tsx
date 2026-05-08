@@ -20,7 +20,7 @@ const DEFAULT_SNIPPET = `() => (
   </div>
 )`
 
-/** VPE Sandbox — live component preview + Vault workflow onboarding (v1.3.0). */
+/** VPE Sandbox — live component preview + Vault workflow onboarding (v1.3.1). */
 export function Sandbox() {
   const [code, setCode] = useState(DEFAULT_SNIPPET)
 

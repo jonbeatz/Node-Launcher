@@ -1,5 +1,11 @@
 # VPE Checkpoint (2026-05-08)
 
+## Build v1.3.1 — CI alignment (`npm ci`) & **`VPE-v1.3.x-Dev`** branch
+
+- **Version:** **`1.3.1`** — shipped labels (`package.json`, preload **`vpeInfo.version`**, footer, **`layout.tsx`**); Prompt Vault **master** rows **`MSC Media Engine v1.3.1`** in **`vpe-ipc.js`** (**Electron E2E Suite** / **Playwright Manual** presets remain **`v1.2.8`**).
+- **GitHub Actions:** **`package-lock.json`** synchronized so **`npm ci`** succeeds (prior drift: **`framer-motion`** / **`motion-*`** missing from lock broke **`lint-and-build`** in seconds). Workflow uses **`actions/checkout@v4`**, **`actions/setup-node@v4`**, **`permissions: contents: read`**, concurrency **`cancel-in-progress`**, **`NEXT_TELEMETRY_DISABLED`** quoted in YAML env.
+- **Branching:** active development branch standard **`VPE-v1.3.x-Dev`** (replaces **`Node-Launcher-v11`** naming for Vader cycle clarity).
+
 ## Build v1.3.0 — UI density, sidebar neutralization & import cleanup
 
 - **Version:** **`1.3.0`** — shipped labels (`package.json`, preload **`vpeInfo.version`**, footer, **`layout.tsx`**); Prompt Vault **master** rows **`MSC Media Engine v1.3.0`** in **`vpe-ipc.js`** (**Electron E2E Suite** / **Playwright Manual** presets keep **`v1.2.8`** labels).
@@ -202,13 +208,13 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 - `brave-search` will stay in error state until `BRAVE_API_KEY` is replaced with a real key.
 - Several MCP smoke tests show terminal `exit_code=4294967295` because processes were intentionally stopped after successful startup verification.
 
-**Last doc update:** 2026-05-08 — **v1.3.0** vault create accordion + sidebar neutral CTAs + direct **`PromptVault`** import; **v1.2.9** vault list accordion / **`vpe:update-vault-item`** / Sandbox onboarding / neutral dashboard pills. Earlier: **v1.2.6** archive, Ctrl+K jump search; **v1.2.3** managed-project **install + dev** bootstrap; **v1.2.2** vault seed + **`media/`** icon path. **Active branch:** confirm with **`git status`**. Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer; **custom `.exe` icon** via **`afterPack` + `rcedit`**. **Current optimized packaging mode:** `build.asar = true`.
+**Last doc update:** 2026-05-08 — **v1.3.1** CI lockfile + Actions pins + branch **`VPE-v1.3.x-Dev`**. **v1.3.0** vault create accordion + sidebar neutral CTAs; **v1.2.9** accordion list + Sandbox onboarding. Earlier: **v1.2.6** archive, Ctrl+K jump search; **v1.2.3** managed-project **install + dev** bootstrap; **v1.2.2** vault seed + **`media/`** icon path. **Active branch:** confirm with **`git status`**. Full Windows release pipeline: [Custom-Commands — **rebuild exe**](Custom-Commands.md#rebuild-exe). Resolved packaging/runtime issues: [Stability-Fix-Backlog](Stability-Fix-Backlog.md). **Packaging identity:** `package.json` **`name`:** `vader-project-engine`, **`productName`:** Vader Project Engine, **`build.appId`:** `com.vader.projectengine`; NSIS **per-user** multi-step installer; **custom `.exe` icon** via **`afterPack` + `rcedit`**. **Current optimized packaging mode:** `build.asar = true`.
 
 ## Current project status (snapshot)
 
 | Area | Status |
 |------|--------|
-| **Branch** | Confirm with **`git status`** — this worktree: **`Node-Launcher-v9`**. Packaging polish: `src/renderer/out/` gitignored; `prebuild:main` runs static export before **`build:main`**. |
+| **Branch** | Confirm with **`git status`** — development line: **`VPE-v1.3.x-Dev`** (legacy names **`Node-Launcher-v*`** may exist on remotes until pruned). Packaging polish: `src/renderer/out/` gitignored; `prebuild:main` runs static export before **`build:main`**. |
 | **Renderer** | **Next.js `15.5.12`** + **React `19.0.0`**; `npm run build:renderer` → **4/4** static export routes. |
 | **Quality gates** | **`npm run lint`** clean; CI: lint → build → AST stub → Playwright (Chromium `--with-deps`). |
 | **Persistence** | SQLite/JSON under **`app.getPath('userData')/vpe-db`**; thumbnails scratch under **`userData/media/thumbnails`**. |

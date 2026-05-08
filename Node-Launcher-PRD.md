@@ -4,7 +4,7 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.3.0** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
+**Shipped desktop build (npm / `package.json` `version`):** **1.3.1** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
 
 **v1.2.6 (product baseline):** **`projects.is_archived`** in SQLite/JSON; **ARCHIVE** filter; **Project Settings → Archive project**; **Ctrl+K / Cmd+K** jump search; **Add Project** type from **`inspectProject`**; tactical sidebar shields; list **12px** shield dot; catalog **`is_archived`**.
 
