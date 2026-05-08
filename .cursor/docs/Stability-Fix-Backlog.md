@@ -214,4 +214,4 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 ---
 
-*Last updated: 2026-05-08 — **v1.3.7** ASAR **`asarUnpack`** for natives (above); **v1.3.2** Ghost watcher (see **Windows ghost process**); [Checkpoint](Checkpoint.md). Forge / `concurrently` baseline **v1.1.8** in [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md). **Powered by the MSC Media Engine v1.3.7**.*
+*Last updated: 2026-05-08 — shipped **v1.4.0** / dev branch **`VPE-v1.4.x-Dev`**; **v1.3.7** ASAR **`asarUnpack`** for natives (above); **v1.3.2** Ghost watcher (see **Windows ghost process**); [Checkpoint](Checkpoint.md). Forge / `concurrently` baseline **v1.1.8** in [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md). **Powered by the MSC Media Engine v1.4.0**.*

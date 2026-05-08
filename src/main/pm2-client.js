@@ -1,5 +1,5 @@
 /**
- * v1.3.7 — PM2 programmatic client must load from `app.asar.unpacked` when packaged;
+ * v1.4.0 — PM2 programmatic client must load from `app.asar.unpacked` when packaged;
  * `require('pm2')` from code inside `app.asar` does not resolve to unpacked `node_modules`.
  */
 const path = require('path');

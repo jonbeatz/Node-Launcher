@@ -4,7 +4,7 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.3.7** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
+**Shipped desktop build (npm / `package.json` `version`):** **1.4.0** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; dev branch **`VPE-v1.4.x-Dev`** (next new line: **`VPE-v1.5.x-Dev`** — increment minor, bump **`package.json`** minor accordingly). See [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
 
 **v1.3.7 (native / ASAR):** **`asarUnpack`** in **`package.json`** **`build`** for **`better-sqlite3`**, **`node-pty`**, and **`pm2`**. Packaged main must load the PM2 API from **`app.asar.unpacked`** — **`src/main/pm2-client.js`** (**`msc_getPm2`**) used by **`pm2-manager.js`**; **`stopAll`** connects before **`pm2.stop('all')`** and avoids rejecting so unified stop still clears runner + DB.
 
@@ -18,7 +18,7 @@
 
 **v1.3.2 (ghost + UX):** Main **Ghost watcher** (Windows): periodic check for **node.exe** on catalog ports with no matching **running** row → renderer cue on System Health; dashboard **grid/list** and filter pill (**ARCHIVE**) persisted in **LocalStorage**.
 
-**v1.3.1 (ops / branching):** Default dev branch **`VPE-v1.3.x-Dev`**; CI **`.github/workflows/ci.yml`** runs **`npm ci`** (requires **`package-lock.json`** synced to **`package.json`**) → lint → **`build:renderer`** → AST stub → Playwright **`test:e2e`** (lint strictness superseded by **v1.3.3** relaxed lint above).
+**v1.3.1 (ops / branching):** Introduced **`VPE-v1.3.x-Dev`**; CI **`.github/workflows/ci.yml`** runs **`npm ci`** (requires **`package-lock.json`** synced to **`package.json`**) → lint → **`build:renderer`** → AST stub → Playwright **`test:e2e`** (lint strictness superseded by **v1.3.3** relaxed lint above). **Current (v1.4.0+):** **`VPE-v1.4.x-Dev`** — see [.cursor/docs/Checkpoint.md](.cursor/docs/Checkpoint.md) **Build v1.4.0** for branch / semver alignment.
 
 **v1.2.6 (product baseline):** **`projects.is_archived`** in SQLite/JSON; **ARCHIVE** filter; **Project Settings → Archive project**; **Ctrl+K / Cmd+K** jump search; **Add Project** type from **`inspectProject`**; tactical sidebar shields; list **12px** shield dot; catalog **`is_archived`**.
 

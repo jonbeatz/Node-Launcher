@@ -19,7 +19,7 @@ let msc_vpeIpcRegistered = false;
 /** Node-Launcher UI port; managed projects must avoid this port. */
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 
-/** v1.3.7 — sync Windows login-item with persisted `launch_at_login`. */
+/** v1.4.0 — sync Windows login-item with persisted `launch_at_login`. */
 function msc_applyLoginStartupFromStore(store) {
   try {
     if (typeof store.getSettings !== 'function') return;
@@ -129,7 +129,7 @@ function msc_promptVaultPath() {
   return path.join(app.getPath('userData'), 'prompt-vault.json');
 }
 
-/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.3.7: master `versionLabel` MSC line. */
+/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.4.0: master `versionLabel` MSC line. */
 function msc_promptVaultMasterItems() {
   const updatedAt = new Date().toISOString();
   return [
@@ -137,7 +137,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.7',
+      versionLabel: 'MSC Media Engine v1.4.0',
       description: 'Full production build: wipe dist, verify dev, ship the Windows installer.',
       updatedAt,
       bodyMd:
@@ -148,7 +148,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.7',
+      versionLabel: 'MSC Media Engine v1.4.0',
       description: 'Everyday Electron + Next stack; closes clean when you quit the window.',
       updatedAt,
       bodyMd:
@@ -159,7 +159,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.7',
+      versionLabel: 'MSC Media Engine v1.4.0',
       description: 'Block until dev exits, then run forge chain (snapshot → guard → build).',
       updatedAt,
       bodyMd:
@@ -170,7 +170,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.7',
+      versionLabel: 'MSC Media Engine v1.4.0',
       description: 'Version bump path with dist reset before dev + forge.',
       updatedAt,
       bodyMd:
@@ -181,7 +181,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.3.7',
+      versionLabel: 'MSC Media Engine v1.4.0',
       description: 'Heavy Node purge + launcher port recovery (use from System Health when stuck).',
       updatedAt,
       bodyMd:
