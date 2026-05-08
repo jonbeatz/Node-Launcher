@@ -6,9 +6,9 @@ import { getVpeApi } from '@/lib/vpe-bridge'
 type NetLedState = 'unknown' | 'forge' | 'dev' | 'conflict'
 
 function msc_engineVersionLabel(): string {
-  if (typeof window === 'undefined') return '1.3.1'
+  if (typeof window === 'undefined') return '1.3.5'
   const w = window as Window & { vpeInfo?: { version?: string } }
-  return w.vpeInfo?.version ?? '1.3.1'
+  return w.vpeInfo?.version ?? '1.3.5'
 }
 
 export function Footer() {

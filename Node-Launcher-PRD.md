@@ -4,9 +4,17 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.3.1** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
+**Shipped desktop build (npm / `package.json` `version`):** **1.3.5** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
 
-**v1.3.1 (ops / branching):** Default dev branch **`VPE-v1.3.x-Dev`**; CI **`.github/workflows/ci.yml`** runs **`npm ci`** (requires **`package-lock.json`** synced to **`package.json`**) → lint → **`build:renderer`** → AST stub → Playwright **`test:e2e`**.
+**v1.3.5 (nav + maintenance):** **Top bar** — single catalog project badge (no duplicate in dashboard filter row); **+ Add New Project** in header. **Sidebar** — flat **Dashboard**; **Engineering** accordion (tactical rows); **Vault** holds Prompt Vault, Repair Logs, and **VPE Sandbox** (no standalone Sandbox section). **Maintenance** UI tabs: **Prompt Vault** first, **Repair Logs** second; default sub-view **Prompt Vault**. **Sandbox Engineer** tab uses **Radix Accordion** per step (matches Strategist pattern).
+
+**v1.3.4 (shell + Sandbox workflow):** **Top bar** project count badge after breadcrumb; **Sandbox Strategist** = **Radix Accordion** (Brain Bank → Audition → Ship). **v1.3.3** layers below (tabs, Vault **`type`**, CI) still apply.
+
+**v1.3.3 (Sandbox + Vault + CI):** Sandbox **Strategist** (default) vs **Engineer** tabs. Prompt Vault optional **`type`** (**Command** / **Directive** / **Snippet**) with **[CMD]** / **[DIR]** / **[SNP]** badges; **Copy** tooltip **Prime AI Assistant**. **GitHub Actions:** lint runs **`npm run lint -- --fix || true`** (relaxed; job not blocked by minor lint alone); **`NEXT_TELEMETRY_DISABLED: "1"`** remains quoted on lint/build/E2E steps.
+
+**v1.3.2 (ghost + UX):** Main **Ghost watcher** (Windows): periodic check for **node.exe** on catalog ports with no matching **running** row → renderer cue on System Health; dashboard **grid/list** and filter pill (**ARCHIVE**) persisted in **LocalStorage**.
+
+**v1.3.1 (ops / branching):** Default dev branch **`VPE-v1.3.x-Dev`**; CI **`.github/workflows/ci.yml`** runs **`npm ci`** (requires **`package-lock.json`** synced to **`package.json`**) → lint → **`build:renderer`** → AST stub → Playwright **`test:e2e`** (lint strictness superseded by **v1.3.3** relaxed lint above).
 
 **v1.2.6 (product baseline):** **`projects.is_archived`** in SQLite/JSON; **ARCHIVE** filter; **Project Settings → Archive project**; **Ctrl+K / Cmd+K** jump search; **Add Project** type from **`inspectProject`**; tactical sidebar shields; list **12px** shield dot; catalog **`is_archived`**.
 

@@ -3,7 +3,7 @@
 This document is the **Constitution** of the Vader Project Engine. It serves as the absolute technical source of truth. If any document conflicts with this, **this document wins**.
 
 ## 1. Architectural Integrity
-- **The Vader Shield:** The renderer layer must remain "dumb" regarding the OS. It may only communicate through the `src/preload/main.ts` bridge.
+- **The Vader Shield:** The renderer layer must remain "dumb" regarding the OS. It may only communicate through **`src/preload`** (canonical gate: **`preload.js`**) via **`contextBridge`** — **`nodeIntegration`** off.
 - **Process Survival:** PM2 is the daemon. Closing the Electron UI does NOT kill dev servers unless a "Stop" command is explicitly issued.
 
 ## 2. Mandatory File Hierarchy

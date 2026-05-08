@@ -31,7 +31,7 @@ When this skill applies, **always**:
 - **PM2:** Prefer the **bundled programmatic API** in main; do not assume a globally installed PM2 daemon is required for the product story.
 - **Termination:** Discuss and implement stops with **`tree-kill`** (and project-runner preflight / Windows port sweeps where already implemented).
 - **Repairs:** **`.vader-backup`** before writes; diff-first confirmation for AST changes; align with `scripts/repair` / PRD repair suite.
-- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.3.1**). **Navigation selection** in the shell uses neutral **`#2a2a2a`** (see **`VPE-BUILD-PROTOCOL.md`** Standards — not the green CTA accent).
+- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.3.5**). **Navigation selection** in the shell uses neutral **`#2a2a2a`** (see **`VPE-BUILD-PROTOCOL.md`** Standards — not the green CTA accent).
 - **Naming:** Custom CSS/Tailwind-style classes prefixed with **`msc-`**; new main-process helpers follow existing **`msc_`** naming (match surrounding code).
 - **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. **Forge / packaging sequencing:** [`.cursor/docs/VPE-BUILD-PROTOCOL.md`](.cursor/docs/VPE-BUILD-PROTOCOL.md) — e.g. **`vader:sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vpe:cleanup-dist`**.
 - **API Bootstrap:** Always ensure the **"start API"** (LiteLLM) is running for any task requiring model orchestration. Confirmation: **"API is Live"**.
@@ -55,6 +55,7 @@ When this skill applies, **always**:
 - **Managed projects:** Must use **ports strictly above** the launcher port (e.g. **3001+** when the shell is on 3000). The app enforces a **reserved-port guard** so managed apps do not bind the launcher port.
 - **Bootstrap (v1.2.3+):** **`vpe:toggle-status`** → main **`project-runner`**: missing **`node_modules`** with **`package.json`** triggers a single-shell **`install && run <start_script>`** before health probes (longer first probe delay). Log-drawer **`vpe:execute-terminal-command`** does **not** auto-install — see **`vpe-ipc.js`** docs.
 - **Conflicts:** Auto-increment (up to **10** attempts), **port lock** UX, and toasts on exhaustion—per PRD / `.cursorrules`.
+- **Ghost watcher (v1.3.2+, Windows):** Main **`vpe-orchestrator`** — ~**60s** tick detects **node.exe** **LISTENING** on a catalog port **>** launcher port when **no** project row on that port is **`running`**; emits **`vpe:ghost-detected`** / **`vpe:ghost-cleared`**. Renderer: preload **`subscribeGhostPresence`** → TopBar **Activity** amber cue (prompts **System Health** / cleanup). Complements **`project-runner`** port preflight; does **not** auto-kill.
 
 ### 1.3 Nuke suite
 
@@ -89,6 +90,8 @@ Never delete **`.next`** while **`next dev`** is actively running for that proje
 - **Primary:** SQLite (and JSON fallback) under **`app.getPath('userData')/vpe-db`**—not renderer assumptions about cwd.
 - **Thumbnails:** Scratch/cache under **`userData/media/thumbnails`** (packaged-safe).
 - Legacy **`projects.json`** may be archived; **logical** project fields still match `.cursorrules` §11 / PRD schema for IDs, ports, scripts, and status.
+- **Client dashboard prefs (v1.3.2+):** Tactical **grid vs list** and status filter pill (**ALL** … **ARCHIVE**) persist in **`localStorage`** (**`useDashboardPersistedSettings`** — **`src/renderer/state/useSettings.ts`**), not SQLite.
+- **Maintenance UX (v1.3.3+):** **Sandbox** uses **Strategist** / **Engineer** tabs — **v1.3.5:** both tabs use **Radix Accordion** for steps; **Prompt Vault** rows support optional **`type`** (**Command** / **Directive** / **Snippet**) for **[CMD]**/**[DIR]**/**[SNP]** badges — **`vpe:update-vault-item`** persists **`type`**; **Copy** primes assistants (**tooltip**). **v1.3.5:** **Engineering** / **Vault** / **Favorites** accordions default **collapsed**; **Dashboard** flat; **Vault** includes **VPE Sandbox**; **+ Add New Project** in **TopBar**; Maintenance tabs **Prompt Vault** then **Repair Logs**.
 
 ### 1.7 IPC and telemetry discipline
 

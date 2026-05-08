@@ -4,15 +4,18 @@
 
 **Authority note:** Executable script strings and Electron-builder knobs live in **`package.json`**. If this document ever diverges from **`package.json`**, **`package.json` wins** — update this file in the same change.
 
-**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.3.1** (CI / branch), **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
+**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.3.5** (TopBar add, flat Dashboard, Vault + Sandbox, Engineer accordion), **Build v1.3.4** (top bar badge, Strategist accordion), **Build v1.3.3** (Strategist tabs + Vault **`type`**), **Build v1.3.2** (ghost UX), **Build v1.3.1** (CI / branch), **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
 
-**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.3.1**).
+**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.3.5**).
 
 ### Permanent product notes (v1.2.9+)
 
 - Integrated Playwright E2E for automated Electron data validation.
 - Implemented Scorched Earth global cleanup for 0x2740 socket recovery.
 - Standardized 12px Paperclip indicators for documented projects.
+- **v1.3.5:** **Top bar** — **+ Add New Project**; catalog count badge **only** by breadcrumb (no duplicate in dashboard filter row). **Sidebar** — **Dashboard** flat; **Engineering** accordion (tactical rows); **Vault** holds Prompt Vault, Repair Logs, **VPE Sandbox**; **Favorites** accordion. **Maintenance** tabs: **Prompt Vault** first. **Sandbox** — **Strategist** + **Engineer** each use **Radix Accordion** for steps.
+- **v1.3.4:** **Top bar** project count badge after breadcrumb; **Sandbox Strategist** = **Radix Accordion** (Brain Bank → Audition → Ship), no “why this exists” wall.
+- **v1.3.3:** **Sandbox** **[Strategist]** | **[Engineer]** tabs (**`#2a2a2a`** active); **Prompt Vault** action categorization (**`type`**, **[CMD]** / **[DIR]** / **[SNP]** badges, **Prime AI Assistant**). **GitHub CI** lint step relaxed: **`npm run lint -- --fix || true`**.
 
 ### Skills (v1.3.0+)
 
@@ -24,7 +27,8 @@
 
 ### CI (v1.3.1+)
 
-- GitHub **`lint-and-build`** runs **`npm ci`** → **`npm run lint`** → **`npm run build:renderer`** → **`npm run repair:ast`** → Playwright Chromium **`test:e2e`**. **`npm ci` requires `package-lock.json` to match `package.json`** — commit lock updates whenever dependencies change.
+- GitHub **`lint-and-build`** runs **`npm ci`** → **`npm run lint -- --fix || true`** (**v1.3.3+** relaxed: ESLint may auto-fix; lint step never fails the job alone) → **`npm run build:renderer`** → **`npm run repair:ast`** → Playwright Chromium **`test:e2e`**. Lint / build / E2E steps keep **`NEXT_TELEMETRY_DISABLED: "1"`** as a quoted YAML string. **`npm ci` requires `package-lock.json` to match `package.json`** — commit lock updates whenever dependencies change.
+- **README badge (v1.3.2+):** Root [README](../../README.md) embeds **`actions/workflows/ci.yml`** status (**`jonbeatz/Node-Launcher`**) near the title so **Build: CI** is visible on the repo homepage.
 
 ---
 
@@ -78,16 +82,17 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ---
 
-## 4. In-app tooling (v1.1.0+ reference; UI through **v1.3.1**)
+## 4. In-app tooling (v1.1.0+ reference; UI through **v1.3.5**)
 
 These are **UX / ops** features in the packaged or dev UI; they do not replace **`package.json`** scripts:
 
-- **System Health / diagnostics:** **Closed** by default on load; open from TopBar. **CPU temperature:** **not collected**; **v1.1.7** removed all thermal UI (**no `Temp:` line**; **`cpuTemp`** dropped from IPC types). **System Log** drawer **collapsed** by default (`logDrawerExpanded` / user expand); **`terminal-prefs`** does not persist drawer open state. Log lines strip **ANSI / CSI** and **CLIXML** for plain HTML (not a full xterm).
-- **Sidebar:** **Add New Project** sits directly under **Dashboard** (no **REGISTRY** section label). **v1.3.0+:** sidebar **navigation** active/hover surfaces use **`#2a2a2a`** (**Add**, **STOP ALL**, tactical rows, Maintenance, Sandbox, Settings) — Studio Dark neutrality; tactical row **shield dots** keep type colors for recognition only.
+- **System Health / diagnostics:** **Closed** by default on load; open from TopBar (**Activity**). **v1.3.2+:** **Ghost watcher** (Windows): if **node.exe** listens on a catalog dev port while SQLite shows **no** **running** project on that port, TopBar **Activity** flashes **amber** until **Scorched Earth** / manual cleanup — IPC **`vpe:ghost-detected`** / **`vpe:ghost-cleared`** via preload **`subscribeGhostPresence`**. **CPU temperature:** **not collected**; **v1.1.7** removed all thermal UI (**no `Temp:` line**; **`cpuTemp`** dropped from IPC types). **System Log** drawer **collapsed** by default (`logDrawerExpanded` / user expand); **`terminal-prefs`** does not persist drawer open state. Log lines strip **ANSI / CSI** and **CLIXML** for plain HTML (not a full xterm).
+- **Sidebar:** **v1.3.5+:** **+ Add New Project** moved to **TopBar**; **Dashboard** is a single flat button; **Engineering** (tactical rows), **Vault** (Prompt Vault, Repair Logs, **VPE Sandbox**), **Favorites** use accordions (default collapsed). **v1.3.0+:** sidebar **navigation** active/hover surfaces use **`#2a2a2a`** — Studio Dark neutrality; tactical row **shield dots** keep type colors for recognition only.
 - **Footer “Net” LED + Purge:** IPC reports **`p3000` / `p3001` / `p9222`**, whether listeners are **node/electron-only** (**`ok`**), and **`forgeReady`** (3000/3001 free). **Green** = **`forgeReady`** — **9222** is **always** reported idle for LED purposes (**v1.1.8** purge + forced row — see §2); **amber** = dev stack on **3000** and/or **3001**; **red** = foreign process on **3000/3001**. **Purge env (`msc_purgeLauncherPorts`):** optional **`chrome.exe`** kill when window title matches **`VPE*`**; **`taskkill /F /PID`** only (**no `/T`**) for listeners on **3000**, **3001**, **9222**, always skipping **`process.pid`** and **`process.ppid`**; second-pass **9222** clears remaining non-protected listeners; **`stdio: 'ignore'`**; **500ms** settle before port re-check.
-- **Maintenance → Prompt Vault:** Templates with **title / versionLabel / optional description / body** under **`userData` / `prompt-vault.json`**; stable-id **master** rows merged on read (**`vpe-ipc.js`**). **v1.2.9+:** row **Accordion** in UI; **Edit** persists via **`vpe:update-vault-item`**. **v1.3.0+:** **create** composer is a **collapsed-by-default** Accordion (**+ Create New Master Directive**).
-- **Sandbox:** **v1.2.9+** — top instructional **Accordion** (**How to use the VPE Sandbox & Vault**). **react-live** panel for pasting v0-style React snippets against **Studio Dark** (**`#121212`**) preview.
+- **Maintenance → Prompt Vault:** Templates with **title / versionLabel / optional description / optional `type` (Command | Directive | Snippet) / body** under **`userData` / `prompt-vault.json`**; stable-id **master** rows merged on read (**`vpe-ipc.js`**). **v1.2.9+:** row **Accordion** in UI; **Edit** persists via **`vpe:update-vault-item`** (incl. **`type`**). **v1.3.0+:** **create** composer is a **collapsed-by-default** Accordion (**+ Create New Master Directive**). **v1.3.3+:** per-row **type** badge (**[CMD]** / **[DIR]** / **[SNP]**); legacy rows without **`type`** render as **Directive**; **Copy** uses tooltip **Prime AI Assistant**; **Save template** uses neutral bordered style.
+- **Sandbox:** **v1.3.5+** — **Strategist** and **Engineer** tabs each use **Radix Accordion** for numbered steps; both under **Tabs** (**`#2a2a2a`** active). **v1.3.4:** Engineer was a single static block. **v1.2.9–v1.3.2:** single instructional **Accordion**. **react-live** panel unchanged — v0-style React snippets on **Studio Dark** (**`#121212`**).
+- **Dashboard layout (v1.3.2+):** **`useDashboardPersistedSettings`** — **grid vs list** toggle and status filter pill (**ALL** / **RUNNING** / **STOPPED** / **ERRORS** / **ARCHIVE**) restore from **`localStorage`** on relaunch.
 
 ---
 
-*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.3.1.”*
+*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.3.5.”*

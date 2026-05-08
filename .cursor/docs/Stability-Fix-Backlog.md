@@ -1,6 +1,6 @@
 # Stability & fix backlog (resolved)
 
-Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** (**`--success last`**), **`vader:clean-sync`** (**`rimraf` + hardened `||`**), **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.8**).
+Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** (**`--success last`**), **`vader:clean-sync`** (**`rimraf` + hardened `||`**), **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.8**). For **v1.3.2+** **Ghost watcher** behavior (orphan **node.exe** on catalog ports + **TopBar Activity** amber cue), see **§ Windows ghost process** below (**Related — UI visibility**).
 
 ---
 
@@ -155,6 +155,8 @@ Additional hardening:
 - Startup safety kill waits for both **15s grace** and **5 consecutive failed probes**
 - Windows spawn path uses direct `npm.cmd` / `pnpm.cmd` / `yarn.cmd` with `shell: false`
 
+**Related — UI visibility (v1.3.2+):** Orphan **node.exe** listeners can still appear when SQLite **does not** show a **running** project on that port (manual shells, crashes, or registry drift). That is a **different** signal from the **Start** preflight above. Main **`msc_startGhostWatcher`** in [`vpe-orchestrator.js`](../../src/main/vpe-orchestrator.js) runs on a **~60s** interval (**Windows** only): **`netstat`** + **`tasklist`** — if **node.exe** is **LISTENING** on a catalog dev port **above** the launcher port and **no** row sharing that port is **`running`**, main sends **`vpe:ghost-detected`** (payload: sorted **`ports`**, **`at`**); when the condition clears, **`vpe:ghost-cleared`**. Preload exposes **`subscribeGhostPresence`**; the dashboard **TopBar** **Activity** icon pulses **amber** until the user addresses it (**System Health**, **Scorched Earth**, or manual port cleanup). The watcher **does not** auto-kill processes. Product / agent index: [Checkpoint.md](Checkpoint.md) (**Build v1.3.2** at top), [AGENT-BOOT-CHECKLIST.md](AGENT-BOOT-CHECKLIST.md) (**Ghost watcher & dashboard layout** row), [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) §4 (System Health + ghost bullet).
+
 ---
 
 ## Packaged boot crash: main-process parse error from `app.asar` (tray path)
@@ -186,4 +188,4 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 ---
 
-*Last updated: 2026-05-07 — align with [Checkpoint](Checkpoint.md); **build v1.1.8**; git branch: **confirm with `git status`**. Powered by the MSC Media Engine.*
+*Last updated: 2026-05-08 — cross-ref **v1.3.2** Ghost watcher UI (see **Windows ghost process** section above); align with [Checkpoint](Checkpoint.md). Forge / `concurrently` baseline still **v1.1.8** in [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md). Git branch: **confirm with `git status`**. Powered by the MSC Media Engine.*

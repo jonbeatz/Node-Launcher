@@ -4,9 +4,11 @@
 
 **Cursor ↔ Google (Vertex AI) via LiteLLM + ngrok** (paths, ports, Cursor settings, post-restart checklist): [API-SetUp-Master.md](API-SetUp-Master.md)
 
-**Build & terminal command sequencing** (`vader:dev`, **`VPE_LAUNCHER_FORGE`** [reserved flag; no thermal polling in main as of **v1.1.6**], **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vader:force-forge`**, **`vader:sync`**, **`vader:clean-sync`**, `&&` gates, **`vpe-forge-pause`**, snapshot, syntax guard, **`dist/`** artifacts): [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (includes **v1.2.3** managed-project bootstrap; forge hardening still **v1.1.8**). **Product / UX:** **Build v1.3.1** (current) + **Build v1.3.0** + **Build v1.2.9** + **Build v1.2.6** archive/jump baseline in [Checkpoint.md](Checkpoint.md).
+**Build & terminal command sequencing** (`vader:dev`, **`VPE_LAUNCHER_FORGE`** [reserved flag; no thermal polling in main as of **v1.1.6**], **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vader:force-forge`**, **`vader:sync`**, **`vader:clean-sync`**, `&&` gates, **`vpe-forge-pause`**, snapshot, syntax guard, **`dist/`** artifacts): [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (includes **v1.2.3** managed-project bootstrap; forge hardening still **v1.1.8**). **Product / UX:** **Build v1.3.5** (current) + **Build v1.3.4** + **Build v1.3.3** + **Build v1.3.2** + **Build v1.3.1** + **Build v1.3.0** + **Build v1.2.9** + **Build v1.2.6** archive/jump baseline in [Checkpoint.md](Checkpoint.md).
 
 **Shipped app version:** root **`package.json` → `"version"`** (align with preload / footer / **`layout.tsx`**) drives shipped labels — see [Custom-Commands.md — Update Docs](Custom-Commands.md#update-docs) after each release.
+
+**v1.3.5 product notes:** **Top bar** — **+ Add New Project**, single catalog badge (no filter-row duplicate). **Sidebar** — flat **Dashboard**; **Engineering** / **Vault** (incl. **VPE Sandbox**) / **Favorites** accordions. **Maintenance** — **Prompt Vault** tab first. **Sandbox** — **Engineer** = **accordion** steps. **v1.3.4:** Strategist accordion; **v1.3.3:** Vault **`type`** + badges. **CI** — **`npm run lint -- --fix || true`**. **[Checkpoint.md](Checkpoint.md)** — **Build v1.3.5** at top.
 
 **Windows app icon:** staged at **`media/icon.ico`** (from **`_design_references/VPE.ico`** via **`msc-copy-release-icon`**); [`package.json`](../../package.json) **`build`** block references that path — see [Checkpoint.md](Checkpoint.md) (v1.2.2 UI / icon bullets) and [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe).
 

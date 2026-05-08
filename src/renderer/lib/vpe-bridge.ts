@@ -158,6 +158,9 @@ export interface VpePurgeLauncherPortsResult {
   forgeReady?: boolean
 }
 
+/** v1.3.5 — Prompt Vault row categorization (UI badges: CMD / DIR / SNP). */
+export type VpePromptVaultEntryType = 'Command' | 'Directive' | 'Snippet'
+
 export interface VpePromptVaultItem {
   id: string
   title: string
@@ -167,6 +170,8 @@ export interface VpePromptVaultItem {
   description?: string
   bodyMd: string
   updatedAt: string
+  /** Defaults to Directive when absent (legacy rows). */
+  type?: VpePromptVaultEntryType
 }
 
 export interface VpeUpdateVaultItemPayload {
@@ -175,6 +180,7 @@ export interface VpeUpdateVaultItemPayload {
   versionLabel?: string
   description?: string
   bodyMd?: string
+  type?: VpePromptVaultEntryType | null
 }
 
 export interface VpePromptVaultData {
@@ -186,6 +192,13 @@ export interface CatalogExportResult {
   ok: boolean
   canceled?: boolean
   path?: string
+}
+
+/** v1.3.2+ — main ghost watcher heartbeat (`vpe:ghost-detected` / cleared). */
+export interface VpeGhostPresenceEvent {
+  active: boolean
+  ports?: number[]
+  at?: number
 }
 
 export interface VpeApi {
@@ -220,6 +233,9 @@ export interface VpeApi {
   /** Fires when install+dev pipeline appears to reach the dev server (or clear installing UI). */
   subscribeBootstrapDevVisible?: (
     cb: (payload: { projectId: string }) => void,
+  ) => () => void
+  subscribeGhostPresence?: (
+    cb: (payload: VpeGhostPresenceEvent) => void,
   ) => () => void
   /** PM2 stop-all + runner kill-all + SQLite all stopped */
   stopAllProjects?: () => Promise<{ ok?: boolean }>

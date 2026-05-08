@@ -6,12 +6,12 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Plus,
-  FileText,
   Square,
   Star,
   ChevronDown,
   FlaskConical,
+  BookOpen,
+  ScrollText,
 } from 'lucide-react'
 
 import {
@@ -20,11 +20,14 @@ import {
   type VpeTacticalProjectFilter,
 } from '@/lib/project-tactical-filter'
 import { msc_shieldColorHex } from '@/lib/shield-colors'
+import { useSidebarAccordionState } from '@/state/useSidebar'
+import type { MaintenanceTab } from '@/components/maintenance-section'
 
 interface AppSidebarProps {
   activeItem?: string
+  /** When on Maintenance, which sub-tab is active (for sidebar highlight). */
+  maintenanceTab?: MaintenanceTab
   onNavigate?: (id: string) => void
-  onAddProject?: () => void
   onStopAll?: () => void
   favorites?: { id: string; name: string }[]
   /** v1.2.5 tactical filter (mirrors dashboard pills). */
@@ -34,8 +37,8 @@ interface AppSidebarProps {
 
 export function AppSidebar({
   activeItem = 'dashboard',
+  maintenanceTab = 'vault',
   onNavigate,
-  onAddProject,
   onStopAll,
   favorites = [],
   tacticalActive = 'all',
@@ -43,9 +46,8 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  const [maintenanceOpen, setMaintenanceOpen] = useState(false)
-  const [favoritesOpen, setFavoritesOpen] = useState(false)
-  const [projectsNavOpen, setProjectsNavOpen] = useState(true)
+  const { engineeringOpen, setEngineeringOpen, vaultOpen, setVaultOpen, favoritesOpen, setFavoritesOpen } =
+    useSidebarAccordionState()
 
   const tc: VpeTacticalCounts = tacticalCounts ?? {
     all: 0,
@@ -61,6 +63,8 @@ export function AppSidebar({
   const dashboardActive = activeItem === 'dashboard'
   const maintenanceActive = activeItem === 'maintenance'
   const sandboxActive = activeItem === 'sandbox'
+  const vaultTabActive = (tab: MaintenanceTab) =>
+    maintenanceActive && maintenanceTab === tab
 
   const msc_sidebarShieldTint = (
     tacticalId: VpeTacticalProjectFilter,
@@ -83,62 +87,57 @@ export function AppSidebar({
 
       <nav className="flex-1 p-2 overflow-y-auto custom-scrollbar">
         <div className="space-y-4">
+          {/* Dashboard — flat (v1.3.5): full-width Dashboard button; Add lives in TopBar */}
           <div>
-            <button
-              onClick={onAddProject}
-              className={`
-                w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
+            {!collapsed && (
+              <div className="px-2 mb-2">
+                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
+                  Dashboard
+                </span>
+              </div>
+            )}
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => onNavigate?.('dashboard')}
+                onMouseEnter={() => setHoveredItem('dashboard')}
+                onMouseLeave={() => setHoveredItem(null)}
+                className={`
+                w-full flex items-center gap-3 p-2.5 rounded transition-all duration-200 vader-focus
                 border border-[#444444] bg-[#1c1c1c] text-[#eaeaea] hover:bg-[#2a2a2a] hover:text-white
-                ${collapsed ? 'justify-center' : ''}
-              `}
-              title={collapsed ? 'Add New Project' : undefined}
-            >
-              <Plus size={18} />
-              {!collapsed && (
-                <span className="font-sans text-sm font-medium">Add New Project</span>
-              )}
-            </button>
-          </div>
-
-          <div>
-            <button
-              onClick={() => onNavigate?.('dashboard')}
-              onMouseEnter={() => setHoveredItem('dashboard')}
-              onMouseLeave={() => setHoveredItem(null)}
-              className={`
-                w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
                 ${
                   dashboardActive
-                    ? 'bg-[#2a2a2a] text-white'
+                    ? 'bg-[#2a2a2a] text-white border-[#555555]'
                     : hoveredItem === 'dashboard'
                       ? 'bg-[#2a2a2a] text-white'
-                      : 'text-[#A0A0A0]'
+                      : ''
                 }
+                ${collapsed ? 'justify-center' : ''}
               `}
-              title={collapsed ? 'Dashboard' : undefined}
-            >
-              <LayoutDashboard size={18} />
-              {!collapsed && <span className="font-sans text-sm font-medium">Dashboard</span>}
-            </button>
+                title={collapsed ? 'Dashboard' : undefined}
+              >
+                <LayoutDashboard size={18} />
+                {!collapsed && <span className="font-sans text-sm font-semibold">Dashboard</span>}
+              </button>
+            </div>
           </div>
 
-          {/* Tactical filters — dots; hidden entirely when sidebar collapsed (v1.2.7) */}
           {!collapsed && (
             <div>
               <button
                 type="button"
-                onClick={() => setProjectsNavOpen(!projectsNavOpen)}
+                onClick={() => setEngineeringOpen(!engineeringOpen)}
                 className="w-full px-2 mb-2 flex items-center justify-between group"
               >
                 <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left">
-                  Projects
+                  Engineering
                 </span>
                 <ChevronDown
                   size={10}
-                  className={`text-[#A0A0A0] transition-transform shrink-0 ${projectsNavOpen ? '' : '-rotate-90'}`}
+                  className={`text-[#A0A0A0] transition-transform shrink-0 ${engineeringOpen ? '' : '-rotate-90'}`}
                 />
               </button>
-              {projectsNavOpen && (
+              {engineeringOpen && (
                 <div className="space-y-0.5 pl-1">
                   {VPE_TACTICAL_NAV_META.map((item) => {
                     const n = tc[item.countKey]
@@ -193,49 +192,71 @@ export function AppSidebar({
             {!collapsed && (
               <button
                 type="button"
-                onClick={() => setMaintenanceOpen(!maintenanceOpen)}
+                onClick={() => setVaultOpen(!vaultOpen)}
                 className="w-full px-2 mb-2 flex items-center justify-between group"
               >
                 <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left">
-                  Maintenance
+                  Vault
                 </span>
                 <ChevronDown
                   size={10}
-                  className={`text-[#A0A0A0] transition-transform ${maintenanceOpen ? '' : '-rotate-90'}`}
+                  className={`text-[#A0A0A0] transition-transform ${vaultOpen ? '' : '-rotate-90'}`}
                 />
               </button>
             )}
-            {(maintenanceOpen || collapsed) && (
+            {(vaultOpen || collapsed) && (
               <div className="space-y-1">
                 <button
-                  onClick={() => onNavigate?.('maintenance')}
-                  onMouseEnter={() => setHoveredItem('maintenance')}
+                  type="button"
+                  onClick={() => onNavigate?.('maintenance:vault')}
+                  onMouseEnter={() => setHoveredItem('vault-prompt')}
                   onMouseLeave={() => setHoveredItem(null)}
                   className={`
                     w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
                     ${
-                      maintenanceActive
+                      vaultTabActive('vault')
                         ? 'bg-[#2a2a2a] text-white'
-                        : hoveredItem === 'maintenance'
+                        : hoveredItem === 'vault-prompt'
                           ? 'bg-[#2a2a2a] text-white'
                           : 'text-[#A0A0A0]'
                     }
                   `}
-                  title={collapsed ? 'Maintenance' : undefined}
+                  title={collapsed ? 'Prompt Vault' : undefined}
                 >
-                  <FileText size={18} />
-                  {!collapsed && <span className="font-sans text-sm font-medium">Maintenance</span>}
+                  <BookOpen size={18} />
+                  {!collapsed && <span className="font-sans text-sm font-medium">Prompt Vault</span>}
                 </button>
                 <button
+                  type="button"
+                  onClick={() => onNavigate?.('maintenance:logs')}
+                  onMouseEnter={() => setHoveredItem('vault-logs')}
+                  onMouseLeave={() => setHoveredItem(null)}
+                  className={`
+                    w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
+                    ${
+                      vaultTabActive('logs')
+                        ? 'bg-[#2a2a2a] text-white'
+                        : hoveredItem === 'vault-logs'
+                          ? 'bg-[#2a2a2a] text-white'
+                          : 'text-[#A0A0A0]'
+                    }
+                  `}
+                  title={collapsed ? 'Repair Logs' : undefined}
+                >
+                  <ScrollText size={18} />
+                  {!collapsed && <span className="font-sans text-sm font-medium">Repair Logs</span>}
+                </button>
+                <button
+                  type="button"
                   onClick={() => onNavigate?.('sandbox')}
-                  onMouseEnter={() => setHoveredItem('sandbox')}
+                  onMouseEnter={() => setHoveredItem('vault-sandbox')}
                   onMouseLeave={() => setHoveredItem(null)}
                   className={`
                     w-full flex items-center gap-3 p-2 rounded transition-all duration-200 vader-focus
                     ${
                       sandboxActive
                         ? 'bg-[#2a2a2a] text-white'
-                        : hoveredItem === 'sandbox'
+                        : hoveredItem === 'vault-sandbox'
                           ? 'bg-[#2a2a2a] text-white'
                           : 'text-[#A0A0A0]'
                     }
@@ -243,7 +264,7 @@ export function AppSidebar({
                   title={collapsed ? 'VPE Sandbox' : undefined}
                 >
                   <FlaskConical size={18} />
-                  {!collapsed && <span className="font-sans text-sm font-medium">Sandbox</span>}
+                  {!collapsed && <span className="font-sans text-sm font-medium">VPE Sandbox</span>}
                 </button>
               </div>
             )}

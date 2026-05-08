@@ -25,9 +25,16 @@
 *   **Top Bar**: 
     *   Height: 48px
     *   Style: `bg-vader-surface`, border-bottom 1px `#333`
-    *   Content: "VPE" logomark + dynamic breadcrumb (`VPE > Projects > MSC Media Pro`) in muted text; Right side: settings icon.
+    *   Content: "VPE" logomark + dynamic breadcrumb (`VPE > Projects > MSC Media Pro`) in muted text, with optional **`[N PROJECT(S)]`** badge (`#2a2a2a`) immediately after the breadcrumb trail; **v1.3.5+:** **+ Add New Project** in the header (global). Right: **System Health** (**Activity** icon), settings; **v1.3.2+:** Activity uses an **amber** pulse when main detects **orphan node.exe** on a catalog dev port (**Ghost watcher** cue → open System Health / cleanup).
 *   **Main Content Area**: `flex-1`, padding 24px, scrollable vertical.
 *   **Footer**: 32px, centered, `bg-vader-surface` / text-muted, "Powered by the MSC Media Engine".
+
+---
+
+## 🧪 Sandbox & Prompt Vault (Maintenance)
+
+*   **Sandbox (v1.3.3+):** Instruction layer uses **Tabs** — **[Strategist]** vs **[Engineer]**. Active tab uses **`#2a2a2a`** (Studio Dark neutral), not Vader Red. **v1.3.4+:** **Strategist** = **Radix Accordion** (Brain Bank → Audition → Ship). **v1.3.5+:** **Engineer** = **Radix Accordion** (four technical steps). **Vault** sidebar group includes **VPE Sandbox** link (no top-level Sandbox accordion).
+*   **Prompt Vault:** Rows may include an optional **`type`** (**Command** / **Directive** / **Snippet**) shown as compact badges (**[CMD]** / **[DIR]** / **[SNP]**). Primary copy action is framed as **Prime AI Assistant** (tooltip). **Save template** uses a subtle border + neutral hover.
 
 ---
 

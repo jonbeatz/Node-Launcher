@@ -81,14 +81,15 @@ function msc_promptVaultPath() {
   return path.join(app.getPath('userData'), 'prompt-vault.json');
 }
 
-/** v1.2.2 — stable-id master Prompt Vault rows (merged on read / seeded on empty file). */
+/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.3.5: master `versionLabel` MSC line. */
 function msc_promptVaultMasterItems() {
   const updatedAt = new Date().toISOString();
   return [
     {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
-      versionLabel: 'MSC Media Engine v1.3.1',
+      type: 'Command',
+      versionLabel: 'MSC Media Engine v1.3.5',
       description: 'Full production build: wipe dist, verify dev, ship the Windows installer.',
       updatedAt,
       bodyMd:
@@ -98,7 +99,8 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
-      versionLabel: 'MSC Media Engine v1.3.1',
+      type: 'Command',
+      versionLabel: 'MSC Media Engine v1.3.5',
       description: 'Everyday Electron + Next stack; closes clean when you quit the window.',
       updatedAt,
       bodyMd:
@@ -108,7 +110,8 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
-      versionLabel: 'MSC Media Engine v1.3.1',
+      type: 'Command',
+      versionLabel: 'MSC Media Engine v1.3.5',
       description: 'Block until dev exits, then run forge chain (snapshot → guard → build).',
       updatedAt,
       bodyMd:
@@ -118,7 +121,8 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
-      versionLabel: 'MSC Media Engine v1.3.1',
+      type: 'Command',
+      versionLabel: 'MSC Media Engine v1.3.5',
       description: 'Version bump path with dist reset before dev + forge.',
       updatedAt,
       bodyMd:
@@ -128,7 +132,8 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
-      versionLabel: 'MSC Media Engine v1.3.1',
+      type: 'Command',
+      versionLabel: 'MSC Media Engine v1.3.5',
       description: 'Heavy Node purge + launcher port recovery (use from System Health when stuck).',
       updatedAt,
       bodyMd:
@@ -138,6 +143,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-electron-e2e',
       title: 'Electron E2E Suite',
+      type: 'Snippet',
       versionLabel: 'v1.2.8',
       description: 'Builds renderer and runs Playwright smoke tests for Vault/Notes.',
       updatedAt,
@@ -146,6 +152,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-playwright-manual',
       title: 'Playwright Manual',
+      type: 'Snippet',
       versionLabel: 'v1.2.8',
       description: 'Directly triggers the E2E test runner with process-kill teardown.',
       updatedAt,
@@ -2036,6 +2043,13 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
       const d = payload.description;
       if (d == null || String(d).trim() === '') delete next.description;
       else next.description = String(d);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'type')) {
+      const t = payload.type;
+      const allowed = new Set(['Command', 'Directive', 'Snippet']);
+      if (t == null || t === '') delete next.type;
+      else if (allowed.has(String(t))) next.type = String(t);
     }
 
     next.updatedAt = new Date().toISOString();

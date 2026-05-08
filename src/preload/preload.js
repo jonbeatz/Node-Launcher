@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-/** v1.3.1 — preload bridge (IPC formatting + bootstrap subscribe). */
+/** v1.3.5 — preload bridge (IPC formatting + ghost watcher subscribe). */
 function msc_formatCaughtForPreload(reason) {
   if (reason == null) return 'Unknown failure';
   if (typeof reason === 'string') return reason;
@@ -72,6 +72,18 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     return () =>
       ipcRenderer.removeListener('vpe:bootstrap-dev-visible', listener);
   },
+  /** v1.3.2 — orphan `node.exe` on catalog port while no project marked running */
+  subscribeGhostPresence: (callback) => {
+    const onDetected = (_event, data) =>
+      callback({ active: true, ports: data?.ports ?? [], at: data?.at });
+    const onCleared = () => callback({ active: false, ports: [] });
+    ipcRenderer.on('vpe:ghost-detected', onDetected);
+    ipcRenderer.on('vpe:ghost-cleared', onCleared);
+    return () => {
+      ipcRenderer.removeListener('vpe:ghost-detected', onDetected);
+      ipcRenderer.removeListener('vpe:ghost-cleared', onCleared);
+    };
+  },
   getUnifiedLogs: (limit) =>
     ipcRenderer.invoke('vpe:get-unified-logs', limit),
   patchStartScript: (projectId) =>
@@ -112,7 +124,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.3.1',
+  version: '1.3.5',
   hardware: '9700x Tuned',
 });
 

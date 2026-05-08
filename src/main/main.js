@@ -9,6 +9,7 @@ const MSC_ProjectRunner = require('./project-runner');
 const { msc_registerVpeIpc, msc_onDevExitCompanionSweep } = require('./vpe-ipc');
 const { msc_archiveLegacyProjectsJson } = require('./legacy-projects-archive');
 const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile');
+const { msc_startGhostWatcher } = require('./vpe-orchestrator');
 
 // Vader Protocol: Remote debugging for MCP / Playwright CDP (override with VPE_REMOTE_DEBUG_PORT).
 const MSC_VPE_REMOTE_DEBUG_PORT = String(
@@ -20,7 +21,7 @@ console.log(
   `[VPE Main] Remote debugging port enabled on http://127.0.0.1:${MSC_VPE_REMOTE_DEBUG_PORT}`,
 );
 
-/** v1.3.1 — mute noisy DevTools/socket stderr unless `--verbose` is present. */
+/** v1.3.5 — mute noisy DevTools/socket stderr unless `--verbose` is present; ghost watcher post-reconcile. */
 const MSC_VPE_VERBOSE_LOG = process.argv.includes('--verbose');
 if (!MSC_VPE_VERBOSE_LOG && !global.__vpe_stderr_filter_registered) {
   global.__vpe_stderr_filter_registered = true;
@@ -104,6 +105,8 @@ let mainWindow;
 let pm2Manager;
 let trayManager;
 let projectRunner;
+/** Ghost port watcher (`vpe:ghost-detected` IPC). */
+let msc_ghostWatcher;
 
 /**
  * Packaged UI: Next static export at `src/renderer/out/index.html` (inside app.asar).
@@ -238,6 +241,19 @@ function msc_attachEngineAfterWindow(mainWin) {
           );
         },
       );
+
+      try {
+        if (!msc_ghostWatcher) {
+          msc_ghostWatcher = msc_startGhostWatcher({
+            getStore: () => msc_getDatabase(),
+            getMainWindow: () => mainWindow,
+            intervalMs: 60_000,
+          });
+          msc_ghostWatcher.start();
+        }
+      } catch (wErr) {
+        console.warn('VPE: Ghost watcher did not start:', wErr?.message ?? wErr);
+      }
     } catch (e) {
       console.error('VPE: Engine attach failed (continuing UI-only)', e?.message ?? e);
     }
@@ -353,6 +369,12 @@ function msc_createWindow() {
   });
 
   mainWindow.on('closed', () => {
+    try {
+      msc_ghostWatcher?.stop();
+    } catch (_) {
+      /* */
+    }
+    msc_ghostWatcher = undefined;
     mainWindow = null;
     if (projectRunner) {
       projectRunner.setMainWindow(null);

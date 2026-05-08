@@ -34,9 +34,12 @@ import {
   msc_computeTacticalCounts,
   type VpeTacticalProjectFilter,
 } from '@/lib/project-tactical-filter'
+import {
+  useDashboardPersistedSettings,
+  type DashboardActiveFilter,
+} from '@/state/useSettings'
 
-type FilterType = 'ALL' | 'RUNNING' | 'STOPPED' | 'ERRORS' | 'ARCHIVE'
-type ViewMode = 'grid' | 'list'
+type FilterType = DashboardActiveFilter
 type NavItem = 'dashboard' | 'maintenance' | 'sandbox' | 'settings'
 
 interface Project {
@@ -168,21 +171,27 @@ function DashboardContent() {
   const [clientReady, setClientReady] = useState(false)
   const [projectsReady, setProjectsReady] = useState(false)
   const [activeNav, setActiveNav] = useState<NavItem>('dashboard')
-  const [activeFilter, setActiveFilter] = useState<FilterType>('ALL')
+  const {
+    viewMode,
+    setViewMode,
+    activeFilter,
+    setActiveFilter,
+  } = useDashboardPersistedSettings()
   /** v1.2.5 — tactical shield filter (synced with sidebar + filter nav). */
   const [tacticalProjectFilter, setTacticalProjectFilter] =
     useState<VpeTacticalProjectFilter>('all')
-  const [viewMode, setViewMode] = useState<ViewMode>('grid') // Card View as default per revision spec
   const [repairModalOpen, setRepairModalOpen] = useState(false)
   const [repairLogRev, setRepairLogRev] = useState(0)
   const [repairModalContext, setRepairModalContext] = useState<RepairHistoryRow | null>(null)
-  const [maintenanceTab, setMaintenanceTab] = useState<MaintenanceTab>('logs')
+  const [maintenanceTab, setMaintenanceTab] = useState<MaintenanceTab>('vault')
   const [nukeModalOpen, setNukeModalOpen] = useState(false)
   const [addProjectModalOpen, setAddProjectModalOpen] = useState(false)
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [appSettingsModalOpen, setAppSettingsModalOpen] = useState(false)
   const [systemHealthOpen, setSystemHealthOpen] = useState(false)
+  /** v1.3.2 — main `vpe:ghost-detected` heartbeat (orphan node on catalog ports). */
+  const [ghostPorts, setGhostPorts] = useState<number[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [activeLogProject, setActiveLogProject] = useState('2')
   const [logDrawerExpanded, setLogDrawerExpanded] = useState(false)
@@ -220,6 +229,14 @@ function DashboardContent() {
 
   useEffect(() => {
     setClientReady(true)
+  }, [])
+
+  useEffect(() => {
+    const api = getVpeApi()
+    if (!api?.subscribeGhostPresence) return
+    return api.subscribeGhostPresence((ev) => {
+      setGhostPorts(ev.active && Array.isArray(ev.ports) ? ev.ports : [])
+    })
   }, [])
 
   useEffect(() => {
@@ -344,6 +361,7 @@ function DashboardContent() {
     commandSearchTerm,
     addToast,
     refreshProjects,
+    setViewMode,
   ])
 
   useEffect(() => {
@@ -811,6 +829,16 @@ function DashboardContent() {
       setLogDrawerExpanded(true)
       return
     }
+    if (nav === 'maintenance:vault') {
+      setActiveNav('maintenance')
+      setMaintenanceTab('vault')
+      return
+    }
+    if (nav === 'maintenance:logs') {
+      setActiveNav('maintenance')
+      setMaintenanceTab('logs')
+      return
+    }
     setActiveNav(nav as NavItem)
   }
 
@@ -874,8 +902,6 @@ function DashboardContent() {
     commandSearchTerm,
   ])
 
-  const projectCount = filteredProjects.length
-
   // Projects for log drawer (only show projects with logs open)
   const logProjects = projects.filter(p => p.status === 'running' || p.status === 'building' || p.id === activeLogProject)
   const favorites = useMemo(() => projects.filter(p => p.is_favorite), [projects])
@@ -914,9 +940,9 @@ function DashboardContent() {
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <AppSidebar 
-          activeItem={activeNav} 
+          activeItem={activeNav}
+          maintenanceTab={maintenanceTab}
           onNavigate={handleNavigation}
-          onAddProject={() => setAddProjectModalOpen(true)}
           onStopAll={handleStopAll}
           favorites={favorites}
           tacticalActive={tacticalProjectFilter}
@@ -927,8 +953,16 @@ function DashboardContent() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Top Bar - 48px */}
           <TopBar
+            projectCount={projects.length}
+            onAddProject={() => setAddProjectModalOpen(true)}
             onOpenSettings={() => setAppSettingsModalOpen(true)}
             onOpenDiagnostics={() => setSystemHealthOpen(!systemHealthOpen)}
+            ghostWarning={ghostPorts.length > 0}
+            ghostHint={
+              ghostPorts.length > 0
+                ? `Ghost node.exe listener on catalog port(s): ${ghostPorts.join(', ')} — open System Health for Scorched Earth / purge`
+                : undefined
+            }
             filterSearchTerm={searchTerm}
             onFilterSearchChange={setSearchTerm}
             commandSearchTerm={commandSearchTerm}
@@ -972,9 +1006,9 @@ function DashboardContent() {
                 <>
                   <div className="shrink-0">
                     {/* Filter Pills Bar */}
-                    <div className="px-6 py-3 flex items-center justify-between">
-                      {/* Left: status filter pills — neutral active (matches sidebar / tactical tabs). */}
-                      <div className="flex items-center gap-2">
+                    <div className="px-6 py-3 flex items-center justify-between gap-4">
+                      {/* Left: status filter pills — catalog total lives on TopBar breadcrumb only (v1.3.5). */}
+                      <div className="flex flex-wrap items-center gap-2 min-w-0">
                         {FILTERS.map((filter) => (
                           <button
                             key={filter.id}
@@ -990,22 +1024,21 @@ function DashboardContent() {
                             {filter.label}
                           </button>
                         ))}
-                      </div>
-
-                      {/* Center: Project Count */}
-                      <span className="font-sans text-[11px] text-[#A0A0A0] uppercase tracking-[0.05em]">
-                        {projectCount} PROJECT{projectCount !== 1 ? 'S' : ''}
                         {commandSearchActive && commandSearchTerm.trim() ? (
-                          <span className="ml-2 text-[#d4d4d4]">(jump)</span>
+                          <span className="font-sans text-[10px] text-[#888888] uppercase tracking-wide">
+                            Jump mode
+                          </span>
                         ) : null}
                         {searchTerm.trim() &&
                         !(commandSearchActive && commandSearchTerm.trim()) ? (
-                          <span className="ml-2 text-[#d4d4d4]">(filtered)</span>
+                          <span className="font-sans text-[10px] text-[#888888] uppercase tracking-wide">
+                            Filtered view
+                          </span>
                         ) : null}
-                      </span>
+                      </div>
 
                       {/* Right: grid / list toggle */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => setViewMode('grid')}
                           className={`

@@ -5,6 +5,7 @@ import { Copy, Plus, Trash2, Pencil, X } from 'lucide-react'
 import {
   getVpeApi,
   type VpePromptVaultData,
+  type VpePromptVaultEntryType,
   type VpePromptVaultItem,
 } from '@/lib/vpe-bridge'
 import { useToast } from '@/components/vader-toast'
@@ -31,6 +32,18 @@ function msc_copyBlob(item: VpePromptVaultItem): string {
   return parts.join('\n\n')
 }
 
+function msc_resolvedVaultType(item: VpePromptVaultItem): VpePromptVaultEntryType {
+  const t = item.type
+  if (t === 'Command' || t === 'Directive' || t === 'Snippet') return t
+  return 'Directive'
+}
+
+function msc_vaultTypeBadge(t: VpePromptVaultEntryType): string {
+  if (t === 'Command') return '[CMD]'
+  if (t === 'Snippet') return '[SNP]'
+  return '[DIR]'
+}
+
 export function PromptVault() {
   const { addToast } = useToast()
   const [data, setData] = useState<VpePromptVaultData>({ v: 1, items: [] })
@@ -39,6 +52,7 @@ export function PromptVault() {
   const [versionLabel, setVersionLabel] = useState('')
   const [description, setDescription] = useState('')
   const [bodyMd, setBodyMd] = useState('')
+  const [itemType, setItemType] = useState<VpePromptVaultEntryType>('Directive')
 
   const [editOpen, setEditOpen] = useState(false)
   const [editItem, setEditItem] = useState<VpePromptVaultItem | null>(null)
@@ -46,6 +60,7 @@ export function PromptVault() {
   const [eVersion, setEVersion] = useState('')
   const [eDesc, setEDesc] = useState('')
   const [eBody, setEBody] = useState('')
+  const [eType, setEType] = useState<VpePromptVaultEntryType>('Directive')
 
   const reload = useCallback(async () => {
     const api = getVpeApi()
@@ -116,6 +131,7 @@ export function PromptVault() {
       id: msc_newId(),
       title: t,
       versionLabel: v,
+      type: itemType,
       description: description.trim() || undefined,
       bodyMd: b,
       updatedAt: new Date().toISOString(),
@@ -125,6 +141,7 @@ export function PromptVault() {
     setVersionLabel('')
     setDescription('')
     setBodyMd('')
+    setItemType('Directive')
     addToast('Template saved', 'success', item.versionLabel)
   }
 
@@ -148,6 +165,7 @@ export function PromptVault() {
     setEVersion(item.versionLabel)
     setEDesc(item.description ?? '')
     setEBody(item.bodyMd)
+    setEType(msc_resolvedVaultType(item))
     setEditOpen(true)
   }
 
@@ -172,6 +190,7 @@ export function PromptVault() {
         versionLabel: v,
         description: eDesc.trim(),
         bodyMd: b,
+        type: eType,
       })
       setEditOpen(false)
       setEditItem(null)
@@ -213,10 +232,24 @@ export function PromptVault() {
             />
             <input
               className="w-full h-9 rounded bg-[#121212] border border-[#333333] px-3 font-sans text-sm text-white placeholder:text-[#555555] vader-focus"
-              placeholder='Version label (e.g. v1.3.1 or "MSC Media Engine v1.3.1")'
+              placeholder='Version label (e.g. v1.3.5 or "MSC Media Engine v1.3.5")'
               value={versionLabel}
               onChange={(e) => setVersionLabel(e.target.value)}
             />
+            <div className="flex flex-col gap-1">
+              <label className="font-sans text-[10px] text-[#888888] uppercase tracking-wide">
+                Type
+              </label>
+              <select
+                className="w-full h-9 rounded bg-[#121212] border border-[#333333] px-3 font-sans text-sm text-white vader-focus"
+                value={itemType}
+                onChange={(e) => setItemType(e.target.value as VpePromptVaultEntryType)}
+              >
+                <option value="Directive">Directive — [DIR]</option>
+                <option value="Command">Command — [CMD]</option>
+                <option value="Snippet">Snippet — [SNP]</option>
+              </select>
+            </div>
             <input
               className="w-full h-9 rounded bg-[#121212] border border-[#333333] px-3 font-sans text-sm text-white placeholder:text-[#555555] vader-focus"
               placeholder="Short description (optional)"
@@ -232,7 +265,7 @@ export function PromptVault() {
             <button
               type="button"
               onClick={() => void handleAdd()}
-              className="inline-flex items-center gap-2 h-9 px-4 rounded bg-[#2a2a2a] border border-[#444444] text-white font-sans text-xs font-semibold uppercase tracking-wide hover:bg-[#333333] vader-focus"
+              className="inline-flex items-center gap-2 h-9 px-4 rounded border border-[#333333] bg-transparent text-[#e0e0e0] font-sans text-xs font-semibold uppercase tracking-wide hover:bg-[#2a2a2a] hover:border-[#444444] vader-focus"
             >
               <Plus size={16} />
               Save template
@@ -257,16 +290,29 @@ export function PromptVault() {
                 <div className="flex items-stretch gap-0">
                   <AccordionTrigger className="flex-1 px-4 py-3 hover:bg-[#2a2a2a] hover:no-underline text-left [&>svg]:text-[#888888] font-sans">
                     <div className="flex flex-col gap-0.5 min-w-0 pr-2">
-                      <span className="text-sm font-medium text-white truncate">
-                        {item.title}
-                      </span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="shrink-0 font-mono text-[10px] font-semibold tracking-wide text-[#888888] border border-[#333333] rounded px-1.5 py-0.5 bg-[#121212]"
+                          title={
+                            msc_resolvedVaultType(item) === 'Command'
+                              ? 'Command — runnable / CLI oriented'
+                              : msc_resolvedVaultType(item) === 'Snippet'
+                                ? 'Snippet — short copy-paste'
+                                : 'Directive — protocol or narrative'
+                          }
+                        >
+                          {msc_vaultTypeBadge(msc_resolvedVaultType(item))}
+                        </span>
+                        <span className="text-sm font-medium text-white truncate">{item.title}</span>
+                      </div>
                       <span className="text-[11px] text-[#c8c8c8]">{item.versionLabel}</span>
                     </div>
                   </AccordionTrigger>
                   <div className="flex items-center gap-1 pr-2 shrink-0 border-l border-[#2a2a2a]">
                     <button
                       type="button"
-                      title="Copy"
+                      title="Prime AI Assistant"
+                      aria-label="Prime AI Assistant"
                       onClick={() => void handleCopy(item)}
                       className="h-9 w-9 flex items-center justify-center rounded bg-[#2a2a2a] text-[#eaeaea] hover:bg-[#333333] vader-focus"
                     >
@@ -274,7 +320,8 @@ export function PromptVault() {
                     </button>
                     <button
                       type="button"
-                      title="Edit"
+                      title="Edit vault template"
+                      aria-label="Edit vault template"
                       onClick={() => openEdit(item)}
                       className="h-9 w-9 flex items-center justify-center rounded bg-[#2a2a2a] text-[#eaeaea] hover:bg-[#333333] vader-focus"
                     >
@@ -301,7 +348,8 @@ export function PromptVault() {
                     </span>
                     <button
                       type="button"
-                      title="Delete"
+                      title="Remove from vault"
+                      aria-label="Remove from vault"
                       onClick={() => handleDelete(item.id)}
                       className="h-8 px-3 rounded border border-[#333333] text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a] font-sans text-[11px] vader-focus inline-flex items-center gap-1"
                     >
@@ -348,6 +396,20 @@ export function PromptVault() {
                 onChange={(e) => setEVersion(e.target.value)}
                 placeholder="Version label"
               />
+              <div className="flex flex-col gap-1">
+                <label className="font-sans text-[10px] text-[#888888] uppercase tracking-wide">
+                  Type
+                </label>
+                <select
+                  className="w-full h-9 rounded bg-[#0a0a0a] border border-[#333333] px-3 font-sans text-sm text-white vader-focus"
+                  value={eType}
+                  onChange={(e) => setEType(e.target.value as VpePromptVaultEntryType)}
+                >
+                  <option value="Directive">Directive — [DIR]</option>
+                  <option value="Command">Command — [CMD]</option>
+                  <option value="Snippet">Snippet — [SNP]</option>
+                </select>
+              </div>
               <textarea
                 className="w-full min-h-[72px] rounded bg-[#0a0a0a] border border-[#333333] px-3 py-2 font-sans text-xs text-[#e0e0e0] vader-focus resize-y"
                 value={eDesc}

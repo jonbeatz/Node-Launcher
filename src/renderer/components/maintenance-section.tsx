@@ -29,17 +29,6 @@ export function MaintenanceSection({
       <div className="shrink-0 px-6 pt-4 pb-2 flex gap-2 border-b border-[#2a2a2a]">
         <button
           type="button"
-          onClick={() => onMaintenanceTab('logs')}
-          className={`h-8 px-4 rounded-t font-sans text-[11px] font-medium uppercase tracking-wide vader-focus transition-colors ${
-            maintenanceTab === 'logs'
-              ? 'bg-[#2a2a2a] text-white border border-b-0 border-[#333333]'
-              : 'text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]'
-          }`}
-        >
-          Repair Logs
-        </button>
-        <button
-          type="button"
           onClick={() => onMaintenanceTab('vault')}
           className={`h-8 px-4 rounded-t font-sans text-[11px] font-medium uppercase tracking-wide vader-focus transition-colors ${
             maintenanceTab === 'vault'
@@ -48,6 +37,17 @@ export function MaintenanceSection({
           }`}
         >
           Prompt Vault
+        </button>
+        <button
+          type="button"
+          onClick={() => onMaintenanceTab('logs')}
+          className={`h-8 px-4 rounded-t font-sans text-[11px] font-medium uppercase tracking-wide vader-focus transition-colors ${
+            maintenanceTab === 'logs'
+              ? 'bg-[#2a2a2a] text-white border border-b-0 border-[#333333]'
+              : 'text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]'
+          }`}
+        >
+          Repair Logs
         </button>
       </div>
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
