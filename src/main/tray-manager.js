@@ -25,14 +25,22 @@ class MSC_TrayManager {
     let msc_iconPath;
     
     if (isDev) {
-      msc_iconPath = path.join(app.getAppPath(), 'build', 'icon.ico');
+      msc_iconPath = path.join(app.getAppPath(), 'media', 'icon.ico');
     } else {
       // In production, extraResources puts it next to the executable or in resources
       msc_iconPath = path.join(process.resourcesPath, 'icon.ico');
     }
 
     if (!fs.existsSync(msc_iconPath)) {
-      // Fallback for different build structures
+      msc_iconPath = path.join(__dirname, '..', '..', 'media', 'icon.ico');
+    }
+
+    if (!fs.existsSync(msc_iconPath)) {
+      // Legacy layout + different dev cwd
+      msc_iconPath = path.join(app.getAppPath(), 'build', 'icon.ico');
+    }
+
+    if (!fs.existsSync(msc_iconPath)) {
       msc_iconPath = path.join(__dirname, '..', '..', 'build', 'icon.ico');
     }
 

@@ -55,7 +55,7 @@ Short variants that should expand the same way: **production build**, **full exe
 
 Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
 
-1. **Icon staging** — Ensure `build/` exists; copy **`_design_references/VPE.ico`** → **`build/icon.ico`** (source file untouched):  
+1. **Icon staging** — Ensure **`media/`** exists; copy **`_design_references/VPE.ico`** → **`media/icon.ico`** (source file untouched):  
    `node scripts/msc-copy-release-icon.cjs`
 2. **Optional fail-fast export** — If you want to catch a broken Next export *before* natives/E2E, run **`npm run build:renderer`** once and confirm **`src/renderer/out/index.html`**. Otherwise **`npm run build:main`** (step 7) runs **`prebuild:main`**, which already performs icon copy + **`build:renderer`** once—no duplicate full pipeline when you skip this optional step.
 3. **Native SQL alignment** — Rebuild **better-sqlite3** for Electron only (avoids Spectre MSVC / full-tree native rebuild traps on Windows):  
@@ -69,7 +69,7 @@ Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
 7. **Package** — NSIS installer + **`win-unpacked`** tree. **`prebuild:main`** runs **once** (icon + **`build:renderer`**) then **`electron-builder`**:  
    `npm run build:main`  
    After it finishes, confirm **`src/renderer/out/index.html`** exists.
-8. **Trim `dist/` junk** — Run **`npm run vpe:cleanup-dist`** (same as the tail of **`vader:post-dev-forge`** / **`vader:force-forge`**): deletes **only top-level files** in **`dist/`** — **`*.blockmap`**, **`*.yml`**, **`builder-effective-config.yaml`** — never **`win-unpacked/`** or **`*.exe`**. **Keep:** **`dist/Vader Project Engine.exe`** and **`dist/win-unpacked/`**.
+8. **Trim `dist/` junk** — Run **`npm run vpe:cleanup-dist`** (same as the tail of **`vader:post-dev-forge`** / **`vader:force-forge`**): deletes **only top-level files** in **`dist/`** — **`*.blockmap`**, **`*.yml`**, **`builder-effective-config.yaml`** — never **`win-unpacked/`**, **`*.exe`**, repo **`media/`**, or repo **`build/`**. **Keep:** **`dist/Vader Project Engine.exe`** and **`dist/win-unpacked/`**.
 
 ### Outputs
 
@@ -82,7 +82,7 @@ Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
 
 ### Notes
 
-- **Custom `.exe` icon:** With **`build.win.signAndEditExecutable: false`** (avoids winCodeSign symlink failures on some Windows setups), **`npm run build:main`** runs **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) + **`rcedit`** to embed **`build/icon.ico`** into the main executable. See [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
+- **Custom `.exe` icon:** With **`build.win.signAndEditExecutable: false`** (avoids winCodeSign symlink failures on some Windows setups), **`npm run build:main`** runs **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) + **`rcedit`** to embed **`media/icon.ico`** (legacy **`build/icon.ico`** if missing) into the main executable. See [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
 - **`src/renderer/out/`** is **gitignored**; **`npm run build:main`** / **`npm run build:win`** always triggers **`prebuild:main`** (icon + **`build:renderer`**). **`npm run build`** is an alias that runs **`build:main` only**, so Next is not built twice unless you separately run **`build:renderer`** and then **`build:main`**.
 - Electron **`asar`** is **`true`** in **`package.json`** (archive app payload). Keep **`npmRebuild`** at **`false`** for faster packs when natives are already aligned via **`npm run rebuild:natives`**.
 - For a lighter loop (no installer, no E2E), use **restart app**, **start app**, or **hardened setup** instead.
@@ -125,7 +125,7 @@ Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Elect
 | **`npm run vader:clean-sync`** | **`rimraf dist`**, then **`vader:dev`** (with **`||`** fallback so forge still runs if dev exits non-zero), then **`vader:post-dev-forge`**. For **`--success last`** gating, use **`vader:sync`** instead. |
 | **`npm run vader:post-dev-forge`** | Usually internal: **3s** **`vpe-forge-pause`** → snapshot + **`vpe:check-readiness`** + **`build:win`** + **`vpe:cleanup-dist`**. Same order as the tail of **`vader:sync`**. |
 | **`npm run vader:force-forge`** | Same as **`vader:post-dev-forge`**. |
-| **`npm run vpe:cleanup-dist`** | **`scripts/msc-cleanup-dist.cjs`** — strip **`dist/`** root **`.blockmap`**, **`.yml`**, **`builder-effective-config.yaml`** only. Also runnable standalone after **`npm run build:main`**. |
+| **`npm run vpe:cleanup-dist`** | **`scripts/msc-cleanup-dist.cjs`** — strip **`dist/`** root **`.blockmap`**, **`.yml`**, **`builder-effective-config.yaml`** only (never **`media/`**). Also runnable standalone after **`npm run build:main`**. |
 | **`npm run vpe:take-state-snapshot`** | Headless pre-forge backup only (CLI **`userData`** path mirrors main process). |
 | **`npm run vpe:check-readiness`** | JS syntax guard only; exit **1** lists **`VPE_SYNTAX_GUARD:`** hits. |
 
@@ -188,7 +188,7 @@ Intent: ship Electron installer after renderer is production-built.
 **Minimal (when you already ran quality gates):**
 
 1. `npm run build` or **`npm run build:win`** — both run **`build:main`**. **`prebuild:main`** runs icon copy + **`build:renderer`**, then **`electron-builder`** (NSIS **`dir`** + **`nsis`**).  
-   Ensure no stray **node/electron** holds locks; release icon source: [`_design_references/VPE.ico`](../../_design_references/VPE.ico) → **`build/icon.ico`** via **`msc-copy-release-icon`** (see **[rebuild exe](#rebuild-exe)**).
+   Ensure no stray **node/electron** holds locks; release icon source: [`_design_references/VPE.ico`](../../_design_references/VPE.ico) → **`media/icon.ico`** via **`msc-copy-release-icon`** (see **[rebuild exe](#rebuild-exe)**).
 
 ## new git branch
 

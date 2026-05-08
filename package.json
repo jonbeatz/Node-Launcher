@@ -1,18 +1,19 @@
 {
   "name": "vader-project-engine",
-  "version": "1.1.8",
-  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.1.8",
+  "version": "1.2.2",
+  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.2.2",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
     "vader:dev": "cross-env VPE_LAUNCHER_FORGE=1 concurrently -k --success first \"npm run dev:renderer\" \"npm run dev:main\"",
-    "vader:post-dev-forge": "node scripts/vpe-forge-pause.cjs && npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win && npm run vpe:cleanup-dist",
-    "vader:force-forge": "node scripts/vpe-forge-pause.cjs && npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win && npm run vpe:cleanup-dist",
+    "vader:post-dev-forge": "node scripts/vpe-forge-stall-watchdog.cjs launch && node scripts/vpe-forge-pause.cjs && npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win && npm run vpe:cleanup-dist",
+    "vader:force-forge": "node scripts/vpe-forge-stall-watchdog.cjs launch && node scripts/vpe-forge-pause.cjs && npm run vpe:take-state-snapshot && npm run vpe:check-readiness && npm run build:win && npm run vpe:cleanup-dist",
     "vpe:cleanup-dist": "node scripts/msc-cleanup-dist.cjs",
     "vader:dev-to-forge": "npm run vader:dev && npm run vader:post-dev-forge",
     "vader:sync": "npm run vader:dev -- --success last && npm run vader:post-dev-forge",
-    "vader:clean-sync": "rimraf dist && (npm run vader:dev || node -e \"process.exit(0)\") && npm run vader:post-dev-forge",
+    "vader:clean-sync": "node scripts/vpe-clean-sync.cjs",
+    "vpe:force-clear": "taskkill /F /IM node.exe /T /FI \"MEMUSAGE gt 1000\" || node -e \"process.exit(0)\"",
     "vpe:take-state-snapshot": "node scripts/vpe-prebuild-snapshot.cjs",
     "vpe:check-readiness": "node scripts/vpe-syntax-guard.cjs",
     "dev:main": "electron . --remote-debugging-port=9222",
@@ -73,7 +74,7 @@
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^1.14.0",
-    "next": "15.0.7",
+    "next": "15.5.12",
     "next-themes": "^0.2.1",
     "node-pty": "^1.0.0",
     "pm2": "^5.3.1",
@@ -107,7 +108,7 @@
     "electron": "^28.2.0",
     "electron-builder": "^26.8.1",
     "eslint": "^8.57.1",
-    "eslint-config-next": "15.0.7",
+    "eslint-config-next": "15.5.12",
     "postcss": "^8.5.14",
     "rcedit": "^5.0.2",
     "rimraf": "^6.1.2",
@@ -119,7 +120,7 @@
     "productName": "Vader Project Engine",
     "afterPack": "scripts/msc-after-pack-embed-icon.cjs",
     "copyright": "Copyright © MSC Media",
-    "icon": "build/icon.ico",
+    "icon": "media/icon.ico",
     "forceCodeSigning": false,
     "npmRebuild": false,
     "directories": {
@@ -156,12 +157,12 @@
     ],
     "extraResources": [
       {
-        "from": "build/icon.ico",
+        "from": "media/icon.ico",
         "to": "icon.ico"
       }
     ],
     "win": {
-      "icon": "build/icon.ico",
+      "icon": "media/icon.ico",
       "executableName": "Vader Project Engine",
       "signAndEditExecutable": false,
       "target": [
@@ -186,8 +187,8 @@
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "Vader Project Engine",
       "uninstallDisplayName": "Vader Project Engine",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "installerIcon": "media/icon.ico",
+      "uninstallerIcon": "media/icon.ico"
     }
   }
 }

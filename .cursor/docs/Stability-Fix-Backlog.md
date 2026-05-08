@@ -32,7 +32,7 @@ Living notes for **problems we hit and how we fixed them**—mostly Windows pack
 
 **Fix in repo:** Keep `package.json` → `build.win.signAndEditExecutable: false` so electron-builder does **not** extract **winCodeSign** (and that symlink path) during pack.
 
-**Follow-up (2026-05-06, verified):** Embed the **Explorer file icon** on the main app `.exe` without winCodeSign by wiring **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs), which runs the **`rcedit`** npm package against **`dist/win-unpacked/Vader Project Engine.exe`** using staged **`build/icon.ico`**. **`npm run build:main`** succeeds on a normal user session; installed and portable builds show the **custom icon**, and **NSIS uninstall works correctly** with the interactive installer settings below.
+**Follow-up (2026-05-06, verified):** Embed the **Explorer file icon** on the main app `.exe` without winCodeSign by wiring **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs), which runs the **`rcedit`** npm package against **`dist/win-unpacked/Vader Project Engine.exe`** using staged **`media/icon.ico`** (**`build/icon.ico`** fallback in [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs)). **`npm run build:main`** succeeds on a normal user session; installed and portable builds show the **custom icon**, and **NSIS uninstall works correctly** with the interactive installer settings below.
 
 **If you want electron-builder’s built-in rcedit path only:** Enable **Windows Developer Mode** (or build from an elevated shell) and set **`signAndEditExecutable: true`**, then remove or no-op the **`afterPack`** hook to avoid double-patching the same binary.
 
@@ -174,7 +174,7 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 **Symptom:** Desire predictable install location without **`Program Files`** elevation friction, plus a **guided installer** (Next / review destination) instead of a silent one-click flow; uninstaller must behave correctly.
 
-**Fix in repo:** **`build.nsis`**: **`perMachine: false`** (per-user, no admin by default), **`oneClick: false`**, **`allowToChangeInstallationDirectory: true`** → multi-step NSIS wizard with a visible install directory; default remains under **`%LocalAppData%\Programs\Vader Project Engine\`** unless the user changes it. **`installerIcon`** / **`uninstallerIcon`** use **`build/icon.ico`**. **`build.appId`:** `com.vader.projectengine`. **Verified 2026-05-06:** custom **.exe** icon (via **`afterPack` + `rcedit`**, see winCodeSign section) and **uninstaller** behavior confirmed in production builds.
+**Fix in repo:** **`build.nsis`**: **`perMachine: false`** (per-user, no admin by default), **`oneClick: false`**, **`allowToChangeInstallationDirectory: true`** → multi-step NSIS wizard with a visible install directory; default remains under **`%LocalAppData%\Programs\Vader Project Engine\`** unless the user changes it. **`installerIcon`** / **`uninstallerIcon`** use **`media/icon.ico`**. **`build.appId`:** `com.vader.projectengine`. **Verified 2026-05-06:** custom **.exe** icon (via **`afterPack` + `rcedit`**, see winCodeSign section) and **uninstaller** behavior confirmed in production builds.
 
 ---
 
@@ -182,7 +182,7 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 **Why:** Same as the winCodeSign section—embedding via **`signAndEditExecutable: true`** can fail on Windows when **7za** cannot create symlinks during **winCodeSign** extraction.
 
-**In repo:** **`rcedit`** is a **devDependency**; the hook runs only at build time and is **not** shipped in the packaged app’s `node_modules` artifact (build **`files`** excludes `scripts/`). Staging for release still uses **`node scripts/msc-copy-release-icon.cjs`** so **`build/icon.ico`** matches **`_design_references/VPE.ico`**.
+**In repo:** **`rcedit`** is a **devDependency**; the hook runs only at build time and is **not** shipped in the packaged app’s `node_modules` artifact (build **`files`** excludes `scripts/`). Staging for release still uses **`node scripts/msc-copy-release-icon.cjs`** so **`media/icon.ico`** matches **`_design_references/VPE.ico`** (repo **`build/`** remains optional **`buildResources`** for electron-builder — not required for the app icon).
 
 ---
 

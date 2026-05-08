@@ -1,5 +1,26 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+/** v1.2.2 — never stringify raw DOM Event as "[object Event]" across terminal IPC bridge. */
+function msc_formatCaughtForPreload(reason) {
+  if (reason == null) return 'Unknown failure';
+  if (typeof reason === 'string') return reason;
+  if (typeof reason !== 'object') return String(reason);
+  if (reason instanceof Error) return reason.message || reason.name || '[Error]';
+  const o = reason;
+  if (typeof o.message === 'string' && o.message.trim()) return o.message;
+  if (typeof Event !== 'undefined' && reason instanceof Event) {
+    const t = typeof o.type === 'string' ? o.type : 'unknown';
+    return o.message ? `DOM Event (${t}): ${o.message}` : `DOM Event (${t})`;
+  }
+  try {
+    const s = JSON.stringify(o);
+    if (s && s !== '{}' && s !== '[]') return s;
+  } catch (_) {
+    /* fall through */
+  }
+  return o?.constructor?.name ? `[${o.constructor.name}]` : '[unserializable]';
+}
+
 contextBridge.exposeInMainWorld('vpeAPI', {
   getProjects: () => ipcRenderer.invoke('vpe:getProjects'),
   getRepairRuns: (limit) => ipcRenderer.invoke('vpe:get-repair-runs', limit),
@@ -43,8 +64,16 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     ipcRenderer.invoke('vpe:patch-start-script', projectId),
   takeStateSnapshot: () => ipcRenderer.invoke('vpe:take-state-snapshot'),
   restoreStateSnapshot: () => ipcRenderer.invoke('vpe:restore-state-snapshot'),
-  executeTerminalCommand: (command, activeProjectId) =>
-    ipcRenderer.invoke('vpe:execute-terminal-command', { command, activeProjectId }),
+  executeTerminalCommand: async (command, activeProjectId) => {
+    try {
+      return await ipcRenderer.invoke('vpe:execute-terminal-command', {
+        command,
+        activeProjectId,
+      });
+    } catch (reason) {
+      return { ok: false, output: msc_formatCaughtForPreload(reason) };
+    }
+  },
   openExplorer: (folderPath) => ipcRenderer.invoke('vpe:open-explorer', folderPath),
   openShell: (path, type) => ipcRenderer.invoke('vpe:open-shell', { path, type }),
   killProcessOnPort: (port) => ipcRenderer.invoke('vpe:kill-process-on-port', port),
@@ -66,7 +95,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.1.8',
+  version: '1.2.2',
   hardware: '9700x Tuned',
 });
 

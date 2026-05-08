@@ -13,7 +13,7 @@ node_modules/
 src/renderer/out/
 **/*.tsbuildinfo
 dist/
-# build/ holds electron-builder buildResources (e.g. icon.ico); do not ignore — tracked for releases.
+# build/ = electron-builder `buildResources` (optional NSIS assets); app icon lives in media/icon.ico.
 coverage/
 
 # electron / bundler caches

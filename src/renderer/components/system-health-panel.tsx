@@ -245,7 +245,10 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
             <div className="p-4 rounded bg-[#00cc66]/10 border border-[#00cc66]/30 flex items-center gap-3">
               <Zap size={16} className="text-[#00cc66]" />
               <span className="font-sans text-sm text-[#00cc66]">
-                No actionable warnings — metrics poll every 3s
+                No actionable warnings —{' '}
+                <span className="text-[0.65rem] opacity-30 italic font-sans">
+                  metrics poll every 3s
+                </span>
               </span>
             </div>
           )}

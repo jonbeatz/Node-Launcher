@@ -26,7 +26,7 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 **Standard dev (multi-session):** **`npm run dev`** keeps the usual Electron + Next stack without **`–k`** — intentional for iterative work. It does **not** set **`VPE_LAUNCHER_FORGE`**; use **`vader:*`** scripts when hand-off to **`build:win`** must behave like a gated pipeline.
 
-**Minimal production compile (no Vader Sync):** **`npm run build`** and **`npm run build:win`** both resolve to **`build:main`**; **`prebuild:main`** runs **icon staging + `next build` (export)** once before **`electron-builder`**. That path does **not** run the pre-forge snapshot, **`vpe:check-readiness`**, or **`vpe:cleanup-dist`** — run **`npm run vpe:cleanup-dist`** afterward if you want the same lean **`dist/`** root as **`vader:post-dev-forge`**.
+**Minimal production compile (no Vader Sync):** **`npm run build`** and **`npm run build:win`** both resolve to **`build:main`**; **`prebuild:main`** runs **`msc-copy-release-icon`** (**`VPE.ico` → `media/icon.ico`**) + **`next build` (export)** once before **`electron-builder`**. That path does **not** run the pre-forge snapshot, **`vpe:check-readiness`**, or **`vpe:cleanup-dist`** — run **`npm run vpe:cleanup-dist`** afterward if you want the same lean **`dist/`** root as **`vader:post-dev-forge`**.
 
 ---
 

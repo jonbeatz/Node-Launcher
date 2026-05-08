@@ -152,7 +152,7 @@ export function Msc_ProjectCard({
 
   return (
     <div
-      className={`vader-card boxBling overflow-hidden relative ${isError ? 'border-[#e02b20]' : ''}`}
+      className={`vader-card vpe-project-card boxBling overflow-hidden relative ${isError ? 'border-[#e02b20]' : ''}`}
       onContextMenu={onContextMenu}
     >
       <div className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]" style={{ borderRadius: '4px 4px 0 0' }}>
@@ -171,13 +171,7 @@ export function Msc_ProjectCard({
           </div>
         )}
 
-        <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-2 z-10 pointer-events-none">
-          <div
-            className="msc-9700x-badge pointer-events-auto px-2 py-0.5 rounded border border-[#333333] bg-[#1c1c1c] font-sans text-[10px] font-semibold text-[#A0A0A0] uppercase tracking-tight"
-            title="Ryzen 9700x tuned profile"
-          >
-            9700x Tuned
-          </div>
+        <div className="absolute top-2 right-2 flex items-start justify-end gap-2 z-10 pointer-events-none">
           <div className="flex items-center gap-1 pointer-events-auto">
             <button
               onClick={(e) => {

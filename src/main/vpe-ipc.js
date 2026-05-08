@@ -8,6 +8,7 @@ const { msc_launcherRendererPort } = require('./launcher-port');
 const { msc_detectProjectScripts } = require('./project-detection');
 const { msc_validateProjectPath } = require('./path-guard');
 const { msc_patchPackageJsonStripScriptPorts } = require('./package-json-script-patch');
+const isDev = require('electron-is-dev');
 
 let msc_vpeIpcRegistered = false;
 /** Node-Launcher UI port; managed projects must avoid this port. */
@@ -73,6 +74,250 @@ function msc_tasklistImageName(pid) {
 
 function msc_promptVaultPath() {
   return path.join(app.getPath('userData'), 'prompt-vault.json');
+}
+
+/** v1.2.2 — stable-id master Prompt Vault rows (merged on read / seeded on empty file). */
+function msc_promptVaultMasterItems() {
+  const updatedAt = new Date().toISOString();
+  return [
+    {
+      id: 'vpe-master-vader-sync',
+      title: 'Vader Sync',
+      versionLabel: 'MSC Media Engine v1.2.2',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run vader:clean-sync`\n\n' +
+        '**Full Production Build:** Wipes `dist`, runs a fresh Dev App, then makes the `.exe`.',
+    },
+    {
+      id: 'vpe-master-rapid-prototype',
+      title: 'Rapid Prototype',
+      versionLabel: 'MSC Media Engine v1.2.2',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run vader:dev`\n\n' +
+        '**Speed prototyping:** Starts Next.js and Electron; both stop when you close the window.',
+    },
+    {
+      id: 'vpe-master-validation-forge',
+      title: 'Validation & Forge',
+      versionLabel: 'MSC Media Engine v1.2.2',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run vader:sync`\n\n' +
+        '**Verify then ship:** Validates the update in dev, then builds the `.exe` once the dev window is closed.',
+    },
+    {
+      id: 'vpe-master-version-bump-sync',
+      title: 'Version Bump Sync',
+      versionLabel: 'MSC Media Engine v1.2.2',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run vader:clean-sync`\n\n' +
+        '**Version bump path:** Wipes `dist`, verifies dev, and creates a fresh release build.',
+    },
+    {
+      id: 'vpe-master-scorched-earth',
+      title: 'Scorched Earth',
+      versionLabel: 'MSC Media Engine v1.2.2',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run vpe:force-clear`\n\n' +
+        '**Emergency purge:** Kills project-root Node processes over 1GB RSS (matches `vpe:force-clear` filter). Use with care.',
+    },
+  ];
+}
+
+/**
+ * Ensures built-in masters exist without overwriting user-edited rows (match by id only).
+ */
+function msc_mergePromptVaultMasters(parsed) {
+  const masters = msc_promptVaultMasterItems();
+  const items = Array.isArray(parsed?.items) ? parsed.items.slice() : [];
+  const seen = new Set(items.map((i) => (i && i.id ? String(i.id) : '')).filter(Boolean));
+  let injected = false;
+  for (let i = masters.length - 1; i >= 0; i -= 1) {
+    const m = masters[i];
+    if (!seen.has(m.id)) {
+      items.unshift(m);
+      seen.add(m.id);
+      injected = true;
+    }
+  }
+  return {
+    data: { v: typeof parsed?.v === 'number' ? parsed.v : 1, items },
+    injected,
+  };
+}
+
+/**
+ * v1.2.1 — avoid "[object Event]" / empty stringification in dev-terminal IPC paths.
+ * DOM `Event` instances are not real `Error`s; log `type`/`message` when present.
+ */
+function msc_formatCaughtForTerminal(reason) {
+  if (reason == null) return 'Unknown failure';
+  if (typeof reason === 'string') return reason;
+  if (typeof reason !== 'object') return String(reason);
+  if (reason instanceof Error) return reason.message || reason.name || '[Error]';
+  const o = /** @type {any} */ (reason);
+  if (typeof o.message === 'string' && o.message.trim()) return o.message;
+  if (typeof Event !== 'undefined' && reason instanceof Event) {
+    const t = typeof o.type === 'string' ? o.type : 'unknown';
+    return o.message ? `DOM Event (${t}): ${o.message}` : `DOM Event (${t})`;
+  }
+  if (typeof o.type === 'string') {
+    try {
+      const s = JSON.stringify(o);
+      return s && s !== '{}' ? s : `Event-like (${o.type})`;
+    } catch (_) {
+      return `Event-like (${o.type})`;
+    }
+  }
+  try {
+    const s = JSON.stringify(o);
+    if (s && s !== '{}') return s;
+  } catch (_) {
+    /* fall through */
+  }
+  return o?.constructor?.name ? `[${o.constructor.name}]` : '[unserializable]';
+}
+
+/**
+ * Slash commands and diagnostics for VPE embedded terminal IPC.
+ * @param {unknown} payload
+ */
+async function msc_executeTerminalCommandInner(store, payload) {
+  const { execSync } = require('child_process');
+  const commandRaw = typeof payload === 'string' ? payload : payload?.command;
+  if (typeof commandRaw !== 'string') {
+    return { ok: false, output: 'Missing command string.' };
+  }
+  const command = commandRaw;
+  const trimmed = command.trim().toLowerCase();
+
+  if (trimmed === '/clean') {
+    try {
+      const stalePorts = [3000, 3001];
+      const debugPorts = [9222];
+      let output = 'Vader: Initiating port cleanup...\n';
+
+      const killPidOnPort = (port, pid, aggressive) => {
+        let processInfo = '';
+        try {
+          processInfo = execSync(`tasklist /FI "PID eq ${pid}" /NH`).toString().trim();
+        } catch {
+          return `PID ${pid} on port ${port}: tasklist failed (skipped)\n`;
+        }
+        const exe = (processInfo.split(/\s+/)[0] || '').toLowerCase();
+        const isNodeLike = /node\.exe|electron\.exe/i.test(processInfo);
+        if (aggressive) {
+          if (isNodeLike) {
+            execSync(`taskkill /F /PID ${pid}`);
+            return `Killed ${exe || 'process'} PID ${pid} on port ${port}\n`;
+          }
+          return `Skipped PID ${pid} on port ${port} (${exe || 'non-node'}) — not Node/Electron\n`;
+        }
+        const isVpeProcess = /node\.exe|electron\.exe|Vader-Project-Engine\.exe/i.test(processInfo);
+        if (!isVpeProcess) {
+          return `Non-VPE process (${exe}) on port ${port}. Skipped. Use /clean again after closing external debug tools.\n`;
+        }
+        execSync(`taskkill /F /PID ${pid}`);
+        return `Killed process ${pid} on port ${port}\n`;
+      };
+
+      const sweepPort = (port, aggressive) => {
+        try {
+          const netstat = execSync(`netstat -ano | findstr :${port}`).toString();
+          const pids = new Set(
+            netstat
+              .split('\n')
+              .map((l) => l.trim().split(/\s+/).pop())
+              .filter((p) => p && !Number.isNaN(Number(p)) && p !== '0'),
+          );
+          if (pids.size === 0) {
+            output += `Port ${port} already clear.\n`;
+            return;
+          }
+          for (const pid of pids) {
+            output += killPidOnPort(port, pid, aggressive);
+          }
+        } catch {
+          output += `Port ${port} already clear.\n`;
+        }
+      };
+
+      for (const p of stalePorts) sweepPort(p, true);
+      for (const p of debugPorts) sweepPort(p, false);
+
+      return { ok: true, output: output + 'Cleanup complete.' };
+    } catch (err) {
+      return { ok: false, output: `Cleanup failed: ${msc_formatCaughtForTerminal(err)}` };
+    }
+  }
+
+  if (trimmed === '/ports') {
+    try {
+      const output = execSync('netstat -ano | findstr LISTENING').toString();
+      return { ok: true, output };
+    } catch (err) {
+      return { ok: false, output: `Failed to list ports: ${msc_formatCaughtForTerminal(err)}` };
+    }
+  }
+
+  if (trimmed === '/vpe') {
+    try {
+      const output = execSync('tasklist /FI "IMAGENAME eq Vader-Project-Engine.exe"').toString();
+      return { ok: true, output };
+    } catch (err) {
+      return { ok: false, output: `Failed to check VPE: ${msc_formatCaughtForTerminal(err)}` };
+    }
+  }
+
+  if (trimmed === '/diag') {
+    try {
+      const ping = execSync('ping 8.8.8.8 -n 1').toString();
+      const nodeVer = execSync('node -v').toString().trim();
+      const output = `VPE Diagnostic:\n- Node Version: ${nodeVer}\n- Network: ${ping.includes('TTL=') ? 'ONLINE' : 'OFFLINE'}\n- Time: ${new Date().toLocaleString()}`;
+      return { ok: true, output };
+    } catch (err) {
+      return { ok: false, output: `Diagnostic failed: ${msc_formatCaughtForTerminal(err)}` };
+    }
+  }
+
+  if (trimmed === '/vader') {
+    const vaderAscii = `
+   _________________
+  < DARK SIDE ONLINE >
+   -----------------
+          \\
+           \\    ___
+               /   \\
+              |  O  |
+              \\ ___ /
+               |   |
+              /|   |\\
+             / |___| \\
+    `;
+    const stats = execSync('powershell -Command "Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty Caption"').toString().trim();
+    return { ok: true, output: `${vaderAscii}\nSystem: ${stats}` };
+  }
+
+  if (trimmed === '/repair') {
+    try {
+      const activeProjectId = payload?.activeProjectId;
+      const project = activeProjectId ? store.getProject(activeProjectId) : null;
+      if (project && project.path) {
+        execSync('npm cache clean --force', { cwd: project.path });
+        return { ok: true, output: `Vader: npm cache purged for ${project.name}. Deep repair initiated.` };
+      }
+      execSync('npm cache clean --force');
+      return { ok: true, output: 'Vader: global npm cache purged. Deep repair initiated.' };
+    } catch (err) {
+      return { ok: false, output: `Repair failed: ${msc_formatCaughtForTerminal(err)}` };
+    }
+  }
+
+  return { ok: false, output: 'Unknown slash command.' };
 }
 
 function msc_emitRepairRunsChanged() {
@@ -158,17 +403,96 @@ async function msc_purgeListenersOnPort9222() {
  */
 function msc_onDevExitCompanionSweep() {
   if (process.platform !== 'win32') return;
-  if (process.env.VPE_LAUNCHER_FORGE !== '1') return;
   const protectedPids = msc_purgeProtectedPids();
-  for (const port of [3000, 3001]) {
+
+  // Always clear launcher-managed listeners in dev quit paths.
+  for (const port of [3000, 3001, 9222]) {
     for (const pid of msc_netstatListeningPidsOnPort(port)) {
       msc_purgeTryKillListeningPid(protectedPids, pid, port, false, null);
     }
+  }
+
+  msc_killNodeProcessesOwnedByRepoRoot(protectedPids);
+
+  // Companion MCP ghost sweep: target known sidecar command lines.
+  try {
+    const { execSync } = require('child_process');
+    const probe = execSync(
+      'powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match \'postgres-mcp|browser-tools-server|@agentdeskai/browser-tools-server\' } | Select-Object -ExpandProperty ProcessId"',
+      { windowsHide: true, stdio: 'pipe' },
+    )
+      .toString()
+      .split(/\r?\n/)
+      .map((v) => v.trim())
+      .filter((v) => /^\d+$/.test(v));
+    for (const pid of probe) {
+      if (protectedPids.has(pid)) continue;
+      try {
+        execSync(`taskkill /F /PID ${pid}`, { windowsHide: true, stdio: 'ignore' });
+      } catch (_) {
+        /* process may already be gone */
+      }
+    }
+  } catch (_) {
+    /* ignore companion sweep failures */
+  }
+}
+
+/** v1.2.0: kill `node.exe` whose command line mentions this repo (`process.cwd`), never launcher PIDs. */
+function msc_killNodeProcessesOwnedByRepoRoot(protectedPids) {
+  if (process.platform !== 'win32') return;
+  let rootResolved = '';
+  try {
+    rootResolved = path.resolve(process.cwd()).replace(/\r|\n|\x00/g, '');
+  } catch (_) {
+    return;
+  }
+  if (!rootResolved) return;
+
+  const { spawnSync } = require('child_process');
+  const guardCsv = [...protectedPids].join(',');
+
+  const ps = [
+    `$rootRaw = $env:VPE_REPO_ROOT_KILL`,
+    `if (-not $rootRaw) { exit 0 }`,
+    `$needle = ($rootRaw -replace '\\', '/')`,
+    `$guards = @{}`,
+    `foreach ($g in (($env:VPE_GUARD_PIDS -split ',') | ForEach-Object { $_.Trim() })) {`,
+    `  if ($g -match '^\\d+$') { $guards[$g] = $true }`,
+    `}`,
+    `Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | ForEach-Object {`,
+    `  $pidStr = \"$($_.ProcessId)\"`,
+    `  if ($guards.ContainsKey($pidStr)) { return }`,
+    `  $cmd = $_.CommandLine`,
+    `  if (-not $cmd) { return }`,
+    `  $hay = ($cmd -replace '\\', '/')`,
+    `  if ($hay.IndexOf($needle, [StringComparison]::OrdinalIgnoreCase) -lt 0) { return }`,
+    `  Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue`,
+    `}`,
+  ].join('; ');
+
+  const encoded = Buffer.from(ps, 'utf16le').toString('base64');
+  try {
+    spawnSync(
+      'powershell.exe',
+      ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
+      {
+        windowsHide: true,
+        stdio: 'ignore',
+        env: { ...process.env, VPE_REPO_ROOT_KILL: rootResolved, VPE_GUARD_PIDS: guardCsv },
+      },
+    );
+  } catch (_) {
+    /* best-effort */
   }
 }
 
 /** Same as inner, but never hangs the UI: on timeout assume port free (forge-friendly). */
 async function msc_launcherPortRowHealth(port) {
+  // v1.2.0: zero-wait dev override — NET always green in dev; real cleanup happens on quit-sweep / purge.
+  if (isDev && [3000, 3001, 9222].includes(port)) {
+    return { inUse: false, ok: true, forced: true };
+  }
   if (port === 9222) {
     let row = null;
     try {
@@ -1112,133 +1436,13 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   });
 
   ipcMain.handle('vpe:execute-terminal-command', async (_event, payload) => {
-    const { execSync } = require('child_process');
-    const command = typeof payload === 'string' ? payload : payload.command;
-    const trimmed = command.trim().toLowerCase();
-    
-    if (trimmed === '/clean') {
-      try {
-        const stalePorts = [3000, 3001];
-        const debugPorts = [9222];
-        let output = 'Vader: Initiating port cleanup...\n';
-
-        const killPidOnPort = (port, pid, aggressive) => {
-          let processInfo = '';
-          try {
-            processInfo = execSync(`tasklist /FI "PID eq ${pid}" /NH`).toString().trim();
-          } catch {
-            return `PID ${pid} on port ${port}: tasklist failed (skipped)\n`;
-          }
-          const exe = (processInfo.split(/\s+/)[0] || '').toLowerCase();
-          const isNodeLike = /node\.exe|electron\.exe/i.test(processInfo);
-          if (aggressive) {
-            if (isNodeLike) {
-              execSync(`taskkill /F /PID ${pid}`);
-              return `Killed ${exe || 'process'} PID ${pid} on port ${port}\n`;
-            }
-            return `Skipped PID ${pid} on port ${port} (${exe || 'non-node'}) — not Node/Electron\n`;
-          }
-          const isVpeProcess = /node\.exe|electron\.exe|Vader-Project-Engine\.exe/i.test(processInfo);
-          if (!isVpeProcess) {
-            return `Non-VPE process (${exe}) on port ${port}. Skipped. Use /clean again after closing external debug tools.\n`;
-          }
-          execSync(`taskkill /F /PID ${pid}`);
-          return `Killed process ${pid} on port ${port}\n`;
-        };
-
-        const sweepPort = (port, aggressive) => {
-          try {
-            const netstat = execSync(`netstat -ano | findstr :${port}`).toString();
-            const pids = new Set(
-              netstat
-                .split('\n')
-                .map((l) => l.trim().split(/\s+/).pop())
-                .filter((p) => p && !Number.isNaN(Number(p)) && p !== '0'),
-            );
-            if (pids.size === 0) {
-              output += `Port ${port} already clear.\n`;
-              return;
-            }
-            for (const pid of pids) {
-              output += killPidOnPort(port, pid, aggressive);
-            }
-          } catch {
-            output += `Port ${port} already clear.\n`;
-          }
-        };
-
-        for (const p of stalePorts) sweepPort(p, true);
-        for (const p of debugPorts) sweepPort(p, false);
-
-        return { ok: true, output: output + 'Cleanup complete.' };
-      } catch (err) {
-        return { ok: false, output: `Cleanup failed: ${err.message}` };
-      }
+    try {
+      return await msc_executeTerminalCommandInner(store, payload);
+    } catch (reason) {
+      const msg = msc_formatCaughtForTerminal(reason);
+      console.warn('[VPE terminal IPC]', msg);
+      return { ok: false, output: msg };
     }
-
-    if (trimmed === '/ports') {
-      try {
-        const output = execSync('netstat -ano | findstr LISTENING').toString();
-        return { ok: true, output };
-      } catch (err) {
-        return { ok: false, output: `Failed to list ports: ${err.message}` };
-      }
-    }
-
-    if (trimmed === '/vpe') {
-      try {
-        const output = execSync('tasklist /FI "IMAGENAME eq Vader-Project-Engine.exe"').toString();
-        return { ok: true, output };
-      } catch (err) {
-        return { ok: false, output: `Failed to check VPE: ${err.message}` };
-      }
-    }
-
-    if (trimmed === '/diag') {
-      try {
-        const ping = execSync('ping 8.8.8.8 -n 1').toString();
-        const nodeVer = execSync('node -v').toString().trim();
-        const output = `VPE Diagnostic:\n- Node Version: ${nodeVer}\n- Network: ${ping.includes('TTL=') ? 'ONLINE' : 'OFFLINE'}\n- Time: ${new Date().toLocaleString()}`;
-        return { ok: true, output };
-      } catch (err) {
-        return { ok: false, output: `Diagnostic failed: ${err.message}` };
-      }
-    }
-
-    if (trimmed === '/vader') {
-      const vaderAscii = `
-   _________________
-  < DARK SIDE ONLINE >
-   -----------------
-          \\
-           \\    ___
-               /   \\
-              |  O  |
-              \\ ___ /
-               |   |
-              /|   |\\
-             / |___| \\
-      `;
-      const stats = execSync('powershell -Command "Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty Caption"').toString().trim();
-      return { ok: true, output: `${vaderAscii}\nSystem: ${stats}` };
-    }
-
-    if (trimmed === '/repair') {
-      try {
-        const activeProjectId = payload?.activeProjectId;
-        const project = activeProjectId ? store.getProject(activeProjectId) : null;
-        if (project && project.path) {
-          execSync('npm cache clean --force', { cwd: project.path });
-          return { ok: true, output: `Vader: npm cache purged for ${project.name}. Deep repair initiated.` };
-        }
-        execSync('npm cache clean --force');
-        return { ok: true, output: 'Vader: global npm cache purged. Deep repair initiated.' };
-      } catch (err) {
-        return { ok: false, output: `Repair failed: ${err.message}` };
-      }
-    }
-
-    return { ok: false, output: 'Unknown slash command.' };
   });
 
   ipcMain.handle('vpe:take-state-snapshot', async (event) => {
@@ -1410,15 +1614,34 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
 
   ipcMain.handle('vpe:prompt-vault-read', () => {
     const filePath = msc_promptVaultPath();
+    const dir = path.dirname(filePath);
+
+    const writeVault = (data) => {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    };
+
     if (!fs.existsSync(filePath)) {
-      return { ok: true, data: { v: 1, items: [] } };
+      const data = { v: 1, items: msc_promptVaultMasterItems() };
+      writeVault(data);
+      return { ok: true, data };
     }
+
     try {
-      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const raw = fs.readFileSync(filePath, 'utf8');
+      const parsed = JSON.parse(raw);
+      const { data, injected } = msc_mergePromptVaultMasters(parsed);
+      if (injected) writeVault(data);
       return { ok: true, data };
     } catch (err) {
+      const rebuilt = { v: 1, items: msc_promptVaultMasterItems() };
+      try {
+        writeVault(rebuilt);
+      } catch (_) {
+        /* disk error — still return rebuilt for UI */
+      }
       const m = err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
-      return { ok: false, error: m };
+      return { ok: true, data: rebuilt, repairedFromCorruptVault: true, note: m };
     }
   });
 

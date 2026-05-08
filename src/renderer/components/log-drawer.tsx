@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
 import { X, GripVertical, ChevronLeft, ChevronRight, ExternalLink, ArrowDownToLine } from 'lucide-react'
-import { getVpeApi } from '@/lib/vpe-bridge'
+import { getVpeApi, msc_formatUnknownIPCError } from '@/lib/vpe-bridge'
 import {
   msc_getTerminalFontSize,
   msc_getTerminalScrollback,
@@ -405,7 +405,15 @@ export function LogDrawer({
     if (trimmedCommand.startsWith('/')) {
       const api = getVpeApi()
       if (api?.executeTerminalCommand) {
-        const res = await api.executeTerminalCommand(trimmedCommand, selectedProject)
+        let res: { ok: boolean; output: string }
+        try {
+          res = await api.executeTerminalCommand(trimmedCommand, selectedProject)
+        } catch (reason) {
+          res = {
+            ok: false,
+            output: msc_formatUnknownIPCError(reason),
+          }
+        }
         const entries: LogEntry[] = res.output.split('\n').filter(l => l.trim()).map((line): LogEntry => ({
           type: (res.ok ? 'output' : 'error') as LogEntry['type'],
           time: getCurrentTime(),
@@ -544,7 +552,7 @@ export function LogDrawer({
         <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
           <div 
             ref={terminalRef}
-            className="absolute inset-0 z-10 bg-[#121212] overflow-y-auto overscroll-y-contain pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
+            className="absolute inset-0 z-10 vpe-system-log-viewport overflow-y-auto overscroll-y-contain pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
             style={{ opacity: 1 }}
             onClick={() => inputRef.current?.focus()}
           >
@@ -721,7 +729,7 @@ export function LogDrawer({
           <div className="flex-1 min-h-0 overflow-hidden relative max-h-[min(72vh,calc(100dvh-10rem))]">
             <div 
               ref={terminalRef}
-              className="absolute inset-y-0 right-0 left-1 z-10 bg-[#121212] overflow-y-auto overscroll-y-contain pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
+              className="absolute inset-y-0 right-0 left-1 z-10 vpe-system-log-viewport overflow-y-auto overscroll-y-contain pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
               style={{ opacity: 1 }}
               onClick={() => inputRef.current?.focus()}
             >

@@ -225,7 +225,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #4a4a4a;
 }
 
 .vpe-terminal-scrollbar {
@@ -247,7 +247,23 @@
 }
 
 .vpe-terminal-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #e02b20;
+  background: #4a4a4a;
+}
+
+/* v1.2.2 — neutral depth (cards + sidebar) */
+.vpe-project-card,
+.vpe-sidebar {
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* System Log / embedded terminal viewport — glass over canvas */
+.vpe-system-log-viewport {
+  background: rgba(20, 20, 20, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* boxBling Effect */

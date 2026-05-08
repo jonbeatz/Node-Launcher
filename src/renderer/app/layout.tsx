@@ -5,7 +5,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Vader Project Engine',
   description:
-    'Node.js Process Management Dashboard — Powered by the MSC Media Engine v1.1.8',
+    'Node.js Process Management Dashboard — Powered by the MSC Media Engine v1.2.2',
   generator: 'v0.app',
 }
 
@@ -21,8 +21,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-[#121212]">
-      <body className="font-sans antialiased bg-[#121212] text-white min-h-screen w-full overflow-x-hidden">
+    <html lang="en" className="bg-[#121212]" suppressHydrationWarning>
+      <body
+        className="font-sans antialiased bg-[#121212] text-white min-h-screen w-full overflow-x-hidden"
+        suppressHydrationWarning
+      >
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

@@ -1,5 +1,5 @@
 /**
- * After pack: embed build/icon.ico into the main Windows exe without
+ * After pack: embed media/icon.ico into the main Windows exe without
  * electron-builder's winCodeSign/rcedit path (avoids 7z symlink extraction on
  * Windows without Developer Mode / elevation). Same visual result for Explorer.
  */
@@ -36,10 +36,15 @@ module.exports = async (context) => {
   const projectDir = context.packager.projectDir;
   const appOutDir = context.appOutDir;
   const exe = msc_resolveMainExe(projectDir, appOutDir);
-  const icon = path.join(projectDir, 'build', 'icon.ico');
+  let icon = path.join(projectDir, 'media', 'icon.ico');
+  if (!fs.existsSync(icon)) {
+    icon = path.join(projectDir, 'build', 'icon.ico');
+  }
 
   if (!fs.existsSync(icon)) {
-    throw new Error(`msc-after-pack-embed-icon: missing ${icon}`);
+    throw new Error(
+      'msc-after-pack-embed-icon: missing media/icon.ico (and legacy build/icon.ico)',
+    );
   }
 
   const { rcedit } = await import('rcedit');

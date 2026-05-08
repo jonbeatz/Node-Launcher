@@ -113,13 +113,16 @@ function msc_configureWritablePaths() {
 msc_configureWritablePaths();
 
 /**
- * Window / taskbar icon: dev → repo `build/icon.ico` (same path as electron-builder `win.icon`);
+ * Window / taskbar icon: dev → repo `media/icon.ico` (matches electron-builder `win.icon`);
  * packaged → `extraResources` copy at `resources/icon.ico` (ASAR-safe).
+ * Falls back to legacy `build/icon.ico` if present.
  * @returns {string | undefined}
  */
 function msc_resolveAppIconPath() {
   const candidates = [];
   if (isDev) {
+    candidates.push(path.join(__dirname, '..', '..', 'media', 'icon.ico'));
+    candidates.push(path.join(process.cwd(), 'media', 'icon.ico'));
     candidates.push(path.join(__dirname, '..', '..', 'build', 'icon.ico'));
     candidates.push(path.join(process.cwd(), 'build', 'icon.ico'));
   } else {
@@ -346,7 +349,7 @@ app.on('will-finish-launching', () => {
 app.on('ready', msc_createWindow);
 
 app.on('before-quit', () => {
-  if (isDev && process.env.VPE_LAUNCHER_FORGE === '1') {
+  if (isDev) {
     msc_onDevExitCompanionSweep();
   }
   if (pm2Manager && typeof pm2Manager.stopAll === 'function') {

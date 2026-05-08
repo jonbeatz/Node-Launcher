@@ -6,9 +6,9 @@ import { getVpeApi } from '@/lib/vpe-bridge'
 type NetLedState = 'unknown' | 'forge' | 'dev' | 'conflict'
 
 function msc_engineVersionLabel(): string {
-  if (typeof window === 'undefined') return '1.1.8'
+  if (typeof window === 'undefined') return '1.2.2'
   const w = window as Window & { vpeInfo?: { version?: string } }
-  return w.vpeInfo?.version ?? '1.1.8'
+  return w.vpeInfo?.version ?? '1.2.2'
 }
 
 export function Footer() {
@@ -62,7 +62,7 @@ export function Footer() {
     ) : led === 'forge' ? (
       <span
         className="text-[#4fde82]"
-        title="Ports 3000 & 3001 free — pre-forge / packaging ready (9222 never blocks NET green; v1.1.8+)"
+        title="Ports 3000 & 3001 free — NET green forced in dev (v1.2.2+); purge / quit sweep for real clears"
       >
         ●
       </span>

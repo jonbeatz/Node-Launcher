@@ -244,6 +244,38 @@ export function getVpeApi(): VpeApi | null {
   return window.vpeAPI ?? null
 }
 
+/** v1.2.1 — safe message for terminals / toasts when IPC rejects with a DOM Event or other non-Error. */
+export function msc_formatUnknownIPCError(reason: unknown): string {
+  if (reason == null) return 'Unknown failure'
+  if (typeof reason === 'string') return reason
+  if (typeof reason !== 'object') return String(reason)
+  if (reason instanceof Error) return reason.message || reason.name || '[Error]'
+  const o = reason as Record<string, unknown> & { constructor?: { name?: string } }
+  if (typeof o.message === 'string' && o.message.trim()) return o.message
+  if (typeof Event !== 'undefined' && reason instanceof Event) {
+    const t = typeof o.type === 'string' ? o.type : 'unknown'
+    const m = typeof o.message === 'string' ? o.message : ''
+    return m ? `DOM Event (${t}): ${m}` : `DOM Event (${t})`
+  }
+  if (typeof o.type === 'string') {
+    try {
+      const s = JSON.stringify(o)
+      if (s && s !== '{}') return s
+      return `Event-like (${o.type})`
+    } catch {
+      return `Event-like (${o.type})`
+    }
+  }
+  try {
+    const s = JSON.stringify(o)
+    if (s && s !== '{}') return s
+  } catch {
+    /* fall through */
+  }
+  const n = o.constructor?.name
+  return n ? `[${n}]` : '[unserializable]'
+}
+
 export function msc_rowToDashboardProject(row: VpeProjectRow): {
   id: string
   name: string

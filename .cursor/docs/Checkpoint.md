@@ -1,5 +1,13 @@
 # VPE Checkpoint (2026-05-07)
 
+## Build v1.2.2 — Neutral Depth UI & Vault Population
+
+- **Version:** **`1.2.2`** — `package.json`, preload **`vpeInfo.version`**, footer, **`layout.tsx`** metadata (**Powered by the MSC Media Engine v1.2.2**), **`msc-cleanup-dist`** log line.
+- **Neutral depth UI:** Project cards (**`.vpe-project-card`**) and sidebar (**`.vpe-sidebar`**) use layered shadow (**`0 10px 30px`** + hairline rim). Scrollbar thumb hover (**global + `.vpe-terminal-scrollbar`**) is **neutral gray** (`#4a4a4a`), not accent red. System Log viewport (**`.vpe-system-log-viewport`** in **`log-drawer.tsx`**) uses **glass** (`rgba(20,20,20,0.75)`, **`backdrop-filter`**, subtle border) instead of solid **`#121212`**.
+- **De-clutter:** Removed **9700x Tuned** badge from **`Msc_ProjectCard.tsx`**. System Health “metrics poll every 3s” subtext is **smaller / low-opacity italic** (**`system-health-panel.tsx`**). *(Repo has **`top-bar.tsx`** as the shell header — no badge there.)*
+- **Prompt Vault hygiene:** **`vpe:prompt-vault-read`** seeds **`prompt-vault.json`** with **five stable-id master commands** when missing; on existing vaults **merges** any missing masters (no overwrite of same **`id`**). Scorched Earth / Vader Sync / Rapid Prototype / Validation & Forge / Version Bump Sync.
+- **App icon path (Forge):** Canonical staged icon is **[`media/icon.ico`](../../media/icon.ico)** — copied from **`_design_references/VPE.ico`** by **`scripts/msc-copy-release-icon.cjs`**. [`package.json`](../../package.json) **`build.win.icon`**, **`extraResources`**, and NSIS icons reference **`media/icon.ico`**. Dev tray/window resolves **`media/`** first, with legacy **`build/icon.ico`** fallback. **`msc-cleanup-dist`** / **`vpe-clean-sync`** never delete **`media/`** (only **`dist/`** cleanup).
+
 ## Build v1.1.8 — NET green override & exit-to-build hardening
 
 - **Version:** **`1.1.8`** — shipped label (`package.json`, preload, footer, **`layout.tsx`**).
@@ -169,16 +177,16 @@ Global MCP config updated at `C:\Users\JONBEATZ\.cursor\mcp.json` with verified 
 | Area | Status |
 |------|--------|
 | **Branch** | Confirm with **`git status`** — this worktree: **`Node-Launcher-v9`**. Packaging polish: `src/renderer/out/` gitignored; `prebuild:main` runs static export before **`build:main`**. |
-| **Renderer** | **Next.js `15.0.7`** + **React `19.0.0`** — patches **CVE-2025-66478** line (see [advisory](https://nextjs.org/blog/CVE-2025-66478)); `npm run build:renderer` → **4/4** static routes. |
+| **Renderer** | **Next.js `15.5.12`** + **React `19.0.0`**; `npm run build:renderer` → **4/4** static export routes. |
 | **Quality gates** | **`npm run lint`** clean; CI: lint → build → AST stub → Playwright (Chromium `--with-deps`). |
 | **Persistence** | SQLite/JSON under **`app.getPath('userData')/vpe-db`**; thumbnails scratch under **`userData/media/thumbnails`**. |
 | **Native modules** | **`npm run rebuild:natives`** = `electron-rebuild -f -o better-sqlite3` only (avoids Windows **node-pty** + Spectre MSVC trap). |
 | **Design assets** | Committed: [`_design_references/VPE.ico`](../../_design_references/VPE.ico), [`_design_references/msc-icon.png`](../../_design_references/msc-icon.png) (commit `e7bcdd3`). [`.cursorignore`](../../.cursorignore) still excludes `_design_references/` from **Cursor indexing** only — files **are** in git. |
 | **Git markers** | Empty restore-point commit before packaging: **`Clean restore-point about to make.exe`** (`1adddf9`). |
-| **Windows installer / icon** | NSIS **`oneClick: false`**, **`allowToChangeInstallationDirectory: true`** (interactive wizard); **`build.win.signAndEditExecutable: false`** + [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) embeds **`build/icon.ico`** into **`Vader Project Engine.exe`** (Explorer icon + uninstaller verified **2026-05-06**). |
+| **Windows installer / icon** | NSIS **`oneClick: false`**, **`allowToChangeInstallationDirectory: true`** (interactive wizard); **`build.win.signAndEditExecutable: false`** + [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) embeds **`media/icon.ico`** (fallback: **`build/icon.ico`**) into **`Vader Project Engine.exe`**. **`directories.buildResources`** may stay **`build/`** for optional assets — app icon path is **`media/`**. |
 | **PM2 daemon badge behavior** | System Health `PM2 Daemon` now reads **Online** only when PM2 RPC is connected **and** at least one workspace project is currently `running` (prevents misleading Online while all cards are stopped). |
 | **Runner stability / ghost ports** | `project-runner` startup preflight force-sweeps occupied target ports on Windows (`netstat -ano | findstr :<port>` + `taskkill /F /PID ...`; fallback `taskkill /F /IM node.exe` if still blocked), preventing 2s self-stop from orphaned Next.js listeners. |
-| **Next packaging step** | Tell the agent **rebuild exe** (see [Custom-Commands](Custom-Commands.md#rebuild-exe)): icon → **`build:renderer`** → **`rebuild:natives`** → lint → E2E (`CI=true`) → clean **`dist/`** → **`build:main`** → remove blockmap / `builder-debug.yml` / `latest.yml`. Icons: [`package.json`](../../package.json) `build` + `build/icon.ico` from **`VPE.ico`**. |
+| **Next packaging step** | Tell the agent **rebuild exe** (see [Custom-Commands](Custom-Commands.md#rebuild-exe)): icon staging → **`build:renderer`** → **`rebuild:natives`** → lint → E2E (`CI=true`) → clean **`dist/`** → **`build:main`** → remove blockmap / `builder-debug.yml` / `latest.yml`. Icons: [`package.json`](../../package.json) **`build.*`** + **[`media/icon.ico`](../../media/icon.ico)** from **`VPE.ico`** via **`msc-copy-release-icon`**. |
 
 **Context — health line on cards:** `GET /` probe does not follow redirects. **HTTP 307** on a project = server responded with redirect (e.g. Next middleware); browser **OPEN** still works. Green **“Active — HTTP 200”** only for **2xx** (see [`Msc_ProjectCard.tsx`](../../src/renderer/components/Msc_ProjectCard.tsx) `getHealthLine`).
 

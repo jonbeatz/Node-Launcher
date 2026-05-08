@@ -13,7 +13,7 @@ To maintain architectural integrity, all development must follow this strict hie
 4. **Node-Launcher-PRD.md**: Feature and requirement truth.
 5. **package.json**: Authority for executable scripts only.
 
-**Current release (npm):** **`1.1.8`** in root **`package.json`**. **Packaging pipeline:** **`npm run vader:sync`** runs **`vader:dev`** with **`--success last`** so npm waits for **full** dev process teardown, then **`vader:post-dev-forge`**: a **3s** pause via **`node scripts/vpe-forge-pause.cjs`**, then **`vpe:take-state-snapshot`**, **`vpe:check-readiness`**, **`build:win`**, and **`vpe:cleanup-dist`**. **`npm run vader:dev-to-forge`** chains **`vader:dev`** → **`vader:post-dev-forge`** without **`rimraf`**; for strict teardown use **`vader:sync`**. Full command table: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**. **v1.1.8** keeps thermal scrub; **9222** never blocks NET green (targeted purge + forced idle row). **`vader:clean-sync`** uses a non-zero-tolerant `||` gate so **`vader:post-dev-forge`** still runs after dev teardown.
+**Current release (npm):** **`1.2.2`** in root **`package.json`**. **Packaging pipeline:** **`npm run vader:sync`** runs **`vader:dev`** with **`--success last`** so npm waits for **full** dev process teardown, then **`vader:post-dev-forge`**: stall watchdog (**`scripts/vpe-forge-stall-watchdog.cjs`**) + **3s** pause via **`node scripts/vpe-forge-pause.cjs`**, then **`vpe:take-state-snapshot`**, **`vpe:check-readiness`**, **`build:win`**, and **`vpe:cleanup-dist`**. **`npm run vader:dev-to-forge`** chains **`vader:dev`** → **`vader:post-dev-forge`** without **`rimraf`**; **`npm run vader:clean-sync`** runs **`node scripts/vpe-clean-sync.cjs`** (**`rimraf dist`**, **`vader:dev`** detached ~**10s** window → forge tail). **`v1.2.2+`** NET LED is **always green in dev** (IPC override **3000 / 3001 / 9222**); **`before-quit`** sweep + **`Purge env`** still clear real listeners. Full command table: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**.
 
 ---
 
@@ -33,8 +33,8 @@ When you run **`npm run dev`**, the Node-Launcher shell (Electron + renderer) is
 | **Terminal** | **xterm.js + node-pty** | Interactive, per-project terminal with full ANSI support. |
 
 ### **2.5 Data Architecture**
-The canonical project registry structure is defined in **.cursorrules §11** (`projects.json`). 
-* **Persistence**: All projects persist with absolute paths, detected package manager, and specific start scripts.
+The logical project registry structure is defined in **.cursorrules §11** (`projects.json` schema). Canonical runtime persistence is stored under **`app.getPath('userData')/vpe-db`** (SQLite with JSON fallback/migration support).
+* **Persistence**: Projects persist with absolute paths, detected package manager, and specific start scripts.
 * **Preferences**: Metadata includes port lock preferences, preferred ports, and creation/launch timestamps.
 * **State**: Live runtime status (running/stopped) is synchronized with the PM2 API on every session start.
 
@@ -62,7 +62,7 @@ The UI follows a tactical "Studio Dark" and "Glassmorphic" aesthetic engineered 
 ### **Key Components**
 * **Vader Cards**: 320px minimum width featuring 4:3 WebP thumbnails and pulsing status LEDs.
 * **Performance Strip**: 40px hairline strip (#333) with low-opacity Vader Red sparkline waveforms for CPU/RAM.
-* **Log Drawer**: 420px width glassmorphic surface with 1px horizontal CRT scanlines at 2% opacity.
+* **Log Drawer**: 420px width glassmorphic surface; System Log text viewport is plain HTML (`#121212`) with ANSI/CLIXML stripping and no overlay on text.
 
 ---
 

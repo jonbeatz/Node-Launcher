@@ -22,7 +22,11 @@ import { VpeSandboxPanel } from '@/components/vpe-sandbox-panel'
 import { type RepairHistoryRow } from '@/components/repair-history-view'
 import { QuickActionsBar } from '@/components/quick-actions-bar'
 import { ToastProvider, useToast } from '@/components/vader-toast'
-import { getVpeApi, msc_rowToDashboardProject } from '@/lib/vpe-bridge'
+import {
+  getVpeApi,
+  msc_formatUnknownIPCError,
+  msc_rowToDashboardProject,
+} from '@/lib/vpe-bridge'
 
 type FilterType = 'ALL' | 'RUNNING' | 'STOPPED' | 'ERRORS'
 type ViewMode = 'grid' | 'list'
@@ -646,8 +650,8 @@ function DashboardContent() {
         await api.executeTerminalCommand(`cd "${project.path}" && npm install`, project.id)
         addToast('Install complete', 'success', 'Starting development server...')
         await handleToggleStatus(projectId)
-      } catch {
-        addToast('Install failed', 'error', 'Check terminal logs for details')
+      } catch (reason: unknown) {
+        addToast('Install failed', 'error', msc_formatUnknownIPCError(reason))
       }
     } else {
       addToast('Install & Start (demo)', 'info', `Pretending to run npm install for ${project.name}`)

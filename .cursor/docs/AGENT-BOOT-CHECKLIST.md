@@ -108,7 +108,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 Defined in [Custom-Commands.md](Custom-Commands.md):
 
-- **`rebuild exe`** — icon → export → natives → lint → E2E → package → trim `dist/`
+- **`rebuild exe`** — **`media/icon.ico`** staging → export → natives → lint → E2E → package → trim `dist/`
 - **`restart app`** / **`start app`** — stop stray node/electron → **`npm run dev`** (prefer **restart app** when you mean kill-then-dev after changes)
 - **`hardened setup`** — clean install / rebuild / optional Playwright / **`repair:ast`** + E2E + lint  
 - **`Vader Sync`** — **`npm run vader:sync`**: **`vader:dev -- --success last`**, then **`vader:post-dev-forge`** (snapshot → syntax guard → **`build:win`**). **`npm run vader:clean-sync`**: **`rimraf dist`**, then **`vader:dev`** with **`||`** fallback, then the same **`post-dev-forge`** tail (**no** **`--success last`**). **Rules:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md). **Examples:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync).  

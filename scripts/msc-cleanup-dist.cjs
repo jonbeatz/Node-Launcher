@@ -1,6 +1,8 @@
 /**
  * msc_cleanupDist — remove non-essential electron-builder artifacts from dist/ root only.
  * Never deletes directories (e.g. win-unpacked/) or the NSIS .exe installer.
+ * Never touches repo `media/` (icons, thumbnails) or `build/` — only files directly under dist/.
+ * (`vader:clean-sync` / vpe-clean-sync.cjs rims `dist/` only, not media.)
  */
 'use strict';
 
@@ -13,6 +15,7 @@ const distDir = path.join(root, 'dist');
 function msc_cleanupDist() {
   if (!fs.existsSync(distDir)) {
     console.log('msc-cleanup-dist: no dist/ folder — skip');
+    console.log('[Vader Protocol] v1.2.2 Build Confirmed.');
     return { removed: [], skipped: true };
   }
 
@@ -51,6 +54,7 @@ function msc_cleanupDist() {
     console.log('msc-cleanup-dist: nothing to remove (or dist empty)');
   }
   console.log('[Vader Protocol] All Thermal UI artifacts and Ghost PIDs purged.');
+  console.log('[Vader Protocol] v1.2.2 Build Confirmed.');
   return { removed };
 }
 

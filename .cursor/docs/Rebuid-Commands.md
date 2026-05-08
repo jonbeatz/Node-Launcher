@@ -9,7 +9,7 @@ Whenever the command "rebuild exe" (or aliases like "production build",
 
 
 
-1\. Staging Sync      | Copy '\_design\_references/VPE.ico' ➡️ 'build/icon.ico'
+1\. Staging Sync      | Copy '\_design\_references/VPE.ico' ➡️ 'media/icon.ico'
 
 2\. Next.js Export    | Run 'npm run build:renderer' (verify 'src/renderer/out/index.html')
 
@@ -21,7 +21,7 @@ Whenever the command "rebuild exe" (or aliases like "production build",
 
 6\. Prep Staging      | Wipe existing 'dist/' directory
 
-7\. Packager Run      | Run 'npm run build:main' (generates 'dist/Vader Project Engine.exe'; `build.afterPack` runs `msc-after-pack-embed-icon.cjs` + `rcedit` so the app `.exe` shows the staged `build/icon.ico` without winCodeSign symlink issues)
+7\. Packager Run      | Run 'npm run build:main' (generates 'dist/Vader Project Engine.exe'; `build.afterPack` runs `msc-after-pack-embed-icon.cjs` + `rcedit` so the app `.exe` shows the staged `media/icon.ico` without winCodeSign symlink issues)
 
 8\. Prune Dist        | Run **`npm run vpe:cleanup-dist`** (same as **`vader:post-dev-forge`** tail): removes **top-level** **`dist/`** **`*.blockmap`**, **`*.yml`**, **`builder-effective-config.yaml`** only — never **`win-unpacked/`** or **`*.exe`**. Logs **`[Vader Protocol] All Thermal UI artifacts and Ghost PIDs purged.`**
 
