@@ -13,6 +13,7 @@ import {
   Hammer,
   ExternalLink,
   Star,
+  Loader2,
 } from 'lucide-react'
 
 interface Msc_ProjectCardProps {
@@ -45,6 +46,8 @@ interface Msc_ProjectCardProps {
   health_reachable?: boolean | null
   /** Opens log drawer (e.g. when health is degraded). */
   onViewErrorConsole?: () => void
+  /** v1.2.3 — dependency auto-install before dev is still running. */
+  devInstallInProgress?: boolean
 }
 
 export function Msc_ProjectCard({
@@ -73,6 +76,7 @@ export function Msc_ProjectCard({
   health_checked_at,
   health_reachable,
   onViewErrorConsole,
+  devInstallInProgress,
 }: Msc_ProjectCardProps) {
   const isRunning = status === 'running'
   const runUrl = `http://localhost:${port}`
@@ -80,6 +84,14 @@ export function Msc_ProjectCard({
   const isBuilding = status === 'building'
 
   const getPrimaryButton = () => {
+    if (devInstallInProgress && isRunning) {
+      return {
+        label: 'Installing…',
+        icon: Loader2,
+        action: onStop,
+        installingActive: true,
+      }
+    }
     if (isBuilding) return { label: 'BUILDING...', icon: Hammer, disabled: true }
     if (!hasBuilt) {
       if (node_modules_missing) return { label: 'INSTALL & START', icon: Play, action: onInstallAndStart }
@@ -93,6 +105,7 @@ export function Msc_ProjectCard({
   const primaryBtn = getPrimaryButton()
 
   const getLedColor = () => {
+    if (devInstallInProgress && isRunning) return 'bg-[#ffcc00] animate-pulse-led'
     if (isRunning) return 'bg-[#4fde82] shadow-[0_0_6px_#4fde82]'
     if (isError) return 'bg-[#e02b20] animate-pulse-led shadow-[0_0_6px_#e02b20]'
     if (isBuilding) return 'bg-[#ffcc00] animate-pulse-led'
@@ -100,6 +113,7 @@ export function Msc_ProjectCard({
   }
 
   const getStatusLabel = () => {
+    if (devInstallInProgress && isRunning) return 'INSTALLING'
     if (isRunning) return 'RUNNING'
     if (isError) return 'ERROR'
     if (isBuilding) return 'BUILDING'
@@ -218,7 +232,7 @@ export function Msc_ProjectCard({
         <div className="flex items-center gap-2 mb-3">
           <div className={`w-2 h-2 rounded-full ${getLedColor()}`} />
           <span
-            className={`font-sans text-[11px] uppercase tracking-[0.05em] ${isError ? 'text-[#e02b20]' : isRunning ? 'text-[#4fde82]' : 'text-[#A0A0A0]'}`}
+            className={`font-sans text-[11px] uppercase tracking-[0.05em] ${isError ? 'text-[#e02b20]' : devInstallInProgress && isRunning ? 'text-[#ffcc00]' : isRunning ? 'text-[#4fde82]' : 'text-[#A0A0A0]'}`}
           >
             {getStatusLabel()}
           </span>
@@ -293,19 +307,40 @@ export function Msc_ProjectCard({
 
       <div className="p-3 flex items-center gap-2">
         <button
-          onClick={primaryBtn.action}
-          disabled={primaryBtn.disabled}
+          type="button"
+          onClick={() => {
+            if ('action' in primaryBtn && typeof primaryBtn.action === 'function') {
+              primaryBtn.action()
+            }
+          }}
+          disabled={Boolean(
+            'disabled' in primaryBtn && primaryBtn.disabled === true,
+          )}
+          title={
+            primaryBtn.label === 'Installing…'
+              ? 'Stop cancels install + dev pipeline'
+              : undefined
+          }
           className={`
             flex-1 flex items-center justify-center gap-1.5 h-7 rounded font-sans text-xs transition-all vader-focus
             ${primaryBtn.active
               ? 'bg-[#4fde82] text-black'
               : primaryBtn.disabled
                 ? 'bg-transparent border border-[#333333] text-[#555555] cursor-not-allowed'
+                : primaryBtn.label === 'Installing…'
+                  ? 'bg-transparent border border-[#ffcc00] text-[#ffcc00] hover:border-[#e02b20] hover:text-[#e02b20]'
                 : 'bg-transparent border border-[#555555] text-white hover:border-[#4fde82] hover:text-[#4fde82]'
             }
           `}
         >
-          <primaryBtn.icon size={12} />
+          <primaryBtn.icon
+            size={12}
+            className={
+              'installingActive' in primaryBtn && primaryBtn.installingActive
+                ? 'animate-spin shrink-0'
+                : undefined
+            }
+          />
           <span>{primaryBtn.label}</span>
         </button>
 

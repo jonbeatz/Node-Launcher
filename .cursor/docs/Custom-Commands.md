@@ -27,7 +27,7 @@ Use **Update Docs** (or **update docs**, **sync documentation**) when you want a
 7. **Checkpoint** — Update [Checkpoint.md](Checkpoint.md): add or extend a **Build vX.Y.Z** section for the release; fix downstream lines that still say an older “current” version.
 8. **Cross-links** — Align [README.md](../../README.md) (packaging line), [START-HERE.md](START-HERE.md), [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) protocol version string, and [TRUTH.md](TRUTH.md) only if architecture facts changed (do not churn TRUTH for pure marketing bumps).
 9. **Shipped UI strings** — If the user-facing version label changed: [`src/preload/preload.js`](../../src/preload/preload.js) **`vpeInfo.version`**, [`src/renderer/app/layout.tsx`](../../src/renderer/app/layout.tsx) **`metadata.description`**, and [`src/renderer/components/footer.tsx`](../../src/renderer/components/footer.tsx) fallback to match **`package.json`**.
-10. **Drift sweep** — `rg` (or editor search) for the **previous** patch version and fix stragglers (e.g. **`v1.1.8`** after bumping to **`v1.1.9`**).
+10. **Drift sweep** — `rg` (or editor search) for the **previous** patch version and fix stragglers (e.g. **`v1.2.2`** after **`v1.2.3`**).
 11. **Optional** — If **`layout.tsx`** / preload changed: **`npm run lint`** and **`npm run build:renderer`** from repo root.
 
 ### Rules
@@ -102,11 +102,27 @@ Notes:
 - This is a destructive stop for currently running Node/Electron processes on your machine session.
 - Launcher UI dev server defaults to `http://localhost:3000`; managed projects should use `3001+`.
 
+## Managed project dev (v1.2.3)
+
+Intent: **v0.dev-style** repos (and any catalog entry) ship without **`node_modules`** — VPE should still start **`dev`** reliably.
+
+### Behavior
+
+- **Trigger:** User starts a managed project (**`vpe:toggle-status`**) while **`fs.existsSync(<project>/package.json)`** and **`node_modules`** is absent.
+- **Main process:** [`src/main/project-runner.js`](../../src/main/project-runner.js) runs **`pnpm install && pnpm run <start>`**, **`yarn install && yarn run …`**, or **`npm install && npm run …`** (from **`pkg_manager`** + **`start_script`**), Windows via **`cmd /d /s /c`**.
+- **v0 heuristic:** **`components/ui`** exists, **`package.json`** exists, **`node_modules`** missing → log **`[VPE] v0 project detected… msc_autoRepairInstaller`** and return **`projectKind: 'v0-prototype'`** from **`toggleStatus`** (with **`installing: true`**).
+- **UI:** Dashboard **INSTALLING** / spinner on the primary control; **`subscribeBootstrapDevVisible`** clears the installing affordance when dev-server-like output appears — user can **stop** during install (**same toggle** kills the compound process).
+- **Health timing:** First HTTP probe after bootstrap waits **10s** ( **`MSC_HEALTH_FIRST_INSTALL_MS`** ) vs **`MSC_HEALTH_FIRST_MS`** for normal **`npm run dev`** only starts.
+
+### Not covered here
+
+Embedded **Log Drawer** slash commands (**`vpe:execute-terminal-command`**) stay separate — see **`vpe-ipc.js`** comment on **`msc_executeTerminalCommandInner`**.
+
 ## Vader Sync
 
 Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), then the same **`vader:post-dev-forge`** tail (**`vpe-forge-pause`** → snapshot → syntax guard → **`build:win`** → **`vpe:cleanup-dist`**). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **`post-dev-forge`** until **all** dev children have exited. **`npm run vader:clean-sync`** runs **`rimraf dist`** first, then **`(vader:dev || …)`** so **`post-dev-forge`** still runs after dev teardown even if **`vader:dev`** exits non-zero (**no** **`--success last`**). If the syntax guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) (v1.1.8: **`vader:clean-sync`** hardened chain, **`vader:dev-to-forge`**, **`--success last`** on **`vader:sync`**, **`&&`**, **`VPE_LAUNCHER_FORGE`**, **`rimraf dist`**, **`vpe-forge-pause`**, **`vader:force-forge`**, ASAR/native guidance).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) — **v1.2.3** catalog **`install && dev`** (§2 managed dev); forge chain still keyed to **`vader:clean-sync`** / **`vader:sync`** / **`&&`** / **`VPE_LAUNCHER_FORGE`** / **`rimraf dist`** / **`vpe-forge-pause`** (**v1.1.8** baseline).
 
 ### How **`vader:sync`** works
 

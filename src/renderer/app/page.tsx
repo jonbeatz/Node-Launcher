@@ -161,6 +161,10 @@ function DashboardContent() {
   >(null)
   const [nukeLogLines, setNukeLogLines] = useState<string[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  /** v1.2.3 — main auto `install && dev`; cleared when dev output signals or process stops. */
+  const [devInstallUiByProject, setDevInstallUiByProject] = useState<
+    Record<string, boolean>
+  >({})
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null)
@@ -203,6 +207,37 @@ function DashboardContent() {
       }
     })
   }, [clientReady, refreshProjects])
+
+  useEffect(() => {
+    if (!clientReady) return
+    const api = getVpeApi()
+    if (!api?.subscribeBootstrapDevVisible) return
+    return api.subscribeBootstrapDevVisible((payload) => {
+      const id = payload?.projectId
+      if (!id || typeof id !== 'string') return
+      setDevInstallUiByProject((prev) => {
+        if (!prev[id]) return prev
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    })
+  }, [clientReady])
+
+  useEffect(() => {
+    setDevInstallUiByProject((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const id of Object.keys(next)) {
+        const row = projects.find((p) => p.id === id)
+        if (!row || row.status !== 'running') {
+          delete next[id]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [projects])
 
   // Keyboard Shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -510,6 +545,17 @@ function DashboardContent() {
     if (api?.toggleStatus) {
       try {
         const r = await api.toggleStatus(projectId)
+        if (r && typeof r === 'object' && r.installing === true) {
+          setDevInstallUiByProject((prev) => ({ ...prev, [projectId]: true }))
+        }
+        if (r && typeof r === 'object' && r.status === 'stopped') {
+          setDevInstallUiByProject((prev) => {
+            if (!prev[projectId]) return prev
+            const next = { ...prev }
+            delete next[projectId]
+            return next
+          })
+        }
         await refreshProjects()
         const running = r?.status === 'running'
         let displayPort = project.port
@@ -957,6 +1003,9 @@ function DashboardContent() {
                             onOpenInBrowser={() =>
                               void handleOpenProjectUrl(project.id)
                             }
+                            devInstallInProgress={Boolean(
+                              devInstallUiByProject[project.id],
+                            )}
                           />
                         ))}
                       </div>
@@ -993,6 +1042,7 @@ function DashboardContent() {
                         onOpenInBrowser={(id) => void handleOpenProjectUrl(id)}
                         compact={compactMode}
                         onToggleCompact={() => setCompactMode(!compactMode)}
+                        devInstallByProjectId={devInstallUiByProject}
                       />
                     )}
                   </div>

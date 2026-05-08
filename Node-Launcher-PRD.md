@@ -4,7 +4,7 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.2.2** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata should match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts, **`vader:clean-sync`** (Node launcher + 10s dev window → forge), NET dev override (**v1.2.2+**).
+**Shipped desktop build (npm / `package.json` `version`):** **1.2.3** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata should match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts, **`vader:clean-sync`** (Node launcher + 10s dev window → forge), NET dev override (**v1.2.3+**).
 
 ---
 

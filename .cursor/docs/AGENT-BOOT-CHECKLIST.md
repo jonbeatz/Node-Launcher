@@ -37,6 +37,7 @@ If sources disagree, follow this order (**highest wins first**):
 | **Persistence** | Canonical store under **`app.getPath('userData')/vpe-db`** (SQLite/JSON); thumbnails under **`userData` media**. Legacy `projects.json` may be migrated/archived. |
 | **E2E / CI** | Playwright, Chromium; **`CI=true`** for deterministic bind—see [../../playwright.config.ts](../../playwright.config.ts) and [.github/workflows/ci.yml](../../.github/workflows/ci.yml). |
 | **Electron debug** | **`npm run dev:main`** uses **`--remote-debugging-port=9222`** — for MCP attach workflows. |
+| **Managed catalog dev (v1.2.3+)** | **`vpe:toggle-status`** → **`project-runner`**: if **`package.json`** exists and **`node_modules`** missing, runs **`install && dev`** in one shell; IPC may return **`installing`**, **`projectKind: 'v0-prototype'`** when **`components/ui`** is present; first HTTP health probe delay **10s** during bootstrap; UI **INSTALLING** / stop kills the compound process. |
 | **CPU temperature** | **Removed (v1.1.6+); UI scrub v1.1.7:** no WMI / PowerShell thermal in main; System Health has **no** temperature field. Do not restore without [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) sign-off. |
 
 ---
@@ -48,8 +49,8 @@ Read when you need **“where we are today”** or **exact command sequences**:
 | Doc | Use when |
 | :--- | :--- |
 | [Checkpoint.md](Checkpoint.md) | Branch status, recent milestones, risky areas, files to reopen |
-| [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`Update Docs`**, **`restart app`**, **`start app`**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
-| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`**, **`vader:clean-sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`** (**v1.1.8**) |
+| [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`Update Docs`**, **`restart app`**, **`start app`**, **`Managed project dev` (v1.2.3)**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
+| [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`**, **`vader:clean-sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`**; catalog **managed dev bootstrap** (**v1.2.3**) |
 | [API-SetUp-Master.md](API-SetUp-Master.md) | **LiteLLM + ngrok → Vertex AI**; Cursor Base URL + `master_key`; **post–Cursor-restart reconnect** checklist |
 | [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) | Packaging, ASAR, winCodeSign, native rebuild, telemetry—**resolved** symptoms |
 
@@ -63,7 +64,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
 - [ ] Intended branch matches [Checkpoint.md](Checkpoint.md) (or `git status` is intentional).
-- [ ] VPE Version: **v1.1.8** (see root `package.json` if disputed)
+- [ ] VPE Version: **v1.2.3** (see root `package.json` if disputed)
 - [ ] Node matches team expectation (CI uses Node **20**; local may differ—note if so).
 - [ ] **`npm install`** already run after last `package.json` change (`legacy-peer-deps` via [../../.npmrc](../../.npmrc)).
 
@@ -110,6 +111,7 @@ Defined in [Custom-Commands.md](Custom-Commands.md):
 
 - **`rebuild exe`** — **`media/icon.ico`** staging → export → natives → lint → E2E → package → trim `dist/`
 - **`restart app`** / **`start app`** — stop stray node/electron → **`npm run dev`** (prefer **restart app** when you mean kill-then-dev after changes)
+- **`Managed project dev`** — catalog **`vpe:toggle-status`**: missing **`node_modules`** + **`package.json`** → **`project-runner`** shell **`install && dev`**; see [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123)
 - **`hardened setup`** — clean install / rebuild / optional Playwright / **`repair:ast`** + E2E + lint  
 - **`Vader Sync`** — **`npm run vader:sync`**: **`vader:dev -- --success last`**, then **`vader:post-dev-forge`** (snapshot → syntax guard → **`build:win`**). **`npm run vader:clean-sync`**: **`rimraf dist`**, then **`vader:dev`** with **`||`** fallback, then the same **`post-dev-forge`** tail (**no** **`--success last`**). **Rules:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md). **Examples:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync).  
 - **`new git branch`** — commit/push/version bump pattern (if still current)

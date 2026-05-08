@@ -83,7 +83,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
-      versionLabel: 'MSC Media Engine v1.2.2',
+      versionLabel: 'MSC Media Engine v1.2.3',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:clean-sync`\n\n' +
@@ -92,7 +92,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
-      versionLabel: 'MSC Media Engine v1.2.2',
+      versionLabel: 'MSC Media Engine v1.2.3',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:dev`\n\n' +
@@ -101,7 +101,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
-      versionLabel: 'MSC Media Engine v1.2.2',
+      versionLabel: 'MSC Media Engine v1.2.3',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:sync`\n\n' +
@@ -110,7 +110,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
-      versionLabel: 'MSC Media Engine v1.2.2',
+      versionLabel: 'MSC Media Engine v1.2.3',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:clean-sync`\n\n' +
@@ -119,7 +119,7 @@ function msc_promptVaultMasterItems() {
     {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
-      versionLabel: 'MSC Media Engine v1.2.2',
+      versionLabel: 'MSC Media Engine v1.2.3',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vpe:force-clear`\n\n' +
@@ -184,6 +184,8 @@ function msc_formatCaughtForTerminal(reason) {
 
 /**
  * Slash commands and diagnostics for VPE embedded terminal IPC.
+ * Managed-project **dev** auto-install (`npm install && npm run dev`) is implemented in **`project-runner.startDev`**
+ * (see **v1.2.3**), not in this handler — keep terminal slash-commands separate from the dev pipeline.
  * @param {unknown} payload
  */
 async function msc_executeTerminalCommandInner(store, payload) {
@@ -1136,6 +1138,11 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     return { ok: true, previous, next, backupPath, scriptName };
   });
 
+  /**
+   * Start/stop managed dev. v1.2.3+: missing `node_modules` + `package.json` runs shell
+   * `install && run <start_script>` inside `project-runner` (not `vpe:execute-terminal-command`).
+   * Install bootstrap delays first HTTP health probe to **10s** so the UI/Open flow is not starved.
+   */
   ipcMain.handle('vpe:toggle-status', async (event, projectId) =>
     projectRunner.toggleStatus(projectId),
   );

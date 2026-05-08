@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Hammer,
   ExternalLink,
+  Loader2,
 } from 'lucide-react'
 
 interface Project {
@@ -79,6 +80,8 @@ interface ProjectListViewProps {
   onOpenInBrowser?: (id: string) => void
   compact?: boolean
   onToggleCompact?: () => void
+  /** Per-project installing state (npm install embedded in dev start). */
+  devInstallByProjectId?: Record<string, boolean>
 }
 
 type SortField = 'name' | 'port' | 'path'
@@ -97,6 +100,7 @@ export function ProjectListView({
   onSettings,
   onUnregister,
   onOpenInBrowser,
+  devInstallByProjectId = {},
 }: ProjectListViewProps) {
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -225,9 +229,14 @@ export function ProjectListView({
               const isStopped = project.status === 'stopped'
               const isBuilding = project.status === 'building'
               const hasBuilt = project.hasBuilt !== false
+              const isDevInstalling = Boolean(devInstallByProjectId[project.id] && isRunning)
               const rowBg = index % 2 === 0 ? 'bg-[#121212]' : 'bg-[#1a1a1a]'
               const isHovered = hoveredProject === project.id
               const httpCell = msc_healthCell(project)
+              const statusLed =
+                isDevInstalling
+                  ? 'bg-[#ffcc00] animate-pulse-led'
+                  : getLedColor(project.status)
 
               return (
                 <tr 
@@ -249,7 +258,7 @@ export function ProjectListView({
                     />
                   </td>
                   <td className="px-3 text-center">
-                    <div className={`w-2 h-2 rounded-full mx-auto ${getLedColor(project.status)}`} />
+                    <div className={`w-2 h-2 rounded-full mx-auto ${statusLed}`} />
                   </td>
                   <td className="px-3">
                     <div className="relative">
@@ -302,6 +311,15 @@ export function ProjectListView({
                           className="w-7 h-7 rounded flex items-center justify-center border border-[#ffcc00] text-[#ffcc00] cursor-not-allowed"
                         >
                           <Hammer size={14} className="animate-pulse" />
+                        </button>
+                      ) : isDevInstalling ? (
+                        <button
+                          type="button"
+                          onClick={() => onToggleStatus(project.id)}
+                          title="Installing dependencies… — click to stop"
+                          className="w-7 h-7 rounded flex items-center justify-center border border-[#ffcc00] text-[#ffcc00] hover:border-[#e02b20] hover:text-[#e02b20] transition-all"
+                        >
+                          <Loader2 size={14} className="animate-spin" />
                         </button>
                       ) : !hasBuilt ? (
                         <button

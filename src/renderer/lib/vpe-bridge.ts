@@ -174,7 +174,17 @@ export interface VpeApi {
   }>
   toggleStatus: (
     projectId: string,
-  ) => Promise<{ ok?: boolean; status?: string }>
+  ) => Promise<{
+    ok?: boolean
+    status?: string
+    /** v1.2.3 — auto `npm install && dev`; UI shows installing until bootstrap signal. */
+    installing?: boolean
+    projectKind?: 'v0-prototype'
+  }>
+  /** Fires when install+dev pipeline appears to reach the dev server (or clear installing UI). */
+  subscribeBootstrapDevVisible?: (
+    cb: (payload: { projectId: string }) => void,
+  ) => () => void
   /** PM2 stop-all + runner kill-all + SQLite all stopped */
   stopAllProjects?: () => Promise<{ ok?: boolean }>
   /** Save full catalog or one project as JSON (native save dialog). */

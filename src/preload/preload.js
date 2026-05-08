@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-/** v1.2.2 — never stringify raw DOM Event as "[object Event]" across terminal IPC bridge. */
+/** v1.2.3 — preload bridge (IPC formatting + bootstrap subscribe). */
 function msc_formatCaughtForPreload(reason) {
   if (reason == null) return 'Unknown failure';
   if (typeof reason === 'string') return reason;
@@ -58,6 +58,12 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     return () =>
       ipcRenderer.removeListener('vpe:projects-updated', listener);
   },
+  subscribeBootstrapDevVisible: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('vpe:bootstrap-dev-visible', listener);
+    return () =>
+      ipcRenderer.removeListener('vpe:bootstrap-dev-visible', listener);
+  },
   getUnifiedLogs: (limit) =>
     ipcRenderer.invoke('vpe:get-unified-logs', limit),
   patchStartScript: (projectId) =>
@@ -95,7 +101,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.2.2',
+  version: '1.2.3',
   hardware: '9700x Tuned',
 });
 

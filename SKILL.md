@@ -31,7 +31,7 @@ When this skill applies, **always**:
 - **PM2:** Prefer the **bundled programmatic API** in main; do not assume a globally installed PM2 daemon is required for the product story.
 - **Termination:** Discuss and implement stops with **`tree-kill`** (and project-runner preflight / Windows port sweeps where already implemented).
 - **Repairs:** **`.vader-backup`** before writes; diff-first confirmation for AST changes; align with `scripts/repair` / PRD repair suite.
-- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.1.8**).
+- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.2.3**).
 - **Naming:** Custom CSS/Tailwind-style classes prefixed with **`msc-`**; new main-process helpers follow existing **`msc_`** naming (match surrounding code).
 - **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. **Forge / packaging sequencing:** [`.cursor/docs/VPE-BUILD-PROTOCOL.md`](.cursor/docs/VPE-BUILD-PROTOCOL.md) — e.g. **`vader:sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vpe:cleanup-dist`**.
 - **API Bootstrap:** Always ensure the **"start API"** (LiteLLM) is running for any task requiring model orchestration. Confirmation: **"API is Live"**.
@@ -53,6 +53,7 @@ When this skill applies, **always**:
 
 - **Launcher URL:** `npm run dev` serves the **shell UI** at **`http://localhost:3000`** by default (overridable via launcher port env such as **`VPE_RENDERER_PORT` / `PORT`** per repo).
 - **Managed projects:** Must use **ports strictly above** the launcher port (e.g. **3001+** when the shell is on 3000). The app enforces a **reserved-port guard** so managed apps do not bind the launcher port.
+- **Bootstrap (v1.2.3+):** **`vpe:toggle-status`** → main **`project-runner`**: missing **`node_modules`** with **`package.json`** triggers a single-shell **`install && run <start_script>`** before health probes (longer first probe delay). Log-drawer **`vpe:execute-terminal-command`** does **not** auto-install — see **`vpe-ipc.js`** docs.
 - **Conflicts:** Auto-increment (up to **10** attempts), **port lock** UX, and toasts on exhaustion—per PRD / `.cursorrules`.
 
 ### 1.3 Nuke suite

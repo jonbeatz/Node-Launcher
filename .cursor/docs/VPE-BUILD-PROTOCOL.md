@@ -1,10 +1,10 @@
-# VPE Build & Command Protocol (v1.1.8)
+# VPE Build & Command Protocol (master; includes v1.2.3 deltas)
 
 **Purpose:** Source of truth for **build sequencing**, **terminal command logic**, and **Windows packaging posture** on Vader Project Engine — so dev sessions stay clean (no orphaned dev servers on **3000**), and release builds stay predictable.
 
 **Authority note:** Executable script strings and Electron-builder knobs live in **`package.json`**. If this document ever diverges from **`package.json`**, **`package.json` wins** — update this file in the same change.
 
-**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates).
+**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap).
 
 ---
 
@@ -32,6 +32,7 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ## 2. Execution logic & rules
 
+- **Managed project dev (v1.2.3+):** **`vpe:toggle-status`** drives [`project-runner.js`](../../src/main/project-runner.js) **`toggleStatus` / `startDev`**. Missing **`node_modules`** with valid **`package.json`** spawns **`install && run <start_script>`** in one shell (package manager aware). **`components/ui`** + no **`node_modules`** marks **`v0-prototype`** internally (IPC **`projectKind`** + dedicated System Log line). First HTTP **health probe** delay is lengthened (**10s**) during that bootstrap so installs are not mistaken for crashed dev servers. Slash commands remain on **`vpe:execute-terminal-command`** — auto-install for **catalog dev** is **not** routed through the drawer terminal IPC.
 - **Strict forge sequence:** **`vader:sync`** / **`vader:clean-sync`** / **`vader:dev-to-forge`** all end in **`vader:post-dev-forge`**: **3s pause** (**`node scripts/vpe-forge-pause.cjs`**) → Snapshot → Syntax guard → Build → **`vpe:cleanup-dist`.** **`vader:clean-sync`** (**v1.1.8+**) runs **`rimraf dist`** then **`vader:dev`** (not **`--success last`**) with a **non-zero-forgiving** `||` gate, then **`post-dev-forge`** — pair with main-process **dev-exit** port sweep (see §4). For blocking full dev teardown, use **`vader:sync`**.
 - **Sequential `&&` chains:** **`vader:sync`**, **`vader:clean-sync`**, **`vader:dev-to-forge`**, and **`vader:post-dev-forge`** rely on **`&&`**. **`build:win` / `build:main`** run only inside **`vader:post-dev-forge`**, after the **snapshot** step succeeds and the **syntax guard** passes. **`vader:sync`** requires **`vader:dev`** to exit **0** for the chain to reach **`post-dev-forge`**. **`vader:clean-sync`** wraps **`vader:dev`** in **`( … || node -e "process.exit(0)" )`** so a non-zero dev exit still advances to **`post-dev-forge`** once that subshell finishes.
 - **`concurrently` success modes:** **`npm run vader:dev`** keeps **`--success first`**. **`npm run vader:sync`** runs **`npm run vader:dev -- --success last`**, producing a final **`concurrently`** invocation where **`--success last`** overrides **`--success first`** so exit code / completion wait aligns with the **last** process to finish — blocking early **`&&`** continuation while **Next** might still release **3000**. **`npm run vader:dev-to-forge`** chains **`vader:dev`** (default **`--success first`**) → **`vader:post-dev-forge`**; for **no race** with **Next** on **3000**, prefer **`vader:sync`** instead.

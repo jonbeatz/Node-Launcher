@@ -13,6 +13,46 @@ const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 /** No TCP/connect failures persisted to SQLite until elapsed — avoids false red “Offline” while Next/boot compiles. */
 const MSC_STARTUP_GRACE_MS = 20000;
 const MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS = 6;
+/** v1.2.3 — first HTTP health probe after auto `install && dev` pipeline (npm install can run long). */
+const MSC_HEALTH_FIRST_INSTALL_MS = 10000;
+
+/**
+ * @param {string} projectRoot
+ * @returns {{ needsAutoInstall: boolean, v0Prototype: boolean, hasPkg: boolean }}
+ */
+function msc_analyzeDependencyBootstrap(projectRoot) {
+  const pkgPath = path.join(projectRoot, 'package.json');
+  const nmPath = path.join(projectRoot, 'node_modules');
+  const v0UiPath = path.join(projectRoot, 'components', 'ui');
+  const hasPkg = fs.existsSync(pkgPath);
+  const hasNm = fs.existsSync(nmPath);
+  const v0Prototype =
+    hasPkg && !hasNm && fs.existsSync(v0UiPath);
+  const needsAutoInstall = hasPkg && !hasNm;
+  return { needsAutoInstall, v0Prototype, hasPkg };
+}
+
+/**
+ * Shell one-liner: install then run dev/start script (v0 zero-config bootstrap).
+ */
+function msc_shellInstallThenDev(row) {
+  const script = (row.start_script || 'dev').toString();
+  const pm = row.pkg_manager || 'npm';
+  if (pm === 'yarn') return `yarn install && yarn run ${script}`;
+  if (pm === 'pnpm') return `pnpm install && pnpm run ${script}`;
+  return `npm install && npm run ${script}`;
+}
+
+function msc_spawnShellCommand(command, cwd, env) {
+  if (process.platform === 'win32') {
+    return spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', command], {
+      cwd,
+      env,
+      windowsHide: true,
+    });
+  }
+  return spawn('/bin/sh', ['-c', command], { cwd, env });
+}
 
 class MSC_ProjectRunner extends EventEmitter {
   /**
@@ -165,35 +205,10 @@ class MSC_ProjectRunner extends EventEmitter {
     }
   }
 
-  _spawnScript(row, script, mode) {
-    const cwd = msc_validateProjectPath(row.path);
-    const pm = row.pkg_manager || 'npm';
-    const cmd =
-      process.platform === 'win32'
-        ? pm === 'yarn'
-          ? 'yarn.cmd'
-          : pm === 'pnpm'
-            ? 'pnpm.cmd'
-            : 'npm.cmd'
-        : pm;
-    let args = ['run', script];
-    if (pm === 'yarn') {
-      args = ['run', script];
-    }
-
-    const configuredPort = Number(row.port);
-    const env = { ...process.env, FORCE_COLOR: '1' };
-    if (Number.isFinite(configuredPort) && configuredPort > 0) {
-      env.PORT = String(configuredPort);
-      env.NEXT_PORT = String(configuredPort);
-      env.DEV_PORT = String(configuredPort);
-    }
-
-    const child = spawn(cmd, args, {
-      cwd,
-      shell: false,
-      env,
-    });
+  _attachChildStreams(row, child, mode, opts = {}) {
+    const { installBootstrapRec } = opts;
+    const npmReady =
+      /(next dev|next-server|ready - started|Local:\s*http|▲ Next\.js|vite v\d|compiled \S+ in|✓\s*(Ready|Starting))/i;
 
     const flushLines = (bufRef, chunk, streamLevel) => {
       bufRef.buf += chunk.toString('utf8');
@@ -202,6 +217,14 @@ class MSC_ProjectRunner extends EventEmitter {
       for (const raw of lines) {
         const line = raw.trimEnd();
         if (!line) continue;
+        if (
+          installBootstrapRec &&
+          installBootstrapRec.installBootstrap &&
+          npmReady.test(line)
+        ) {
+          this._broadcast('vpe:bootstrap-dev-visible', { projectId: row.id });
+          installBootstrapRec.installBootstrap = false;
+        }
         const lvl = streamLevel === 'stderr' ? 'warn' : 'info';
         this._persistAndBroadcastLog(row.id, lvl, line);
       }
@@ -234,8 +257,53 @@ class MSC_ProjectRunner extends EventEmitter {
       );
       this.emit('exit', { projectId: row.id, mode, code, signal });
     });
+  }
 
+  _spawnScript(row, script, mode) {
+    const cwd = msc_validateProjectPath(row.path);
+    const pm = row.pkg_manager || 'npm';
+    const cmd =
+      process.platform === 'win32'
+        ? pm === 'yarn'
+          ? 'yarn.cmd'
+          : pm === 'pnpm'
+            ? 'pnpm.cmd'
+            : 'npm.cmd'
+        : pm;
+    const args = ['run', script];
+
+    const configuredPort = Number(row.port);
+    const env = this._projectChildEnv(row, configuredPort);
+
+    const child = spawn(cmd, args, {
+      cwd,
+      shell: false,
+      env,
+    });
+
+    this._attachChildStreams(row, child, mode);
     return child;
+  }
+
+  /** `npm install && npm run <script>` (or yarn/pnpm). */
+  _spawnInstallThenDevPipeline(row, installBootstrapRec) {
+    const cwd = msc_validateProjectPath(row.path);
+    const configuredPort = Number(row.port);
+    const env = this._projectChildEnv(row, configuredPort);
+    const command = msc_shellInstallThenDev(row);
+    const child = msc_spawnShellCommand(command, cwd, env);
+    this._attachChildStreams(row, child, 'dev', { installBootstrapRec });
+    return child;
+  }
+
+  _projectChildEnv(row, configuredPort) {
+    const env = { ...process.env, FORCE_COLOR: '1' };
+    if (Number.isFinite(configuredPort) && configuredPort > 0) {
+      env.PORT = String(configuredPort);
+      env.NEXT_PORT = String(configuredPort);
+      env.DEV_PORT = String(configuredPort);
+    }
+    return env;
   }
 
   _assertPortConfigured(portLike) {
@@ -388,13 +456,45 @@ class MSC_ProjectRunner extends EventEmitter {
 
     await this._runDevPreflight(row);
 
-    this._persistAndBroadcastLog(
-      row.id,
-      'info',
-      `[vpe] starting dev (${row.pkg_manager} run ${row.start_script})`,
-    );
+    const projectRoot = msc_validateProjectPath(row.path);
+    const boot = msc_analyzeDependencyBootstrap(projectRoot);
+    let installBootstrap = false;
 
-    const child = this._spawnScript(row, row.start_script, 'dev');
+    /** @type {{ installing?: boolean, projectKind?: string }} */
+    const extra = {};
+
+    /** @type {import('child_process').ChildProcess} */
+    let child;
+
+    if (boot.needsAutoInstall) {
+      installBootstrap = true;
+      rec.installBootstrap = true;
+      if (boot.v0Prototype) {
+        this._persistAndBroadcastLog(
+          row.id,
+          'info',
+          '[VPE] v0 project detected. Missing dependencies. Launching msc_autoRepairInstaller...',
+        );
+        extra.installing = true;
+        extra.projectKind = 'v0-prototype';
+      } else {
+        this._persistAndBroadcastLog(
+          row.id,
+          'info',
+          '[VPE] Missing node_modules. Running install before dev (`npm install && npm run …`).',
+        );
+        extra.installing = true;
+      }
+      child = this._spawnInstallThenDevPipeline(row, rec);
+    } else {
+      this._persistAndBroadcastLog(
+        row.id,
+        'info',
+        `[vpe] starting dev (${row.pkg_manager} run ${row.start_script})`,
+      );
+      child = this._spawnScript(row, row.start_script, 'dev');
+    }
+
     rec.dev = child;
     rec.healthFailCount = 0;
 
@@ -403,9 +503,11 @@ class MSC_ProjectRunner extends EventEmitter {
     this._emitProjectsRefresh();
 
     rec.healthStartedAt = Date.now();
+    const firstProbeMs =
+      installBootstrap ? MSC_HEALTH_FIRST_INSTALL_MS : MSC_HEALTH_FIRST_MS;
     rec.healthPollTimer = setTimeout(() => {
       void this._healthPollCycle(row.id);
-    }, MSC_HEALTH_FIRST_MS);
+    }, firstProbeMs);
 
     child.on('close', (code, signal) => {
       const r = this.children.get(row.id);
@@ -413,13 +515,19 @@ class MSC_ProjectRunner extends EventEmitter {
       this._clearHealthPolling(row.id);
       r.dev = undefined;
       r.healthFailCount = 0;
+      r.installBootstrap = false;
       this.store.clearProjectHealth(row.id);
       this.store.setProjectStopped(row.id);
       this._emitProjectsRefresh();
     });
 
-    this.emit('start', { projectId: row.id, mode: 'dev' });
-    return { ok: true, status: 'running' };
+    this.emit('start', {
+      projectId: row.id,
+      mode: 'dev',
+      installing: !!extra.installing,
+      projectKind: extra.projectKind,
+    });
+    return { ok: true, status: 'running', ...extra };
   }
 
   stopDev(projectId) {
@@ -427,6 +535,7 @@ class MSC_ProjectRunner extends EventEmitter {
     if (!rec?.dev) {
       this.store.clearProjectHealth(projectId);
       this.store.setProjectStopped(projectId);
+      if (rec) rec.installBootstrap = false;
       this._emitProjectsRefresh();
       return { ok: true, status: 'stopped' };
     }
@@ -440,6 +549,7 @@ class MSC_ProjectRunner extends EventEmitter {
     );
     treeKill(pid, 'SIGTERM', () => {});
     rec.dev = undefined;
+    rec.installBootstrap = false;
     this.store.clearProjectHealth(projectId);
     this.store.setProjectStopped(projectId);
     this._emitProjectsRefresh();
@@ -492,6 +602,7 @@ class MSC_ProjectRunner extends EventEmitter {
     if (rec) {
       rec.dev = undefined;
       rec.build = undefined;
+      rec.installBootstrap = false;
     }
     this.store.clearProjectHealth(projectId);
     this.store.setProjectStopped(projectId);
@@ -505,6 +616,7 @@ class MSC_ProjectRunner extends EventEmitter {
         clearTimeout(rec.healthPollTimer);
         rec.healthPollTimer = undefined;
       }
+      rec.installBootstrap = false;
       if (rec.dev?.pid) treeKill(rec.dev.pid, 'SIGTERM', () => {});
       if (rec.build?.pid) treeKill(rec.build.pid, 'SIGTERM', () => {});
     }
