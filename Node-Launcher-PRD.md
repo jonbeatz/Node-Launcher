@@ -6,6 +6,8 @@
 
 **Shipped desktop build (npm / `package.json` `version`):** **1.3.1** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match; see [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts and in-app tooling. Prior layers still apply: **`vader:clean-sync`** / **`vader:sync`**, NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
 
+**v1.3.1 (ops / branching):** Default dev branch **`VPE-v1.3.x-Dev`**; CI **`.github/workflows/ci.yml`** runs **`npm ci`** (requires **`package-lock.json`** synced to **`package.json`**) → lint → **`build:renderer`** → AST stub → Playwright **`test:e2e`**.
+
 **v1.2.6 (product baseline):** **`projects.is_archived`** in SQLite/JSON; **ARCHIVE** filter; **Project Settings → Archive project**; **Ctrl+K / Cmd+K** jump search; **Add Project** type from **`inspectProject`**; tactical sidebar shields; list **12px** shield dot; catalog **`is_archived`**.
 
 **v1.2.9–v1.3.0 (UX):** Maintenance **Prompt Vault** — accordion rows, **`vpe:update-vault-item`** edit path, optional row **description**, sandbox onboarding accordion, neutral **`#2a2a2a`** selection on dashboard pills / shell nav where specified; **v1.3.0** — collapsed **+ Create New Master Directive** composer; **`PromptVault`** imported directly from **`@/components/PromptVault`** (no **`prompt-vault-panel`** proxy).
