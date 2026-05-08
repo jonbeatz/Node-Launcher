@@ -155,14 +155,37 @@ class MSC_PM2Manager {
     }
   }
 
-  /** Remove or stop PM2 process named `projectId` so it won't fight dashboard spawns */
+  /**
+   * Remove or stop PM2 process named `projectId` so it won't fight dashboard spawns.
+   * Must not hang when PM2 RPC is down (was causing `vpe:stop-all` "reply was never sent").
+   */
   async msc_evictPm2Slot(projectId) {
     const id = String(projectId);
+    const connected = await this.msc_ensureConnected();
+    if (!connected) {
+      console.warn(`[VPE] msc_evictPm2Slot(${id}): PM2 not connected; skip`);
+      return false;
+    }
+    const timeoutMs = 12000;
     return new Promise((resolve) => {
-      pm2.delete(id, (errDel) => {
-        if (!errDel) return resolve(true);
-        pm2.stop(id, () => resolve(true));
-      });
+      const t = setTimeout(() => {
+        console.warn(`[VPE] msc_evictPm2Slot(${id}): timeout ${timeoutMs}ms`);
+        resolve(false);
+      }, timeoutMs);
+      const finish = (v) => {
+        clearTimeout(t);
+        resolve(v);
+      };
+      try {
+        pm2.delete(id, (errDel) => {
+          if (!errDel) return finish(true);
+          pm2.stop(id, () => finish(true));
+        });
+      } catch (e) {
+        clearTimeout(t);
+        console.warn(`[VPE] msc_evictPm2Slot(${id}) threw:`, e?.message ?? e);
+        finish(false);
+      }
     });
   }
 
@@ -471,8 +494,14 @@ class MSC_PM2Manager {
       console.warn('[VPE] stopAll: PM2 RPC not connected; skipping pm2.stop(all)');
       return false;
     }
+    const timeoutMs = 20000;
     return new Promise((resolve) => {
+      const t = setTimeout(() => {
+        console.warn(`[VPE] pm2.stop(all) timeout ${timeoutMs}ms`);
+        resolve(false);
+      }, timeoutMs);
       pm2.stop('all', (err) => {
+        clearTimeout(t);
         if (err) {
           console.warn('[VPE] pm2.stop(all):', err?.message ?? err);
           resolve(false);
@@ -485,6 +514,11 @@ class MSC_PM2Manager {
 
   /** Delete all managed PM2 apps whose names match VPE registry IDs */
   async msc_pm2CleanupRegistered() {
+    const connected = await this.msc_ensureConnected();
+    if (!connected) {
+      console.warn('[VPE] msc_pm2CleanupRegistered: PM2 not connected; skip evict loop');
+      return;
+    }
     for (const row of this.store.getProjects()) {
       await this.msc_evictPm2Slot(row.id);
     }

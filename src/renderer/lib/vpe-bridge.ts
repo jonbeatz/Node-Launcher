@@ -248,7 +248,7 @@ export interface VpeApi {
     cb: (payload: VpeGhostPresenceEvent) => void,
   ) => () => void
   /** PM2 stop-all + runner kill-all + SQLite all stopped */
-  stopAllProjects?: () => Promise<{ ok?: boolean }>
+  stopAllProjects?: () => Promise<{ ok?: boolean; error?: string }>
   /** Save full catalog or one project as JSON (native save dialog). */
   catalogExport?: (opts: {
     scope: 'full' | 'single'

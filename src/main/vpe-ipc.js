@@ -1457,9 +1457,21 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
 
   /** Same engine path as tray "Stop all (PM2 + dashboard spawns)"; updates SQLite registry. */
   ipcMain.handle('vpe:stop-all', async () => {
-    await msc_vpeStopAllEngines();
-    msc_emitProjectsUpdated();
-    return { ok: true };
+    try {
+      await msc_vpeStopAllEngines();
+      msc_emitProjectsUpdated();
+      return { ok: true };
+    } catch (err) {
+      const m =
+        err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
+      console.error('[VPE] vpe:stop-all', m);
+      try {
+        msc_emitProjectsUpdated();
+      } catch (_) {
+        /* */
+      }
+      return { ok: false, error: m };
+    }
   });
 
   ipcMain.handle('vpe:run-build', async (event, projectId) =>

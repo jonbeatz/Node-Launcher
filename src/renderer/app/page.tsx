@@ -803,8 +803,18 @@ function DashboardContent() {
     const api = getVpeApi()
     if (api?.stopAllProjects) {
       try {
-        await api.stopAllProjects()
+        const r = await api.stopAllProjects()
         await refreshProjects()
+        if (r && r.ok === false) {
+          addToast(
+            'Stop all failed',
+            'error',
+            typeof r.error === 'string' && r.error.trim()
+              ? r.error
+              : 'Engine returned an error',
+          )
+          return
+        }
         addToast('All projects stopped', 'info', 'PM2 and dashboard processes were stopped.')
       } catch (err: unknown) {
         const msg =

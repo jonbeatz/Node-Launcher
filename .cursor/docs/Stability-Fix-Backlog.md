@@ -196,6 +196,22 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 **Fix in repo (v1.3.7):** [`package.json`](../../package.json) **`build.asarUnpack`** includes **`**/node_modules/better-sqlite3/**/*`**, **`**/node_modules/node-pty/**/*`**, and **`**/node_modules/pm2/**/*`** so copies land under **`resources/app.asar.unpacked`**. Main process must **`require`** PM2 from that tree when **`app.isPackaged`** — see [`pm2-client.js`](../../src/main/pm2-client.js) (**`msc_getPm2`**) used by [`pm2-manager.js`](../../src/main/pm2-manager.js). After changing deps, run **`npm install`** so **`node-pty`** is present (electron-builder **`node-pty@undefined`** if missing).
 
+### Stop All / `vpe:stop-all` IPC hang (v1.3.7 — timeout safety guards)
+
+**Symptom:** Sidebar **Stop All** → *Error invoking remote method `vpe:stop-all`: reply was never sent* (handler never settled). Per-card **STOP** still worked ( **`projectRunner`** path).
+
+**Cause:** [`msc_vpeStopAllEngines`](../../src/main/vpe-ipc.js) **`await`**ed **`msc_pm2CleanupRegistered`**, which looped **`pm2.delete`** without a live PM2 RPC — callbacks never ran, so the promise chain hung.
+
+**Fix (implemented):**
+
+| Layer | Behavior |
+|------|-----------|
+| [`pm2-manager.js`](../../src/main/pm2-manager.js) **`msc_pm2CleanupRegistered`** | **`await msc_ensureConnected()`**; on failure **log + return** (no **`pm2.delete`** loop). |
+| **`msc_evictPm2Slot`** | **`await msc_ensureConnected()`** first; **`pm2.delete` / `pm2.stop`** wrapped in a **12s** timeout **`Promise`** (resolve **`false`** on timeout). |
+| **`stopAll`** | **`pm2.stop('all', …)`** wrapped in a **20s** timeout; **`clearTimeout`** when the callback runs. |
+| [`vpe-ipc.js`](../../src/main/vpe-ipc.js) **`vpe:stop-all`** | **`try/catch`**; always returns **`{ ok: true }`** or **`{ ok: false, error }`**; **`msc_emitProjectsUpdated()`** in **`catch`** so the UI refreshes even when PM2 steps fail. |
+| [`page.tsx`](../../src/renderer/app/page.tsx) | If **`stopAllProjects()`** returns **`r.ok === false`**, show **error** toast with **`r.error`**. [`vpe-bridge.ts`](../../src/renderer/lib/vpe-bridge.ts) types include **`error?: string`**. |
+
 ---
 
 *Last updated: 2026-05-08 — **v1.3.7** ASAR **`asarUnpack`** for natives (above); **v1.3.2** Ghost watcher (see **Windows ghost process**); [Checkpoint](Checkpoint.md). Forge / `concurrently` baseline **v1.1.8** in [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md). **Powered by the MSC Media Engine v1.3.7**.*
