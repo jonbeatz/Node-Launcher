@@ -316,7 +316,6 @@ Run from PowerShell:
    - **CDP / Electron** (optional, for **`playwright-electron`**): run **`npm run dev`**, then `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9222/json/version` — expect JSON; failures mean Electron is not up with **`--remote-debugging-port=9222`**. Same flow as [**Playwright MCP (aligned)**](#playwright-mcp-aligned-with-vpe) above.
 
 # Custom Command Shortcuts
-- If the user says "start API" (or any variation like "start server" or "run litellm"), you must immediately open a PowerShell terminal and run these two commands in order:
-  1. $env:GOOGLE_APPLICATION_CREDENTIALS="D:\\Cursor_Projectz\\Node-Launcher\\gcp_key.json"
-  2. litellm --config litellm_config.yaml
+- **New agent session / project setup:** Proactively run **`.\vpe-start-api.ps1`** at **repo root** after reading **`AGENT-BOOT-CHECKLIST.md`** (§4 **First actions**), not only when the user says the phrase—so the LiteLLM → Vertex bridge is live before substantive work. See **`START-HERE.md`**.
+- If the user says "start API" (or any variation like "start server" or "run litellm"), open a PowerShell terminal at the **repo root** (`Node-Launcher`) and run **`.\vpe-start-api.ps1`**. That script sets **`GOOGLE_APPLICATION_CREDENTIALS`** to **`.\google-api\gcp_key.json`**, launches **ngrok** in a **separate** window on **port 4000**, and starts **LiteLLM** with **`litellm --config ./google-api/litellm_config.yaml --port 4000`**. Manual fallback (same port): `$env:GOOGLE_APPLICATION_CREDENTIALS=".\google-api\gcp_key.json"` then `litellm --config ./google-api/litellm_config.yaml --port 4000`, plus **`ngrok http 4000`** in another terminal.
 

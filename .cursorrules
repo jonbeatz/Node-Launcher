@@ -20,14 +20,11 @@ If documentation conflicts occur, follow this hierarchy strictly:
 4. `Node-Launcher-PRD.md` (Feature & Requirement Truth)
 5. `package.json` (Authority for executable scripts only)
 
-**Session bootstrap (cold start):** `.cursor/docs/AGENT-BOOT-CHECKLIST.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above.
+**Session bootstrap (cold start):** `.cursor/docs/AGENT-BOOT-CHECKLIST.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above. **New Cursor session / agent setting up the repo:** follow that checklist §4 **First actions** and run **`.\vpe-start-api.ps1`** early (see `.cursor/docs/START-HERE.md`).
 
 **Critical:** Before performing any build, deployment, or environment setup, read and adhere to the protocols in **`.cursor/docs/VPE-BUILD-PROTOCOL.md`.**
 
-**Crucial:** Always ensure the **LiteLLM API** is running by executing the **"start API"** command sequence:
-   1. `$env:GOOGLE_APPLICATION_CREDENTIALS="D:\Cursor_Projectz\Node-Launcher\gcp_key.json"`
-   2. `litellm --config litellm_config.yaml`
-   Confirm with **"API is Live"** once the terminal shows it's listening.
+**Crucial:** Always ensure the **LiteLLM API** is running by executing the **"start API"** flow from repo root: **`.\vpe-start-api.ps1`** (sets **`GOOGLE_APPLICATION_CREDENTIALS`** to **`.\google-api\gcp_key.json`**, starts **ngrok http 4000** in a new window, runs **LiteLLM** on **port 4000**). Confirm with **"API is Live"** once the terminal shows it's listening.
 
 ## 3. Tech Stack & Architecture Standards
 - **Frameworks:** Electron 28+ (Main) & Next.js 15+ Static Export (UI)

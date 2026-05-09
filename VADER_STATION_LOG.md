@@ -5,6 +5,12 @@
 
 ---
 
+## API stack (v1.6.1)
+
+The Vertex / LiteLLM bridge is **self-contained & scripted**: run **`.\vpe-start-api.ps1`** from the repo root. Service account JSON lives under **`.\google-api\gcp_key.json`** (ignored by git), LiteLLM config under **`.\google-api\litellm_config.yaml`**. **LiteLLM and ngrok both use port 4000** (locked). Detail: [.cursor/docs/API-SetUp-Master.md](.cursor/docs/API-SetUp-Master.md).
+
+---
+
 ## Mission outcome: **[COMPLETE]**
 
 The tactical **Dashboard** catalog filter is now branded and implemented as **Vault Search**: live, **continuous substring** matching over registered projects while preserving the Vader Protocol top bar and grid framing described in the system UI spec.

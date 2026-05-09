@@ -125,9 +125,9 @@ module.exports = {
 *   **Snapshot Engine:** Backs up SQLite and `.env` files to `.vader-checkpoint` via `%TEMP%` staging and copy-on-write logic to bypass file locks.
 
 ### **5.1 API Orchestration (LiteLLM)**
-*   **Command:** `start API` (or `run litellm`).
-*   **Requirement:** Must set `$env:GOOGLE_APPLICATION_CREDENTIALS` to `D:\Cursor_Projectz\Node-Launcher\gcp_key.json`.
-*   **Startup:** `litellm --config litellm_config.yaml`.
+*   **Command:** `start API` (or `run litellm`) → from repo root run **`.\vpe-start-api.ps1`** (v1.6.1).
+*   **Requirement:** Credentials at **`.\google-api\gcp_key.json`** via **`GOOGLE_APPLICATION_CREDENTIALS`** (script sets this relative to **`$PSScriptRoot`**).
+*   **Startup:** `litellm --config ./google-api/litellm_config.yaml --port 4000`; **ngrok** targets **port 4000** in a separate window.
 *   **Verification:** Provide feedback: **"API is Live"** once the server starts.
 *   **Feedback:** Includes Toasts for actions, Card Alerts for crash loops, and a Global Error Boundary for UI failures[cite: 13].
 

@@ -5,7 +5,8 @@
 **How to use**
 
 - **Start of day:** Open this file, tick the **Session verification** section, then skim **Quick mental model**.
-- **New agent / fresh chat:** Paste or `@`-reference this file plus `@AGENT-BOOT-CHECKLIST.md` so the model loads the index; then point at a task.
+- **New agent / fresh chat:** Paste or `@`-reference this file so the model loads the index; then point at a task.
+- **New session + project setup (agents):** After reading this checklist (or alongside §1 read order), **run start API** so Cursor can use the LiteLLM → Vertex bridge: from repo root, **`.\vpe-start-api.ps1`** — see [API-SetUp-Master.md](API-SetUp-Master.md). Do this **early in the session**—before relying on overrides / model routing—not only after other smoke steps. If **`.\google-api\gcp_key.json`** is missing, stop and note **blocked**; do not guess credentials.
 - **Deep work:** This file is an **index**, not a copy of the Constitution—follow the **read order** below when anything seems ambiguous.
 
 ---
@@ -37,6 +38,7 @@ If sources disagree, follow this order (**highest wins first**):
 | **Persistence** | Canonical store under **`app.getPath('userData')/vpe-db`** (SQLite/JSON); thumbnails under **`userData` media**. Legacy `projects.json` may be migrated/archived. |
 | **E2E / CI** | Playwright, Chromium; **`CI=true`** for deterministic bind—see [../../playwright.config.ts](../../playwright.config.ts) and [.github/workflows/ci.yml](../../.github/workflows/ci.yml). |
 | **Electron debug** | **`npm run dev:main`** uses **`--remote-debugging-port=9222`** — for MCP attach workflows. |
+| **Cursor ↔ Vertex (new session)** | **Agents:** Run **`.\vpe-start-api.ps1`** from repo root early (**port 4000**, **`.\google-api\`**) — [API-SetUp-Master.md](API-SetUp-Master.md). Confirm **“API is Live”** once LiteLLM is listening. |
 | **Managed catalog dev (v1.2.3+)** | **`vpe:toggle-status`** → **`project-runner`**: if **`package.json`** exists and **`node_modules`** missing, runs **`install && dev`** in one shell; IPC may return **`installing`**, **`projectKind: 'v0-prototype'`** when **`components/ui`** is present; first HTTP health probe delay **10s** during bootstrap; UI **INSTALLING** / stop kills the compound process. |
 | **Prompt Vault / Sandbox (v1.3.x)** | Maintenance **Prompt Vault**: accordion templates; **Edit** → **`vpe:update-vault-item`** (**v1.2.9+**); **v1.3.0** collapses **create** behind **+ Create New Master Directive**. **Sandbox:** **react-live** preview; **v1.3.5+** **Strategist** / **Engineer** instructional **Accordions** + **Tabs**. Sidebar/dashboard selection surfaces **`#2a2a2a`** ([VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) Standards). **E2E:** **`npm run test:e2e:electron`**. |
 | **Ghost watcher & dashboard layout (v1.3.2+)** | Main **`msc_startGhostWatcher`** ([`vpe-orchestrator.js`](../../src/main/vpe-orchestrator.js)): ~**60s** tick on **Windows** — **node.exe** **LISTENING** on a catalog port **>** launcher port, **no** row on that port with **`status`** **running** → **`vpe:ghost-detected`** ({ **`ports`**, **`at`** }); clear → **`vpe:ghost-cleared`**. Preload **`subscribeGhostPresence`** → TopBar **Activity** **amber** pulse (open **System Health** / **Scorched Earth**). **Renderer-only prefs:** **`vpe.settings.dashboard.viewMode`** + **`vpe.settings.dashboard.activeFilter`** (**ARCHIVE** included) via **`useDashboardPersistedSettings`**. See [Checkpoint.md](Checkpoint.md) (**Build v1.3.2**). |
@@ -63,6 +65,12 @@ Read when you need **“where we are today”** or **exact command sequences**:
 
 Copy into chat as “done / skipped / blocked” if useful.
 
+### First actions for a new agent session (setup)
+
+- [ ] **Read** §1 **Non-negotiable read order** (at least **`.cursorrules`** + this file’s API row in §2).
+- [ ] **Start API** — **`.\vpe-start-api.ps1`** at repo root (PowerShell). Same session as other work unless the operator already has LiteLLM + ngrok on **4000**; if already live, tick **skipped** and say so. Details: [API-SetUp-Master.md](API-SetUp-Master.md).
+- [ ] Then continue with **Environment** and **Quick smoke** below.
+
 ### Environment
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
@@ -78,7 +86,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 ### Quick smoke
 
 - [ ] **`npm run dev`** → shell loads at **3000**; no unexpected red in main/renderer consoles.
-- [ ] **"start API"** → LiteLLM is up with `gcp_key.json` and `litellm_config.yaml`. Confirmation: **"API is Live"**.
+- [ ] **"start API"** → **`.\vpe-start-api.ps1`** at repo root; **`.\google-api\gcp_key.json`** + **`.\google-api\litellm_config.yaml`** · **port 4000**. Confirmation: **"API is Live"**.
 - [ ] Optional: **`CI=true`** + **`npm run test:e2e`** before a big merge (see Custom-Commands).
 
 ### Docs honest?

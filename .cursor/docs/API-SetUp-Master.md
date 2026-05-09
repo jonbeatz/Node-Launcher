@@ -1,6 +1,6 @@
-# Vader API Setup: Master Blueprint (v2.2)
+# Vader API Setup: Master Blueprint (v1.6.1)
 
-This master guide consolidates every technical configuration, fix, and daily routine required to use Google Cloud Vertex AI with Cursor via LiteLLM and Ngrok.
+This master guide consolidates every technical configuration, fix, and daily routine required to use Google Cloud Vertex AI with Cursor via LiteLLM and Ngrok. **v1.6.1** makes the stack **self-contained** under `.\google-api\` and scripted via **`.\vpe-start-api.ps1`** (repo root).
 
 ---
 
@@ -10,27 +10,33 @@ Cursor does **not** store your Google service account secret. After you restart 
 
 ### How connection actually works
 
-1. **Google → LiteLLM:** `gcp_key.json` is referenced by **`GOOGLE_APPLICATION_CREDENTIALS`**. LiteLLM uses it to call **Vertex AI** (models are listed in **`litellm_config.yaml`**; project id there must match your GCP project).
-2. **LiteLLM:** Listens on a **local TCP port** printed in the console (**`Uvicorn running on http://0.0.0.0:<port>`**). Use **that** `<port>` for ngrok (older notes used **`28401`**; recent runs on this machine used **`4000`**—always trust the live line).
-3. **Ngrok:** Forwards **`http://localhost:<that-port>`** to a **public HTTPS URL** Cursor can reach.
+1. **Google → LiteLLM:** `.\google-api\gcp_key.json` is referenced by **`GOOGLE_APPLICATION_CREDENTIALS`**. LiteLLM uses it to call **Vertex AI** (models are listed in **`.\google-api\litellm_config.yaml`**; project id there must match your GCP project).
+2. **LiteLLM:** Listens on **port `4000`** (locked for this workspace). Uvicorn prints **`http://0.0.0.0:4000`**.
+3. **Ngrok:** Forwards **`http://localhost:4000`** to a **public HTTPS URL** Cursor can reach.
 4. **Cursor:** Sends OpenAI-compatible requests to **Base URL + `/v1`**, with **API Key = LiteLLM `master_key`** (see `litellm_config.yaml` → `general_settings.master_key`). Cursor **never** needs the contents of `gcp_key.json`.
 
-### 6-step reconnect (same order every time)
+### Recommended: one command (self-contained)
 
 | Step | What | Notes |
 |:---:|:---|:---|
-| 1 | **Terminal A — LiteLLM** | Repo root (`Node-Launcher`), PowerShell |
-| 2 | Set GCP env | `$env:GOOGLE_APPLICATION_CREDENTIALS="D:\Cursor_Projectz\Node-Launcher\gcp_key.json"` |
-| 3 | (Optional, if console encoding errors) | `$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"` |
-| 4 | Start proxy | `litellm --config litellm_config.yaml` → confirm port (e.g. **28401**) |
-| 5 | **Terminal B — ngrok** | `.\ngrok http <that-port>` (port **must match** LiteLLM’s Uvicorn line) |
-| 6 | **Cursor → Settings → Models** | **Override OpenAI Base URL:** `https://<your-ngrok-host>/v1` (must end with **`/v1`**) · **API Key:** `sk-vader-protocol-1234` |
+| 1 | **PowerShell at repo root** | `Node-Launcher` |
+| 2 | Run script | `.\vpe-start-api.ps1` — sets `GOOGLE_APPLICATION_CREDENTIALS` to **`$PSScriptRoot\google-api\gcp_key.json`**, starts **ngrok** in a **new** window on **4000**, runs **`litellm --config ./google-api/litellm_config.yaml --port 4000`** in this window |
+| 3 | **Cursor → Settings → Models** | **Override OpenAI Base URL:** `https://<your-ngrok-host>/v1` (must end with **`/v1`**) · **API Key:** `sk-vader-protocol-1234` |
 
-**If ngrok assigns a new URL:** update Cursor’s Base URL only; **`master_key`** in `litellm_config.yaml` stays the same unless you change it deliberately.
+**If ngrok assigns a new URL:** update Cursor’s Base URL only; **`master_key`** in `google-api/litellm_config.yaml` stays the same unless you change it deliberately.
+
+### Manual fallback (same paths, port 4000)
+
+| Step | What | Notes |
+|:---:|:---|:---|
+| 1 | Set GCP env | `$env:GOOGLE_APPLICATION_CREDENTIALS=".\google-api\gcp_key.json"` (from repo root; or use absolute path if you prefer) |
+| 2 | (Optional, if console encoding errors) | `$env:PYTHONUTF8="1"; $env:PYTHONIOENCODING="utf-8"` |
+| 3 | Start proxy | `litellm --config ./google-api/litellm_config.yaml --port 4000` |
+| 4 | **Second terminal — ngrok** | `ngrok http 4000` |
 
 ### Quick sanity checks
 
-- **Local (with auth):** `Invoke-WebRequest -Uri "http://127.0.0.1:<port>/v1/models" -Headers @{ Authorization = "Bearer sk-vader-protocol-1234" }` — expect **200** (use the same `<port>` as Uvicorn). Empty/wrong Bearer → **401**.
+- **Local (with auth):** `Invoke-WebRequest -Uri "http://127.0.0.1:4000/v1/models" -Headers @{ Authorization = "Bearer sk-vader-protocol-1234" }` — expect **200**. Empty/wrong Bearer → **401**.
 - **`401` in Cursor:** Re-enter **`sk-vader-protocol-1234`** in Cursor; Base URL must be the **HTTPS** ngrok forwarding URL + **`/v1`**.
 
 ---
@@ -38,8 +44,8 @@ Cursor does **not** store your Google service account secret. After you restart 
 ## 🏗️ 1. System Architecture
 VPE uses a local **LiteLLM Proxy** and **Ngrok Tunnel** to bridge Cursor's OpenAI-style requests to Google Cloud's Vertex AI API.
 - **Client:** Cursor IDE (Settings -> Models -> Override Base URL)
-- **Proxy:** LiteLLM (running locally on port **28401**)
-- **Tunnel:** Ngrok (Forwarding port **28401** to a public HTTPS URL)
+- **Proxy:** LiteLLM (running locally on port **4000**)
+- **Tunnel:** Ngrok (Forwarding **http://localhost:4000** to a public HTTPS URL)
 - **Backend:** Google Cloud Vertex AI (Model: Gemini/Vader aliases)
 
 ---
@@ -48,28 +54,28 @@ VPE uses a local **LiteLLM Proxy** and **Ngrok Tunnel** to bridge Cursor's OpenA
 
 Follow these revised steps to re-establish the bridge between Cursor, LiteLLM, and your Google Cloud credits.
 
-### Step 1: Initialize the LiteLLM Bridge
-This sets your credentials and starts the local server. Run these in your first terminal.
+### Step 1: Initialize the LiteLLM Bridge (scripted)
+
+From the repo root:
 
 ```powershell
-$env:GOOGLE_APPLICATION_CREDENTIALS="D:\Cursor_Projectz\Node-Launcher\gcp_key.json"
-litellm --config litellm_config.yaml
+.\vpe-start-api.ps1
 ```
 
-**Note:** Observe the terminal output. If it says "Uvicorn running on http://0.0.0.0:28401", then **28401** is your active port.
+**Note:** Confirm the console shows Uvicorn on **`http://0.0.0.0:4000`**. The script also opens a second window for **ngrok http 4000**.
 
-### Step 2: Launch the Ngrok Tunnel
-Open a second terminal. This creates the public HTTPS link Cursor needs to reach your machine.
+### Step 2: Ngrok (if not using the script)
 
 ```powershell
-.\ngrok http 28401
+.\ngrok http 4000
 ```
 
-**Verify the Forwarding URL** in the terminal matches:
-`https://pushy-water-reformer.ngrok-free.dev`
+(or `ngrok http 4000` if `ngrok` is on your `PATH`)
+
+**Verify the Forwarding URL** in the ngrok window and paste it into Cursor as **`https://<host>/v1`**.
 
 ### Step 3: Update Cursor Settings
-1. **Override OpenAI Base URL:** `https://pushy-water-reformer.ngrok-free.dev/v1`
+1. **Override OpenAI Base URL:** `https://<your-ngrok-host>/v1`
 2. **API Key:** `sk-vader-protocol-1234`
 
 *Press Enter after typing in each field to ensure Cursor saves the changes.*
@@ -79,14 +85,14 @@ Open a second terminal. This creates the public HTTPS link Cursor needs to reach
 ## 🔑 3. The Google Service Account Key (`gcp_key.json`)
 The `gcp_key.json` file is your identity on Google Cloud.
 
-- **Active File Path:** `D:\Cursor_Projectz\Node-Launcher\gcp_key.json`
+- **Active File Path (repo-relative):** `.\google-api\gcp_key.json`
 - **Verification:** `client_email` must be `cursor-access@wordpress-map-1492461083797.iam.gserviceaccount.com`.
 
 ---
 
 ## 💡 Quick Tips for Next Time
 
-- **Port Match:** If you ever see a connection error, ensure the port in LiteLLM (e.g., **28401**) matches the port in ngrok.
+- **Port Match:** LiteLLM and ngrok both use **`4000`** for this project.
 - **401 Unauthorized:** This means the API Key field in Cursor is empty or incorrect. Re-enter `sk-vader-protocol-1234`.
 - **Session Expiry:** If you restart ngrok and the URL changes, update the "Override URL" in Cursor.
 
@@ -101,19 +107,17 @@ The `gcp_key.json` file is your identity on Google Cloud.
 - **Resolution:** Enabled **Vertex AI API** in the GCP Project Console.
 
 ### ⚠️ Issue #3: Regional Route Restrictions
-- **Resolution:** Set `vertex_location: "global"` in `litellm_config.yaml`.
+- **Resolution:** Set `vertex_location: "global"` in **`google-api/litellm_config.yaml`**.
 
 ---
 
 ## 🚀 5. Workspace Automation
-To automate this, the following rule is already active in your `.cursorrules`:
 
 - **Keyword:** "start API"
-- **Action:** Open PowerShell terminal and run the environment setup + `litellm` command.
+- **Action:** From repo root, run **`.\vpe-start-api.ps1`** (or the manual fallback above with **`.\google-api\gcp_key.json`** and **`--port 4000`**).
 
 ---
-*Document revision v2.3 — Port guidance: always read Uvicorn `<port>` from the live LiteLLM console (ngrok must match); sanity-check URL uses the same `<port>`.*
 
-*Document revision v2.2 — Added “after Cursor restart” reconnect chain and sanity checks.*
+*Document revision v1.6.1 — API assets under `google-api/`; scripted start; port **4000** locked.*
 
 *Powered by the MSC Media Engine*

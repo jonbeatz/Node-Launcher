@@ -61,6 +61,9 @@ src/main/db/vader.sqlite-*
 
 .playwright-mcp/
 
-# GCP Key & LiteLLM Config Secrets
+# Google API workspace (v1.6.1) — keep folder local; only litellm_config.yaml is tracked
+google-api/*
+!google-api/litellm_config.yaml
+# Legacy root paths (if old copies remain)
 gcp_key.json
-litellm_config.yaml
+/litellm_config.yaml

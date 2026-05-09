@@ -2,6 +2,8 @@
 
 **Full cold start (read order, MCP, skills, tick list):** [AGENT-BOOT-CHECKLIST.md](AGENT-BOOT-CHECKLIST.md)
 
+**Agents — new session / setting up this project:** After loading the boot checklist, **run start API** from repo root: **`.\vpe-start-api.ps1`** (LiteLLM **4000** + ngrok; **`.\google-api\gcp_key.json`** required). Confirm **“API is Live”**. Full steps: [API-SetUp-Master.md](API-SetUp-Master.md) · checklist block: [AGENT-BOOT-CHECKLIST.md §4 — First actions](AGENT-BOOT-CHECKLIST.md#4-session-verification-tick-each-start).
+
 **Cursor ↔ Google (Vertex AI) via LiteLLM + ngrok** (paths, ports, Cursor settings, post-restart checklist): [API-SetUp-Master.md](API-SetUp-Master.md)
 
 **Dev branch naming:** **`VPE-v1.{minor}.x-Dev`** — increment **`{minor}`** by **1** for each new development line (current: **`VPE-v1.6.x-Dev`**; next example: **`VPE-v1.7.x-Dev`**). Bump root **`package.json` `version`** to match that minor when you cut the line (e.g. **`1.6.0`** on **`VPE-v1.6.x-Dev`**). Full rule: [Checkpoint.md — Build v1.6.0](Checkpoint.md).
@@ -21,9 +23,11 @@ Vader Project Engine (VPE) is a high-performance command center for Node.js mana
 
 ## 2. Session Activation
 When starting a new session, verify the local environment:
-1. **Check Hardware:** Ensure system identifies as Ryzen 9700x / Windows 11 25H2.
-2. **Verify Persistence:** Confirm project state in `app.getPath('userData')/vpe-db` (SQLite/JSON fallback); use `.cursorrules` `projects.json` shape as the logical schema contract.
-3. **Runtime / packaging:** Prefer launcher owning **3000** during **`npm run dev`** / Vader dev; use **`npm run vader:sync`** when you need **dev → snapshot → syntax guard → Windows pack** (see [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md)).
+
+1. **Start API (agents & operators using Vertex/LiteLLM):** From **repo root**, run **`.\vpe-start-api.ps1`** PowerShell (**[API-SetUp-Master.md](API-SetUp-Master.md)**). Do this early when setting up or resuming work so model routing matches the bridged endpoint; skip only if LiteLLM is already confirmed listening on **4000**.
+2. **Check Hardware:** Ensure system identifies as Ryzen 9700x / Windows 11 25H2.
+3. **Verify Persistence:** Confirm project state in `app.getPath('userData')/vpe-db` (SQLite/JSON fallback); use `.cursorrules` `projects.json` shape as the logical schema contract.
+4. **Runtime / packaging:** Prefer launcher owning **3000** during **`npm run dev`** / Vader dev; use **`npm run vader:sync`** when you need **dev → snapshot → syntax guard → Windows pack** (see [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md)).
 
 ## 3. Communication Protocol
 - **Strict Prefixing:** All functions `msc_`, all classes `msc-`.
