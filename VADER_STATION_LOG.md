@@ -1,7 +1,7 @@
 # 🛸 Vader Station Log — Vault Search (v1.5.0)
 
 **Station:** Vader Project Engine (VPE) · **MSC Media Engine** **`1.5.0`**  
-**Track:** `VPE-v1.5.x-Dev` · Studio Dark command surface (`#121212` / `#1c1c1c` per [README](README.md) & [Vader-Project-Engine](Vader-Project-Engine.md))
+**Track:** `VPE-v1.6.x-Dev` · Studio Dark command surface (`#121212` / `#1c1c1c` per [README](README.md) & [Vader-Project-Engine](Vader-Project-Engine.md))
 
 ---
 

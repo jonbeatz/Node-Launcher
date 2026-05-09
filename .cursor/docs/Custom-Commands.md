@@ -4,7 +4,7 @@ This file tracks shorthand commands you want me to execute in this repo.
 
 **Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [.cursor/docs/VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md).
 
-**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (next after **`VPE-v1.5.x-Dev`**: **`VPE-v1.6.x-Dev`**). Keep **`package.json` `version`** on the same minor when you open the branch (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.5.0](Checkpoint.md)).
+**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (next after **`VPE-v1.6.x-Dev`**: **`VPE-v1.7.x-Dev`**). Keep **`package.json` `version`** on the same minor when you open the branch (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.6.0](Checkpoint.md)).
 
 **Solved problems (symptoms → fixes):** [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
 
