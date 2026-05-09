@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
+const { msc_projectVaultRootDir } = require('../vpe-vault-paths');
 
 /** @typedef {{ id: string; ok: boolean; detail?: string }} ForgeCheck */
 
@@ -79,15 +80,19 @@ function msc_runForgeDiagnostics(store) {
     }
   }
 
-  /** Vault permissions under userData/media/vault */
+  /** Vault permissions under v1.6.0 project vault root (`media/vault` — see `vpe-vault-paths.js`) */
   try {
-    const vaultRoot = path.join(app.getPath('userData'), 'media', 'vault');
+    const vaultRoot = msc_projectVaultRootDir();
     fs.mkdirSync(vaultRoot, { recursive: true });
     const probe = path.join(vaultRoot, `.vpe_forge_probe_${Date.now()}.tmp`);
     fs.writeFileSync(probe, 'vpe', 'utf8');
     fs.unlinkSync(probe);
     fs.accessSync(vaultRoot, fs.constants.R_OK | fs.constants.W_OK);
-    checks.push({ id: 'vault_fs', ok: true, detail: 'media/vault is readable and writable.' });
+    checks.push({
+      id: 'vault_fs',
+      ok: true,
+      detail: 'Project vault root is readable and writable.',
+    });
   } catch (err) {
     checks.push({
       id: 'vault_fs',

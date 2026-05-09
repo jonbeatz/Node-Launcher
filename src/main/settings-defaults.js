@@ -1,5 +1,5 @@
 /**
- * v1.5.0 — Factory defaults for VPE app settings (non-critical features **off**).
+ * v1.6.0 — Factory defaults for VPE app settings (non-critical features **off**).
  * Main + renderer should align with these when a column / key is missing.
  */
 const MSC_VPE_APP_SETTINGS_DEFAULTS = Object.freeze({

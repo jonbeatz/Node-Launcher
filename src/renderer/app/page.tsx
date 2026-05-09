@@ -39,6 +39,7 @@ import {
   VPE_DASHBOARD_VIEW_LS_KEY,
   type DashboardActiveFilter,
 } from '@/state/useSettings'
+import { msc_projectMatchesVaultSearch } from '@/lib/vpe-vault-search'
 
 type FilterType = DashboardActiveFilter
 type NavItem = 'dashboard' | 'maintenance' | 'sandbox' | 'settings'
@@ -156,6 +157,19 @@ const FALLBACK_PROJECTS: Project[] = [
     path: 'C:/Users/Vader/Projects/msc-media-gate',
     shield_project_type: 'electron',
   },
+  /** Standalone / browser fallback — Vault Search “msc” + “projectz” spot-check */
+  {
+    id: '7',
+    name: 'PROJECTZ_MSC_HUB',
+    port: 3015,
+    uptime: '--',
+    status: 'stopped',
+    cpu: 0,
+    ram: '0MB',
+    pkgManager: 'npm',
+    path: 'C:/Users/Vader/Projects/projectz-msc-hub',
+    shield_project_type: 'web',
+  },
 ]
 
 const FILTERS: { id: FilterType; label: string }[] = [
@@ -250,7 +264,7 @@ function DashboardContent() {
     })()
   }, [clientReady, refreshProjects])
 
-  /** v1.5.0 — main `default_view`: card → grid; ignore stale session list when default is card. */
+  /** v1.6.0 — main `default_view`: card → grid; ignore stale session list when default is card. */
   useEffect(() => {
     if (!clientReady || !projectsReady || appliedBootDefaultView.current) return
     const api = getVpeApi()
@@ -897,19 +911,13 @@ function DashboardContent() {
     [projects],
   )
 
-  /** Status / tactical / narrow search — or Ctrl+K jump (ignores filters). */
+  /** Status / tactical / Vault Search (substring name + tag + port) — or Ctrl+K jump (+ path). */
   const filteredProjects = useMemo(() => {
-    const cmd = commandSearchTerm.trim().toLowerCase()
-    if (commandSearchActive && cmd) {
-      return projects.filter((project) => {
-        const name = project.name.toLowerCase()
-        const path = project.path.toLowerCase()
-        return (
-          name.includes(cmd) ||
-          path.includes(cmd) ||
-          project.port.toString().includes(cmd)
-        )
-      })
+    if (commandSearchActive && commandSearchTerm.trim()) {
+      const q = commandSearchTerm.trim()
+      return projects.filter((project) =>
+        msc_projectMatchesVaultSearch(project, q, { includePath: true }),
+      )
     }
 
     let list = projects.filter((project) =>
@@ -929,14 +937,11 @@ function DashboardContent() {
     }
 
     if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase()
-      list = list.filter((project) => {
-        return (
-          project.name.toLowerCase().includes(term) ||
-          project.port.toString().includes(term) ||
-          project.path.toLowerCase().includes(term)
-        )
-      })
+      list = list.filter((project) =>
+        msc_projectMatchesVaultSearch(project, searchTerm, {
+          includePath: false,
+        }),
+      )
     }
 
     return msc_applyTacticalProjectFilter(list, tacticalProjectFilter)
@@ -1079,7 +1084,7 @@ function DashboardContent() {
                         {searchTerm.trim() &&
                         !(commandSearchActive && commandSearchTerm.trim()) ? (
                           <span className="font-sans text-[10px] text-[#888888] uppercase tracking-wide">
-                            Filtered view
+                            Vault search
                           </span>
                         ) : null}
                       </div>
@@ -1162,7 +1167,7 @@ function DashboardContent() {
                               className="font-sans text-sm text-[#eaeaea] hover:underline"
                               type="button"
                             >
-                              Clear search
+                              Clear vault search
                             </button>
                           </>
                         ) : (

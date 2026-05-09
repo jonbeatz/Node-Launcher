@@ -5,7 +5,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Vader Project Engine',
   description:
-    'Node.js Process Management Dashboard — Powered by the MSC Media Engine v1.5.0',
+    'Node.js Process Management Dashboard — Powered by the MSC Media Engine v1.6.0',
   generator: 'v0.app',
 }
 

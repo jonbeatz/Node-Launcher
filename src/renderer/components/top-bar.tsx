@@ -13,7 +13,7 @@ interface TopBarProps {
   /** v1.3.2 — orphan `node.exe` on catalog port while VPE shows no running project. */
   ghostWarning?: boolean
   ghostHint?: string
-  /** Narrow search (respects status / tactical filters in page). */
+  /** v1.6.0 Vault Search — substring match on name / tag / port (respects status + tactical filters on dashboard). */
   filterSearchTerm?: string
   onFilterSearchChange?: (term: string) => void
   /** Ctrl+K palette — finds any project ignoring dashboard filters. */
@@ -61,8 +61,8 @@ export function TopBar({
 
   const displayValue = commandSearchActive ? commandSearchTerm : filterSearchTerm
   const placeholder = commandSearchActive
-    ? 'Jump to any project…'
-    : 'Search in current view…'
+    ? 'Jump — name, tag, port, path…'
+    : 'Vault search — name, tag, port…'
 
   const handleChange = (v: string) => {
     if (commandSearchActive) {
@@ -166,7 +166,7 @@ export function TopBar({
             }
           }}
           className={`p-2 rounded transition-colors vader-focus ${searchOpen ? 'text-[#4fde82]' : 'text-[#A0A0A0] hover:text-[#4fde82]'}`}
-          title="Search current view — Ctrl+K (Cmd+K) finds any project"
+          title="Vault search (dashboard) — Ctrl+K / Cmd+K: jump palette also matches path"
         >
           <Search size={18} />
         </button>

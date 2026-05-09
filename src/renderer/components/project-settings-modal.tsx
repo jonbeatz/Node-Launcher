@@ -5,6 +5,13 @@ import Image from 'next/image'
 import { X, Camera, Upload, FolderOpen, Folder, Play, Trash, Terminal, AlertTriangle, Check, Loader2, Stethoscope } from 'lucide-react'
 import { useToast } from '@/components/vader-toast'
 import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
+import type { VpeJournalEntry } from '@/lib/vpe-project-journal'
+import {
+  msc_journalAddEntry,
+  msc_journalRemoveEntry,
+  msc_parseProjectJournal,
+  msc_serializeProjectJournal,
+} from '@/lib/vpe-project-journal'
 
 export interface ProjectSettingsPayload {
   name: string
@@ -89,7 +96,8 @@ export function ProjectSettingsModal({
     'auto' | VpeShieldProjectType
   >('auto')
   const [archived, setArchived] = useState(isArchived)
-  const [notesText, setNotesText] = useState('')
+  const [journalEntries, setJournalEntries] = useState<VpeJournalEntry[]>([])
+  const [journalDraft, setJournalDraft] = useState('')
   const [vaultFiles, setVaultFiles] = useState<{ name: string; path: string }[]>(
     [],
   )
@@ -133,7 +141,8 @@ export function ProjectSettingsModal({
       lower && allowed.includes(lower) ? lower : 'auto',
     )
     setArchived(Boolean(isArchived))
-    setNotesText(projectNotes ?? '')
+    setJournalEntries(msc_parseProjectJournal(projectNotes ?? null))
+    setJournalDraft('')
     void refreshVault()
   }, [
     isOpen,
@@ -166,7 +175,7 @@ export function ProjectSettingsModal({
         project_type:
           projectTypeSelect === 'auto' ? ('auto' as const) : projectTypeSelect,
         is_archived: archived,
-        notes: notesText,
+        notes: msc_serializeProjectJournal(journalEntries),
       }
       if (window.vpeAPI?.saveSettings) {
         await window.vpeAPI.saveSettings(payload)
@@ -215,6 +224,33 @@ export function ProjectSettingsModal({
           ? String((err as { message?: string }).message)
           : 'Could not add vault file.'
       addToast('Vault add failed', 'error', msg)
+    }
+  }
+
+  const handleVaultDeleteFile = async (fileName: string) => {
+    if (!projectId) return
+    if (!window.vpeAPI?.vaultDeleteFile) {
+      addToast(
+        'Delete unavailable',
+        'warning',
+        'Open inside the VPE desktop shell to remove vault files.',
+      )
+      return
+    }
+    try {
+      const r = await window.vpeAPI.vaultDeleteFile(projectId, fileName)
+      if (r?.ok) {
+        addToast('Removed', 'success', fileName)
+        await refreshVault()
+      } else {
+        addToast('Delete failed', 'error', r?.error ?? 'Unknown error')
+      }
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message?: string }).message)
+          : 'Could not delete file.'
+      addToast('Delete failed', 'error', msg)
     }
   }
 
@@ -375,33 +411,88 @@ export function ProjectSettingsModal({
             </label>
           </section>
 
-          {/* Project notes (SQLite `notes`) */}
-          <section>
+          {/* Project journal (SQLite `notes` as JSON array) */}
+          <section className="msc-project-journal rounded border border-[#333333] bg-[#121212] p-4">
             <h3 className="font-sans text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">
-              PROJECT NOTES
+              PROJECT JOURNAL
             </h3>
-            <textarea
-              value={notesText}
-              onChange={(e) => setNotesText(e.target.value)}
-              rows={5}
-              spellCheck
-              className="w-full min-h-[120px] px-3 py-2.5 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-[13px] text-white placeholder:text-[#555555] focus:outline-none focus:border-[#4fde82] transition-colors resize-y"
-              placeholder="Specs, credentials hints, deploy notes — stored in the registry (not in the repo)…"
-            />
-            <p className="mt-2 font-sans text-[11px] text-[#555555] leading-relaxed">
-              Saved with <span className="text-[#A0A0A0]">Save Changes</span>. Text is local to this machine.
+            <p className="mb-3 font-sans text-[11px] text-[#c8c8c8] leading-relaxed">
+              Entries are stored as JSON in the registry (not in the repo). Click{' '}
+              <span className="text-[#eaeaea] font-medium">Save Changes</span> to persist.
             </p>
+            <div className="msc-project-journal-list max-h-[220px] overflow-y-auto space-y-2 mb-3 pr-1">
+              {journalEntries.length === 0 ? (
+                <p className="font-sans text-xs text-[#888888]">No journal entries yet.</p>
+              ) : (
+                [...journalEntries]
+                  .sort((a, b) => String(b.at).localeCompare(String(a.at)))
+                  .map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="msc-project-journal-row flex gap-2 rounded border border-[#333333] bg-[#1c1c1c] px-3 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono text-[10px] text-[#888888] mb-1">
+                          {(() => {
+                            try {
+                              return new Date(entry.at).toLocaleString()
+                            } catch {
+                              return entry.at
+                            }
+                          })()}
+                        </div>
+                        <p className="font-sans text-[13px] text-[#eaeaea] whitespace-pre-wrap break-words">
+                          {entry.text}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        title="Delete entry"
+                        aria-label="Delete journal entry"
+                        onClick={() =>
+                          setJournalEntries((prev) => msc_journalRemoveEntry(prev, entry.id))
+                        }
+                        className="shrink-0 self-start p-1.5 rounded text-[#888888] hover:text-[#e02b20] hover:bg-[#2a2a2a] transition-colors vader-focus"
+                      >
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  ))
+              )}
+            </div>
+            <textarea
+              value={journalDraft}
+              onChange={(e) => setJournalDraft(e.target.value)}
+              rows={3}
+              spellCheck
+              className="msc-project-journal-input w-full px-3 py-2 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-[13px] text-[#eaeaea] placeholder:text-[#555555] focus:outline-none focus:border-[#4fde82] transition-colors resize-y"
+              placeholder="New entry — specs, deploy notes, reminders…"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setJournalEntries((prev) => msc_journalAddEntry(prev, journalDraft))
+                setJournalDraft('')
+              }}
+              className="mt-2 h-8 px-4 rounded border border-[#444444] bg-[#1c1c1c] font-sans text-xs text-[#c8c8c8] hover:text-white hover:border-[#4fde82] transition-all vader-focus"
+            >
+              ADD JOURNAL ENTRY
+            </button>
           </section>
 
           {/* Reference files vault */}
-          <section className="bg-[#181818] -mx-6 px-6 py-4">
+          <section className="msc-project-vault-attachments bg-[#181818] -mx-6 px-6 py-4">
             <h3 className="font-sans text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">
               REFERENCE FILES
             </h3>
-            <p className="mb-3 font-sans text-[11px] text-[#666666] leading-relaxed">
+            <p className="mb-3 font-sans text-[11px] text-[#c8c8c8] leading-relaxed">
               Copies live under{' '}
-              <span className="text-[#A0A0A0]">userData/media/vault/&lt;project&gt;/</span>
-              . Originals on disk are not moved.
+              <span className="font-mono text-[11px] text-[#eaeaea]">
+                media/vault/&lt;project_name&gt;/
+              </span>{' '}
+              (repo root on this workstation; override with{' '}
+              <span className="font-mono text-[#A0A0A0]">VPE_VAULT_ROOT</span>). Original sources are
+              not moved.
             </p>
             <div className="flex flex-wrap gap-2 mb-3">
               <button
@@ -421,13 +512,13 @@ export function ProjectSettingsModal({
                 OPEN VAULT FOLDER
               </button>
             </div>
-            <div className="rounded border border-[#333333] bg-[#0a0a0a] min-h-[72px] max-h-[160px] overflow-y-auto p-2">
+            <div className="msc-project-vault-file-list rounded border border-[#333333] bg-[#121212] min-h-[72px] max-h-[160px] overflow-y-auto p-2">
               {vaultBusy ? (
-                <p className="font-sans text-xs text-[#555555] px-2 py-1">
+                <p className="font-sans text-xs text-[#888888] px-2 py-1">
                   Loading vault…
                 </p>
               ) : vaultFiles.length === 0 ? (
-                <p className="font-sans text-xs text-[#555555] px-2 py-1">
+                <p className="font-sans text-xs text-[#888888] px-2 py-1">
                   No reference files yet.
                 </p>
               ) : (
@@ -435,10 +526,19 @@ export function ProjectSettingsModal({
                   {vaultFiles.map((f) => (
                     <li
                       key={f.path}
-                      className="font-sans text-xs text-[#c8c8c8] px-2 py-1 rounded hover:bg-[#252525] truncate"
+                      className="msc-project-vault-file-row flex items-center gap-2 font-sans text-xs text-[#eaeaea] px-2 py-1.5 rounded hover:bg-[#1c1c1c] border border-transparent hover:border-[#333333]"
                       title={f.path}
                     >
-                      {f.name}
+                      <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                      <button
+                        type="button"
+                        title="Remove file from vault"
+                        aria-label={`Delete ${f.name}`}
+                        onClick={() => void handleVaultDeleteFile(f.name)}
+                        className="shrink-0 p-1 rounded text-[#888888] hover:text-[#e02b20] hover:bg-[#2a2a2a] transition-colors vader-focus"
+                      >
+                        <X size={14} />
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -670,7 +770,7 @@ export function ProjectSettingsModal({
         {/* Footer */}
         <div className="px-6 py-4 border-t border-[#333333] flex flex-col gap-2 sticky bottom-0 bg-[#1c1c1c]">
         <span className="font-sans text-[10px] text-[#555555] text-center">
-          Powered by the MSC Media Engine v1.5.0
+          Powered by the MSC Media Engine v1.6.0
         </span>
           <div className="flex items-center justify-end gap-3">
             <button

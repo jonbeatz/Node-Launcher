@@ -158,7 +158,7 @@ export interface VpePurgeLauncherPortsResult {
   forgeReady?: boolean
 }
 
-/** v1.5.0 — Prompt Vault row categorization (UI badges: CMD / DIR / SNP). */
+/** v1.6.0 — Prompt Vault row categorization (UI badges: CMD / DIR / SNP). */
 export type VpePromptVaultEntryType = 'Command' | 'Directive' | 'Snippet'
 
 export interface VpePromptVaultItem {
@@ -297,6 +297,11 @@ export interface VpeApi {
   vaultOpenFolder?: (
     projectId: string,
   ) => Promise<{ ok: boolean; dir?: string; error?: string }>
+  /** v1.6.0 — remove one file from project vault on disk (basename only). */
+  vaultDeleteFile?: (
+    projectId: string,
+    fileName: string,
+  ) => Promise<{ ok: boolean; error?: string }>
   /** Main registers `vpe:e2e-vault-copy-from-path` only when `VPE_E2E=1` (Playwright). */
   e2eVaultCopyFromPath?: (
     projectId: string,

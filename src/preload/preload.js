@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-/** v1.5.0 — preload bridge (IPC formatting + ghost watcher subscribe). */
+/** v1.6.0 — preload bridge (IPC formatting + ghost watcher subscribe). */
 function msc_formatCaughtForPreload(reason) {
   if (reason == null) return 'Unknown failure';
   if (typeof reason === 'string') return reason;
@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     ipcRenderer.invoke('vpe:vault-list-files', projectId),
   vaultOpenFolder: (projectId) =>
     ipcRenderer.invoke('vpe:vault-open-folder', projectId),
+  vaultDeleteFile: (projectId, fileName) =>
+    ipcRenderer.invoke('vpe:vault-delete-file', { projectId, fileName }),
   /** Only when main registers `vpe:e2e-vault-copy-from-path` (`VPE_E2E=1`). */
   e2eVaultCopyFromPath: (projectId, srcPath) =>
     ipcRenderer.invoke('vpe:e2e-vault-copy-from-path', { projectId, srcPath }),
@@ -128,7 +130,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.5.0',
+  version: '1.6.0',
   hardware: '9700x Tuned',
 });
 

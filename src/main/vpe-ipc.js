@@ -12,6 +12,11 @@ const {
   msc_ipcEnrichProjectsRow,
 } = require('./project-detection');
 const { msc_validateProjectPath } = require('./path-guard');
+const {
+  msc_safeVaultFolderName,
+  msc_projectVaultProjectDir,
+  msc_vaultRenameProjectFolder,
+} = require('./vpe-vault-paths');
 const { msc_patchPackageJsonStripScriptPorts } = require('./package-json-script-patch');
 const isDev = require('electron-is-dev');
 
@@ -19,7 +24,7 @@ let msc_vpeIpcRegistered = false;
 /** Node-Launcher UI port; managed projects must avoid this port. */
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 
-/** v1.5.0 — sync Windows login-item with persisted `launch_at_login`. */
+/** v1.6.0 — sync Windows login-item with persisted `launch_at_login`. */
 function msc_applyLoginStartupFromStore(store) {
   try {
     if (typeof store.getSettings !== 'function') return;
@@ -129,7 +134,7 @@ function msc_promptVaultPath() {
   return path.join(app.getPath('userData'), 'prompt-vault.json');
 }
 
-/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.5.0: master `versionLabel` MSC line. */
+/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.6.0: master `versionLabel` MSC line. */
 function msc_promptVaultMasterItems() {
   const updatedAt = new Date().toISOString();
   return [
@@ -137,7 +142,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.5.0',
+      versionLabel: 'MSC Media Engine v1.6.0',
       description: 'Full production build: wipe dist, verify dev, ship the Windows installer.',
       updatedAt,
       bodyMd:
@@ -148,7 +153,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.5.0',
+      versionLabel: 'MSC Media Engine v1.6.0',
       description: 'Everyday Electron + Next stack; closes clean when you quit the window.',
       updatedAt,
       bodyMd:
@@ -159,7 +164,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.5.0',
+      versionLabel: 'MSC Media Engine v1.6.0',
       description: 'Block until dev exits, then run forge chain (snapshot → guard → build).',
       updatedAt,
       bodyMd:
@@ -170,7 +175,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.5.0',
+      versionLabel: 'MSC Media Engine v1.6.0',
       description: 'Version bump path with dist reset before dev + forge.',
       updatedAt,
       bodyMd:
@@ -181,7 +186,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.5.0',
+      versionLabel: 'MSC Media Engine v1.6.0',
       description: 'Heavy Node purge + launcher port recovery (use from System Health when stuck).',
       updatedAt,
       bodyMd:
@@ -865,28 +870,6 @@ function msc_userDataMediaThumbnailsDir() {
   return path.join(process.cwd(), 'media', 'thumbnails');
 }
 
-/** Sanitized single path segment for vault: `userData/media/vault/<this>/` */
-function msc_safeVaultFolderName(name) {
-  const raw = String(name || 'project')
-    .replace(/[<>:"/\\|?*\x00-\x1f]+/g, '_')
-    .trim();
-  const s = raw.replace(/^\.+/, '').replace(/\.+$/, '') || 'project';
-  return s.slice(0, 120);
-}
-
-/** Per-project reference files: `userData/media/vault/<safe project name>/` */
-function msc_userDataMediaVaultProjectDir(projectName) {
-  const leaf = msc_safeVaultFolderName(projectName);
-  try {
-    if (typeof app?.getPath === 'function') {
-      return path.join(app.getPath('userData'), 'media', 'vault', leaf);
-    }
-  } catch (_) {
-    /* */
-  }
-  return path.join(process.cwd(), 'media', 'vault', leaf);
-}
-
 /** @param {string} destDir @param {string} filename */
 function msc_vault_destPathNoCollision(destDir, filename) {
   const base = path.basename(filename) || 'file';
@@ -912,7 +895,7 @@ function msc_vault_copyFile(projectDisplayName, srcPath) {
   if (!fs.existsSync(abs)) throw new Error('VPE: Source file does not exist.');
   const st = fs.statSync(abs);
   if (!st.isFile()) throw new Error('VPE: Vault accepts files only.');
-  const destDir = msc_userDataMediaVaultProjectDir(projectDisplayName);
+  const destDir = msc_projectVaultProjectDir(projectDisplayName);
   fs.mkdirSync(destDir, { recursive: true });
   const dest = msc_vault_destPathNoCollision(destDir, path.basename(abs));
   fs.copyFileSync(abs, dest);
@@ -922,7 +905,7 @@ function msc_vault_copyFile(projectDisplayName, srcPath) {
 /** Whether this project's vault folder has at least one file (documentation indicator). */
 function msc_vaultDirHasFiles(projectDisplayName) {
   try {
-    const dir = msc_userDataMediaVaultProjectDir(projectDisplayName);
+    const dir = msc_projectVaultProjectDir(projectDisplayName);
     if (!fs.existsSync(dir)) return false;
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     return entries.some((e) => e.isFile());
@@ -1526,6 +1509,19 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       notes = n == null ? null : String(n);
     }
 
+    const existingRow = typeof store.getProject === 'function' ? store.getProject(id) : null;
+    if (existingRow && String(existingRow.name) !== String(name)) {
+      try {
+        msc_vaultRenameProjectFolder(existingRow.name, name);
+      } catch (e) {
+        console.warn(
+          '[VPE]',
+          'vault folder rename on project name change',
+          e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e),
+        );
+      }
+    }
+
     store.updateProject({
       id,
       name,
@@ -1803,7 +1799,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     if (!id) throw new Error('VPE: Missing project id');
     const row = store.getProject(id);
     if (!row) throw new Error('VPE: Project not found');
-    const dir = msc_userDataMediaVaultProjectDir(row.name);
+    const dir = msc_projectVaultProjectDir(row.name);
     if (!fs.existsSync(dir)) return { ok: true, dir, files: [] };
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     const files = entries
@@ -1821,10 +1817,34 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     if (!id) throw new Error('VPE: Missing project id');
     const row = store.getProject(id);
     if (!row) throw new Error('VPE: Project not found');
-    const dir = msc_userDataMediaVaultProjectDir(row.name);
+    const dir = msc_projectVaultProjectDir(row.name);
     fs.mkdirSync(dir, { recursive: true });
     await shell.openPath(dir);
     return { ok: true, dir };
+  });
+
+  ipcMain.handle('vpe:vault-delete-file', (_event, payload) => {
+    const id = payload?.projectId != null ? String(payload.projectId) : '';
+    const raw = payload?.fileName != null ? String(payload.fileName) : '';
+    if (!id) throw new Error('VPE: Missing project id');
+    const base = path.basename(raw.replace(/\\/g, '/'));
+    if (!base || base === '.' || base === '..') {
+      throw new Error('VPE: Invalid file name');
+    }
+    const row = store.getProject(id);
+    if (!row) throw new Error('VPE: Project not found');
+    const dir = msc_projectVaultProjectDir(row.name);
+    const target = path.resolve(path.join(dir, base));
+    const rootResolved = path.resolve(dir);
+    const rel = path.relative(rootResolved, target);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      throw new Error('VPE: Path escapes vault directory');
+    }
+    if (!fs.existsSync(target)) return { ok: false, error: 'File not found' };
+    const st = fs.statSync(target);
+    if (!st.isFile()) return { ok: false, error: 'Not a file' };
+    fs.unlinkSync(target);
+    return { ok: true };
   });
 
   ipcMain.handle('vpe:open-project-url', async (_event, url) => {

@@ -1,7 +1,7 @@
 {
   "name": "vader-project-engine",
-  "version": "1.5.0",
-  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.5.0",
+  "version": "1.6.0",
+  "description": "Vader Project Engine - Jedi Level Dashboard Build v1.6.0",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {

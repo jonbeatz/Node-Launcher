@@ -524,7 +524,7 @@ export function AppSettingsModal({
               DATABASE & STATE ACTIONS
             </h3>
           <p className="font-sans text-[11px] text-[#555555] mb-4">
-            Snapshot management for database and environment state. Powered by the MSC Media Engine v1.5.0
+            Snapshot management for database and environment state. Powered by the MSC Media Engine v1.6.0
           </p>
             <div className="space-y-3 mb-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -676,7 +676,7 @@ export function AppSettingsModal({
             </button>
           </div>
           <span className="font-sans text-[10px] text-[#555555]">
-            Powered by the MSC Media Engine v1.5.0
+            Powered by the MSC Media Engine v1.6.0
           </span>
         </div>
       </div>
