@@ -19,7 +19,7 @@ let msc_vpeIpcRegistered = false;
 /** Node-Launcher UI port; managed projects must avoid this port. */
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 
-/** v1.4.0 — sync Windows login-item with persisted `launch_at_login`. */
+/** v1.5.0 — sync Windows login-item with persisted `launch_at_login`. */
 function msc_applyLoginStartupFromStore(store) {
   try {
     if (typeof store.getSettings !== 'function') return;
@@ -27,7 +27,7 @@ function msc_applyLoginStartupFromStore(store) {
     const open = s.launch_at_login === true || s.launch_at_login === 1;
     app.setLoginItemSettings({ openAtLogin: Boolean(open) });
   } catch (e) {
-    console.warn('VPE: setLoginItemSettings', e?.message ?? e);
+    console.warn('[VPE ERROR]', 'setLoginItemSettings', e?.message ?? e);
   }
 }
 
@@ -62,7 +62,7 @@ async function msc_runAutoStartProjectsIfEnabled(store, projectRunner, priorRunn
     try {
       await projectRunner.startDev(row);
     } catch (e) {
-      console.warn(`VPE: auto-start skipped for ${id}`, e?.message ?? e);
+      console.warn('[VPE ERROR]', `auto-start skipped for ${id}`, e?.message ?? e);
     }
   }
 }
@@ -129,7 +129,7 @@ function msc_promptVaultPath() {
   return path.join(app.getPath('userData'), 'prompt-vault.json');
 }
 
-/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.4.0: master `versionLabel` MSC line. */
+/** v1.2.2+ — stable-id master Prompt Vault rows (merged on read / seeded on empty file). v1.3.3+: `type` for UI badges; v1.5.0: master `versionLabel` MSC line. */
 function msc_promptVaultMasterItems() {
   const updatedAt = new Date().toISOString();
   return [
@@ -137,7 +137,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-vader-sync',
       title: 'Vader Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.4.0',
+      versionLabel: 'MSC Media Engine v1.5.0',
       description: 'Full production build: wipe dist, verify dev, ship the Windows installer.',
       updatedAt,
       bodyMd:
@@ -148,7 +148,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-rapid-prototype',
       title: 'Rapid Prototype',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.4.0',
+      versionLabel: 'MSC Media Engine v1.5.0',
       description: 'Everyday Electron + Next stack; closes clean when you quit the window.',
       updatedAt,
       bodyMd:
@@ -159,7 +159,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-validation-forge',
       title: 'Validation & Forge',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.4.0',
+      versionLabel: 'MSC Media Engine v1.5.0',
       description: 'Block until dev exits, then run forge chain (snapshot → guard → build).',
       updatedAt,
       bodyMd:
@@ -170,7 +170,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-version-bump-sync',
       title: 'Version Bump Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.4.0',
+      versionLabel: 'MSC Media Engine v1.5.0',
       description: 'Version bump path with dist reset before dev + forge.',
       updatedAt,
       bodyMd:
@@ -181,7 +181,7 @@ function msc_promptVaultMasterItems() {
       id: 'vpe-master-scorched-earth',
       title: 'Scorched Earth',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.4.0',
+      versionLabel: 'MSC Media Engine v1.5.0',
       description: 'Heavy Node purge + launcher port recovery (use from System Health when stuck).',
       updatedAt,
       bodyMd:
@@ -802,7 +802,7 @@ function msc_bytesToGbNumber(bytes) {
  *   projectsActive: number
  *   projectsTotal: number
  * }} p
- * `getPm2RpcConnected` (when set) wins over legacy `pm2Online`.
+ * When `getPm2RpcConnected` is set, its result takes precedence over `pm2Online` for the badge.
  */
 function msc_buildSanitizedSystemStatsPayload(p) {
   const totalMem = Number(p.totalMem);
@@ -1012,7 +1012,7 @@ Get-CimInstance Win32_Process -Filter "Name='electron.exe'" | ForEach-Object {
 /** @param {unknown} err */
 function msc_fallbackSystemStats(err) {
   const msg = err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err ?? '');
-  console.error('[VPE get-system-stats]:', msg || err);
+  console.error('[VPE ERROR]', 'get-system-stats', msg || err);
   try {
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
@@ -1090,6 +1090,10 @@ function msc_optimizeThumbnailIfNeeded(src, fallbackDest) {
 }
 
 /**
+ * IPC handlers: most `ipcMain.handle` paths return domain payloads for preload/renderer parity.
+ * High-risk flows (e.g. `vpe:stop-all`) use `{ ok: boolean, error?: string, ... }`. Migrating every
+ * handler to `{ ok, data, error }` requires coordinated preload + `vpe-bridge` changes.
+ *
  * @param {import('./project-runner')} projectRunner
  * @param store SqlitePersistence | JsonPersistence
  * @param {{ pm2Manager?: import('./pm2-manager') | null }} vpeRuntime mutated after PM2 init (`pm2Manager` set on main)
@@ -1168,7 +1172,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     try {
       return typeof store.getSettings === 'function' ? store.getSettings() : {};
     } catch (e) {
-      console.warn('VPE: get-app-settings', e?.message ?? e);
+      console.warn('[VPE ERROR]', 'get-app-settings', e?.message ?? e);
       return {};
     }
   });
@@ -1339,7 +1343,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
           cpuErr && typeof cpuErr === 'object' && 'message' in cpuErr
             ? String(cpuErr.message)
             : String(cpuErr ?? '');
-        console.warn('[VPE get-system-stats] CPU ticks:', m || cpuErr);
+        console.warn('[VPE ERROR]', 'get-system-stats CPU ticks', m || cpuErr);
       }
 
       let pm2Online = false;
@@ -1355,7 +1359,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
           pm2Err && typeof pm2Err === 'object' && 'message' in pm2Err
             ? String(pm2Err.message)
             : String(pm2Err ?? '');
-        console.warn('[VPE get-system-stats] PM2 eval:', m || pm2Err);
+        console.warn('[VPE ERROR]', 'get-system-stats PM2 eval', m || pm2Err);
         pm2Online = false;
         pm2ProcessCount = 0;
       }
@@ -1464,7 +1468,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     } catch (err) {
       const m =
         err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
-      console.error('[VPE] vpe:stop-all', m);
+      console.error('[VPE ERROR]', 'vpe:stop-all', m);
       try {
         msc_emitProjectsUpdated();
       } catch (_) {
@@ -1878,7 +1882,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       return await msc_executeTerminalCommandInner(store, payload);
     } catch (reason) {
       const msg = msc_formatCaughtForTerminal(reason);
-      console.warn('[VPE terminal IPC]', msg);
+      console.warn('[VPE ERROR]', 'terminal IPC', msg);
       return { ok: false, output: msg };
     }
   });
@@ -2193,6 +2197,8 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
       return { ok: true, dest, name: path.basename(dest) };
     });
   }
+
+  console.log('[VPE SUCCESS]', 'VPE IPC handlers registered');
 }
 
 module.exports = {

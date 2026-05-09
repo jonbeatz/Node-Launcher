@@ -250,7 +250,7 @@ function DashboardContent() {
     })()
   }, [clientReady, refreshProjects])
 
-  /** v1.4.0 — main `default_view`: card → grid; ignore stale session list when default is card. */
+  /** v1.5.0 — main `default_view`: card → grid; ignore stale session list when default is card. */
   useEffect(() => {
     if (!clientReady || !projectsReady || appliedBootDefaultView.current) return
     const api = getVpeApi()

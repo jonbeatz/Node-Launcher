@@ -5,6 +5,9 @@ const path = require('path');
 const MSC_SCRIPT_PORT_ARG_RE =
   /(?:^|\s)(?:-p|--port)\s*(?:=)?\s*\d{2,5}(?=\s|$)/gi;
 
+/**
+ * @internal Exported for tests; {@link msc_patchPackageJsonStripScriptPorts} is the public entry.
+ */
 function msc_stripPortArgsFromScript(command) {
   if (typeof command !== 'string') return command;
   const s = command.replace(MSC_SCRIPT_PORT_ARG_RE, ' ');

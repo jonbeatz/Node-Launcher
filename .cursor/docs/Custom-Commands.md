@@ -4,7 +4,7 @@ This file tracks shorthand commands you want me to execute in this repo.
 
 **Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [.cursor/docs/VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md).
 
-**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (next after **`VPE-v1.4.x-Dev`**: **`VPE-v1.5.x-Dev`**). Keep **`package.json` `version`** on the same minor when you open the branch (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.4.0](Checkpoint.md)).
+**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (next after **`VPE-v1.5.x-Dev`**: **`VPE-v1.6.x-Dev`**). Keep **`package.json` `version`** on the same minor when you open the branch (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.5.0](Checkpoint.md)).
 
 **Solved problems (symptoms → fixes):** [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
 
@@ -27,7 +27,7 @@ Use **Update Docs** (or **update docs**, **sync documentation**) when you want a
 7. **Checkpoint** — Update [Checkpoint.md](Checkpoint.md): add or extend a **Build vX.Y.Z** section for the release; fix downstream lines that still say an older “current” version.
 8. **Cross-links** — Align [README.md](../../README.md) (packaging line, **[Actions workflow badge](../../README.md)** when CI visibility shipped), [START-HERE.md](START-HERE.md), [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) protocol version string, and [TRUTH.md](TRUTH.md) only if architecture facts changed (do not churn TRUTH for pure marketing bumps).
 9. **Shipped UI strings** — If the user-facing version label changed: [`src/preload/preload.js`](../../src/preload/preload.js) **`vpeInfo.version`**, [`src/renderer/app/layout.tsx`](../../src/renderer/app/layout.tsx) **`metadata.description`**, and [`src/renderer/components/footer.tsx`](../../src/renderer/components/footer.tsx) fallback to match **`package.json`**.
-10. **Drift sweep** — `rg` (or editor search) for the **previous** patch version and fix stragglers (e.g. **`1.4.0`** / **`v1.4.0`** after **`1.4.1`**).
+10. **Drift sweep** — `rg` (or editor search) for the **previous** patch version and fix stragglers (e.g. **`1.5.0`** / **`v1.5.0`** after **`1.5.1`**).
 11. **Optional** — If **`layout.tsx`** / preload changed: **`npm run lint`** and **`npm run build:renderer`** from repo root.
 
 ### Rules

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/main/main.js",
+    "src/preload/preload.js",
+    "src/renderer/app/layout.tsx",
+    "src/renderer/app/page.tsx"
+  ],
+  "ignore": [
+    "_design_references/**",
+    "e2e/**",
+    ".cursor/**",
+    "dist/**",
+    "mcps/**",
+    "playwright.config.ts",
+    "playwright.electron.config.ts"
+  ],
+  "ignoreBinaries": ["taskkill", "electron", "concurrently", "cross-env", "rimraf"],
+  "ignoreDependencies": [
+    "electron-builder",
+    "eslint",
+    "eslint-config-next",
+    "rcedit",
+    "rimraf"
+  ]
+}

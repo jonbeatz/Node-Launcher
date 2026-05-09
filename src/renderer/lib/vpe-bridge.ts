@@ -158,7 +158,7 @@ export interface VpePurgeLauncherPortsResult {
   forgeReady?: boolean
 }
 
-/** v1.4.0 — Prompt Vault row categorization (UI badges: CMD / DIR / SNP). */
+/** v1.5.0 — Prompt Vault row categorization (UI badges: CMD / DIR / SNP). */
 export type VpePromptVaultEntryType = 'Command' | 'Directive' | 'Snippet'
 
 export interface VpePromptVaultItem {

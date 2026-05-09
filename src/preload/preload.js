@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-/** v1.4.0 — preload bridge (IPC formatting + ghost watcher subscribe). */
+/** v1.5.0 — preload bridge (IPC formatting + ghost watcher subscribe). */
 function msc_formatCaughtForPreload(reason) {
   if (reason == null) return 'Unknown failure';
   if (typeof reason === 'string') return reason;
@@ -128,7 +128,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.4.0',
+  version: '1.5.0',
   hardware: '9700x Tuned',
 });
 

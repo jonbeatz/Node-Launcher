@@ -4,9 +4,9 @@
 
 **Authority note:** Executable script strings and Electron-builder knobs live in **`package.json`**. If this document ever diverges from **`package.json`**, **`package.json` wins** — update this file in the same change.
 
-**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.4.0** (dev branch **`VPE-v1.4.x-Dev`** + **`1.4.0`** labels), **Build v1.3.7** (ASAR **`asarUnpack`** natives), **Build v1.3.6** (settings IPC, defaults, tray close, auto-start), **Build v1.3.5** (TopBar add, flat Dashboard, Vault + Sandbox, Engineer accordion), **Build v1.3.4** (top bar badge, Strategist accordion), **Build v1.3.3** (Strategist tabs + Vault **`type`**), **Build v1.3.2** (ghost UX), **Build v1.3.1** (CI / branch), **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
+**Related:** [Custom-Commands.md — Vader Sync](Custom-Commands.md#vader-sync) (phrases / agent steps) · [Custom-Commands.md — rebuild exe](Custom-Commands.md#rebuild-exe) (full audited release gates) · [Custom-Commands.md — Managed project dev](Custom-Commands.md#managed-project-dev-v123) (**v1.2.3** catalog **`install && dev`** bootstrap) · [Checkpoint.md](Checkpoint.md) — **Build v1.5.0** (dev branch **`VPE-v1.5.x-Dev`** + **`1.5.0`** labels), **Build v1.4.0** (prior dev line), **Build v1.3.7** (ASAR **`asarUnpack`** natives), **Build v1.3.6** (settings IPC, defaults, tray close, auto-start), **Build v1.3.5** (TopBar add, flat Dashboard, Vault + Sandbox, Engineer accordion), **Build v1.3.4** (top bar badge, Strategist accordion), **Build v1.3.3** (Strategist tabs + Vault **`type`**), **Build v1.3.2** (ghost UX), **Build v1.3.1** (CI / branch), **Build v1.3.0**, **Build v1.2.9**, **Build v1.2.6** (archive / jump search).
 
-**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.4.0**).
+**Shipped npm version:** follow root **`package.json`** / preload **`vpeInfo.version`** (currently **1.5.0**).
 
 ### Permanent product notes (v1.2.9+)
 
@@ -84,7 +84,7 @@ Use these **`npm run …`** aliases from repo root (**`Node-Launcher`**) unless 
 
 ---
 
-## 4. In-app tooling (v1.1.0+ reference; UI through **v1.4.0**)
+## 4. In-app tooling (v1.1.0+ reference; UI through **v1.5.0**)
 
 These are **UX / ops** features in the packaged or dev UI; they do not replace **`package.json`** scripts:
 
@@ -97,4 +97,4 @@ These are **UX / ops** features in the packaged or dev UI; they do not replace *
 
 ---
 
-*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.4.0.”*
+*My Studio Channel (MSC). “Powered by the MSC Media Engine v1.5.0.”*

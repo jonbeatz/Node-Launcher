@@ -2,6 +2,9 @@ const path = require('path');
 const fs = require('fs');
 const { msc_validateProjectPath } = require('./path-guard');
 
+/**
+ * @internal Exported for catalog tooling; primary consumers use {@link msc_detectProjectScripts}.
+ */
 function msc_detectPackageManager(projectRoot) {
   const root = msc_validateProjectPath(projectRoot);
   if (fs.existsSync(path.join(root, 'pnpm-lock.yaml'))) return 'pnpm';

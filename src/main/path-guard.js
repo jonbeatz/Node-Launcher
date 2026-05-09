@@ -4,6 +4,7 @@ const fs = require('fs');
 /**
  * Normalize user-entered Windows paths without breaking drive letters (`D:\\...`).
  * @param {string} raw
+ * @internal Exported for tests / tooling; production path guard uses {@link msc_validateProjectPath} only.
  */
 function msc_normalizeRawPath(raw) {
   let p = typeof raw === 'string' ? raw.trim() : '';
