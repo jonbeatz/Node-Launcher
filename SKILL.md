@@ -11,12 +11,13 @@ version: "2.1"
 - **Skill name:** Vader Project Engine (VPE)
 - **Version:** 2.1
 - **Author:** Jon Beatz (MSC)
-- **Primary sources:** `.cursor/docs/TRUTH.md`, `.cursorrules`, `README.md`, `Node-Launcher-PRD.md`, `Vader-Project-Engine.md`, `.cursor/docs/VPE-BUILD-PROTOCOL.md`, `.cursor/docs/AGENT-BOOT-CHECKLIST.md`, `.cursor/docs/Checkpoint.md`, `.cursor/docs/Custom-Commands.md`, `.cursor/docs/Stability-Fix-Backlog.md`
+- **Primary sources:** `.cursor/docs/TRUTH.md`, `.cursorrules`, `README.md`, `Node-Launcher-PRD.md`, `Vader-Project-Engine.md`, `.cursor/docs/VPE-BUILD-PROTOCOL.md`, `.cursor/docs/AGENT-BOOT-CHECKLIST.md`, `.cursor/prompts/Start-Project.md`, `VADER_STATION_LOG.md`, `.cursor/docs/Checkpoint.md`, `.cursor/docs/Custom-Commands.md`, `.cursor/docs/Stability-Fix-Backlog.md`
 
 ## Activation triggers
 
 Activate when the user:
 
+- Says **Start Project**, **start project**, **cold session**, or expects a **new-chat / reboot** bootstrap for this repo.
 - Mentions **VPE**, **Vader Project Engine**, **Node-Launcher**, or **MSC**.
 - Works on Electron main/preload/renderer, IPC, PM2 lifecycle, ports, thumbnails, logs, repair, or packaging.
 - References **Vader Protocol**, **Studio Dark**, **Vader Shield**, or **MSC Media Engine**.
@@ -34,7 +35,7 @@ When this skill applies, **always**:
 - **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.6.0**). **Navigation selection** in the shell uses neutral **`#2a2a2a`** (see **`VPE-BUILD-PROTOCOL.md`** Standards — not the green CTA accent).
 - **Naming:** Custom CSS/Tailwind-style classes prefixed with **`msc-`**; new main-process helpers follow existing **`msc_`** naming (match surrounding code).
 - **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. **Forge / packaging sequencing:** [`.cursor/docs/VPE-BUILD-PROTOCOL.md`](.cursor/docs/VPE-BUILD-PROTOCOL.md) — e.g. **`vader:sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vpe:cleanup-dist`**.
-- **API Bootstrap:** On **each new Cursor session** or when **setting up / onboarding** this repo as an agent, **run start API early**: from repo root **`.\vpe-start-api.ps1`** (see **[`.cursor/docs/AGENT-BOOT-CHECKLIST.md`](.cursor/docs/AGENT-BOOT-CHECKLIST.md)** §4 **First actions** and **[`.cursor/docs/API-SetUp-Master.md`](.cursor/docs/API-SetUp-Master.md)**). Always ensure LiteLLM is running for any task requiring model orchestration. Confirmation: **"API is Live"**.
+- **API Bootstrap / Start Project:** On **each new Cursor session** or **Start Project**, follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** (operator paste block + agent steps). Cross-check **[`.cursor/docs/AGENT-BOOT-CHECKLIST.md`](.cursor/docs/AGENT-BOOT-CHECKLIST.md)** §4 **First actions** and **[`.cursor/docs/API-SetUp-Master.md`](.cursor/docs/API-SetUp-Master.md)**. From repo root run **`.\vpe-start-api.ps1`** early unless **4000** is already bound. After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000**, then **"API is Live"**. Summarize **`VADER_STATION_LOG.md`** when running the full ritual.
 - **Hardware telemetry:** WMI / PowerShell CPU temperature in **`vpe-ipc.js`** was **removed in v1.1.6**; **v1.1.7** removed **`cpuTemp`** from IPC and all System Health temperature UI — do not restore without product sign-off (**`VPE-BUILD-PROTOCOL.md`** §2).
 - **Windows default:** Prefer Windows 11 25H2 and repo-documented pipelines (PowerShell, `CI=true` for E2E) unless the user scopes otherwise.
 - **UI completion:** Run the **Master Quality Gate** (§4) before calling UI work done.

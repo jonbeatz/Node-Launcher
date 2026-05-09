@@ -2,6 +2,8 @@
 
 This master guide consolidates every technical configuration, fix, and daily routine required to use Google Cloud Vertex AI with Cursor via LiteLLM and Ngrok. **v1.6.1** makes the stack **self-contained** under `.\google-api\` and scripted via **`.\vpe-start-api.ps1`** (repo root).
 
+**Agents — full cold ritual:** [Start-Project.md](../prompts/Start-Project.md) (paste block + **`[VPE STANDBY]`** → **API is Live** → **`VADER_STATION_LOG.md`**).
+
 ---
 
 ## Plug back in after a Cursor restart (copy this checklist)

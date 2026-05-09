@@ -6,7 +6,7 @@
 
 - **Start of day:** Open this file, tick the **Session verification** section, then skim **Quick mental model**.
 - **New agent / fresh chat:** Paste or `@`-reference this file so the model loads the index; then point at a task.
-- **New session + project setup (agents):** After reading this checklist (or alongside §1 read order), **run start API** so Cursor can use the LiteLLM → Vertex bridge: from repo root, **`.\vpe-start-api.ps1`** — see [API-SetUp-Master.md](API-SetUp-Master.md). Do this **early in the session**—before relying on overrides / model routing—not only after other smoke steps. If **`.\google-api\gcp_key.json`** is missing, stop and note **blocked**; do not guess credentials.
+- **New session + project setup (agents):** On **Start Project** (or equivalent), follow **[Start-Project.md](../prompts/Start-Project.md)** for the canonical paste block + numbered steps—or after reading §1 here, **run start API**: from repo root, **`.\vpe-start-api.ps1`** ([API-SetUp-Master.md](API-SetUp-Master.md)). Do this **early**—before relying on overrides / model routing. Confirm **`[VPE STANDBY]`** then **Uvicorn** on **4000** (**API is Live**). Summarize **[VADER_STATION_LOG.md](../../VADER_STATION_LOG.md)**. If **`.\google-api\gcp_key.json`** is missing, note **blocked**; do not guess credentials.
 - **Deep work:** This file is an **index**, not a copy of the Constitution—follow the **read order** below when anything seems ambiguous.
 
 ---
@@ -38,7 +38,7 @@ If sources disagree, follow this order (**highest wins first**):
 | **Persistence** | Canonical store under **`app.getPath('userData')/vpe-db`** (SQLite/JSON); thumbnails under **`userData` media**. Legacy `projects.json` may be migrated/archived. |
 | **E2E / CI** | Playwright, Chromium; **`CI=true`** for deterministic bind—see [../../playwright.config.ts](../../playwright.config.ts) and [.github/workflows/ci.yml](../../.github/workflows/ci.yml). |
 | **Electron debug** | **`npm run dev:main`** uses **`--remote-debugging-port=9222`** — for MCP attach workflows. |
-| **Cursor ↔ Vertex (new session)** | **Agents:** Run **`.\vpe-start-api.ps1`** from repo root early (**port 4000**, **`.\google-api\`**) — [API-SetUp-Master.md](API-SetUp-Master.md). Confirm **“API is Live”** once LiteLLM is listening. |
+| **Cursor ↔ Vertex (new session)** | **Start Project** ritual: [Start-Project.md](../prompts/Start-Project.md). Run **`.\vpe-start-api.ps1`** early (**port 4000**, **`.\google-api\`**) — [API-SetUp-Master.md](API-SetUp-Master.md). After **`[VPE STANDBY]`**, confirm Uvicorn on **4000** → **API is Live**. Log summary: **[VADER_STATION_LOG.md](../../VADER_STATION_LOG.md)**. |
 | **Managed catalog dev (v1.2.3+)** | **`vpe:toggle-status`** → **`project-runner`**: if **`package.json`** exists and **`node_modules`** missing, runs **`install && dev`** in one shell; IPC may return **`installing`**, **`projectKind: 'v0-prototype'`** when **`components/ui`** is present; first HTTP health probe delay **10s** during bootstrap; UI **INSTALLING** / stop kills the compound process. |
 | **Prompt Vault / Sandbox (v1.3.x)** | Maintenance **Prompt Vault**: accordion templates; **Edit** → **`vpe:update-vault-item`** (**v1.2.9+**); **v1.3.0** collapses **create** behind **+ Create New Master Directive**. **Sandbox:** **react-live** preview; **v1.3.5+** **Strategist** / **Engineer** instructional **Accordions** + **Tabs**. Sidebar/dashboard selection surfaces **`#2a2a2a`** ([VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) Standards). **E2E:** **`npm run test:e2e:electron`**. |
 | **Ghost watcher & dashboard layout (v1.3.2+)** | Main **`msc_startGhostWatcher`** ([`vpe-orchestrator.js`](../../src/main/vpe-orchestrator.js)): ~**60s** tick on **Windows** — **node.exe** **LISTENING** on a catalog port **>** launcher port, **no** row on that port with **`status`** **running** → **`vpe:ghost-detected`** ({ **`ports`**, **`at`** }); clear → **`vpe:ghost-cleared`**. Preload **`subscribeGhostPresence`** → TopBar **Activity** **amber** pulse (open **System Health** / **Scorched Earth**). **Renderer-only prefs:** **`vpe.settings.dashboard.viewMode`** + **`vpe.settings.dashboard.activeFilter`** (**ARCHIVE** included) via **`useDashboardPersistedSettings`**. See [Checkpoint.md](Checkpoint.md) (**Build v1.3.2**). |
@@ -53,6 +53,7 @@ Read when you need **“where we are today”** or **exact command sequences**:
 
 | Doc | Use when |
 | :--- | :--- |
+| [Start-Project.md](../prompts/Start-Project.md) | **Cold session ritual** — Golden Ticket (**`vpe-start-api.ps1`**), **`[VPE STANDBY]`**, **API is Live**, **VADER_STATION_LOG** summary |
 | [Checkpoint.md](Checkpoint.md) | Branch status, recent milestones, risky areas, files to reopen |
 | [Custom-Commands.md](Custom-Commands.md) | **`rebuild exe`**, **`Update Docs`**, **`restart app`**, **`start app`**, **`Managed project dev` (v1.2.3)**, **`hardened setup`**, Playwright MCP table, MCP sanity checklist |
 | [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`**, **`vader:clean-sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`**; catalog **managed dev bootstrap** (**v1.2.3**) |
@@ -67,8 +68,10 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 ### First actions for a new agent session (setup)
 
+- [ ] **Start Project shortcut:** [Start-Project.md](../prompts/Start-Project.md) — operator paste block + agent steps (recommended).
 - [ ] **Read** §1 **Non-negotiable read order** (at least **`.cursorrules`** + this file’s API row in §2).
-- [ ] **Start API** — **`.\vpe-start-api.ps1`** at repo root (PowerShell). Same session as other work unless the operator already has LiteLLM + ngrok on **4000**; if already live, tick **skipped** and say so. Details: [API-SetUp-Master.md](API-SetUp-Master.md).
+- [ ] **Start API** — **`.\vpe-start-api.ps1`** at repo root (PowerShell). Unless already live on **4000**, tick **skipped**. After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000** → **API is Live**. [API-SetUp-Master.md](API-SetUp-Master.md).
+- [ ] **Station log** — skim **[VADER_STATION_LOG.md](../../VADER_STATION_LOG.md)** and state one-line status.
 - [ ] Then continue with **Environment** and **Quick smoke** below.
 
 ### Environment
@@ -86,7 +89,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 ### Quick smoke
 
 - [ ] **`npm run dev`** → shell loads at **3000**; no unexpected red in main/renderer consoles.
-- [ ] **"start API"** → **`.\vpe-start-api.ps1`** at repo root; **`.\google-api\gcp_key.json`** + **`.\google-api\litellm_config.yaml`** · **port 4000**. Confirmation: **"API is Live"**.
+- [ ] **"start API"** / **Start Project** → **`.\vpe-start-api.ps1`** at repo root; **`.\google-api\gcp_key.json`** + **`.\google-api\litellm_config.yaml`** · **port 4000**. **`[VPE STANDBY]`** then **Uvicorn** on **4000** → **"API is Live"**.
 - [ ] Optional: **`CI=true`** + **`npm run test:e2e`** before a big merge (see Custom-Commands).
 
 ### Docs honest?

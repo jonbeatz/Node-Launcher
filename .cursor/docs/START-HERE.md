@@ -1,8 +1,10 @@
 # ⚡ START HERE: VPE Session Entry
 
+**Start Project (new chat / reboot / cold session):** Canonical ritual + operator paste block → **[`Start-Project.md`](../prompts/Start-Project.md)**. Agents: follow that file’s **Agent procedure** after skimming this page.
+
 **Full cold start (read order, MCP, skills, tick list):** [AGENT-BOOT-CHECKLIST.md](AGENT-BOOT-CHECKLIST.md)
 
-**Agents — new session / setting up this project:** After loading the boot checklist, **run start API** from repo root: **`.\vpe-start-api.ps1`** (LiteLLM **4000** + ngrok; **`.\google-api\gcp_key.json`** required). Confirm **“API is Live”**. Full steps: [API-SetUp-Master.md](API-SetUp-Master.md) · checklist block: [AGENT-BOOT-CHECKLIST.md §4 — First actions](AGENT-BOOT-CHECKLIST.md#4-session-verification-tick-each-start).
+**Agents — new session / setting up this project:** After loading the boot checklist, **run start API** from repo root: **`.\vpe-start-api.ps1`** (LiteLLM **4000** + ngrok; **`.\google-api\gcp_key.json`** required). After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000** and report **“API is Live”**. Full steps: [API-SetUp-Master.md](API-SetUp-Master.md) · checklist block: [AGENT-BOOT-CHECKLIST.md §4 — First actions](AGENT-BOOT-CHECKLIST.md#4-session-verification-tick-each-start) · project log: [VADER_STATION_LOG.md](../../VADER_STATION_LOG.md).
 
 **Cursor ↔ Google (Vertex AI) via LiteLLM + ngrok** (paths, ports, Cursor settings, post-restart checklist): [API-SetUp-Master.md](API-SetUp-Master.md)
 

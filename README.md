@@ -10,6 +10,8 @@ The **Vader Project Engine (VPE)** is a tactical desktop command center designed
 ---
 
 ## 🏛 1. The Constitution (Source of Truth)
+**New session / cold start:** say **Start Project** in chat or follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — then **[`.cursor/docs/START-HERE.md`](.cursor/docs/START-HERE.md)** and **[`.cursor/docs/AGENT-BOOT-CHECKLIST.md`](.cursor/docs/AGENT-BOOT-CHECKLIST.md)**.
+
 To maintain architectural integrity, all development must follow this strict hierarchy of authority:
 1. **.cursor/docs/TRUTH.md**: The Constitution (Non-negotiable principles).
 2. **.cursorrules**: The Legal Code (Current enforcement rules and guardrails).
