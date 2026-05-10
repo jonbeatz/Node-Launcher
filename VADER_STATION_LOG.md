@@ -12,6 +12,14 @@
 
 ---
 
+## v2.0.0 Phase B - Component Decomposition. Extracted ProjectGrid and StationSidebar from page.tsx to improve maintainability.
+
+**Islands:** **`src/renderer/components/dashboard/ProjectGrid.tsx`** — dashboard filters, cinema/compact/list toggle, tactical nav, quick actions, grid/list body. **`src/renderer/components/layout/StationSidebar.tsx`** — thin wrapper over **`AppSidebar`** for composition. **`src/renderer/app/page.tsx`** remains the orchestration shell (state, IPC, modals).
+
+**`[VPE STANDBY]`** unchanged.
+
+---
+
 ## Infrastructure Consolidation (v1.9.9) - Centralized root-level docs into `.cursor/docs` and consolidated Google-API utilities to eliminate root clutter.
 
 **Docs:** **`core/`** = constitution & capabilities (**`TRUTH.md`**, **`VPE-BUILD-PROTOCOL.md`**, **`AGENT-BOOT.md`**, **`VPE_ENGINE_CAPABILITIES.md`**, **`Vader-Project-Engine.md`**). **`guides/`** = runbooks (**`START-HERE.md`**, **`Custom-Commands.md`**, **`Stability.md`**, **`PRD.md`**, **`Checkpoint.md`**). Root **`SKILL.md`** retired — merged into **`VPE_ENGINE_CAPABILITIES.md`**.

@@ -1,14 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutGrid, List, FolderPlus, Loader2, Grid2x2 } from 'lucide-react'
-import { AppSidebar } from '@/components/app-sidebar';
+import { Loader2 } from 'lucide-react'
+import { StationSidebar } from '@/components/layout/StationSidebar'
+import { ProjectGrid } from '@/components/dashboard/ProjectGrid'
 import { TopBar } from '@/components/top-bar';
 import { Footer } from '@/components/footer';
-import { Msc_ProjectCard } from '@/components/Msc_ProjectCard'
-import { Msc_ProjectFilterNav } from '@/components/Msc_ProjectFilterNav'
-import { ProjectListView } from '@/components/project-list-view'
 import { LogDrawer } from '@/components/log-drawer'
 import { RepairModal } from '@/components/repair-modal'
 import { NukeModal } from '@/components/nuke-modal'
@@ -22,12 +19,10 @@ import { SystemHealthPanel } from '@/components/SystemHealth'
 import { MaintenanceSection, type MaintenanceTab } from '@/components/maintenance-section'
 import { Sandbox } from '@/components/Sandbox'
 import { type RepairHistoryRow } from '@/components/repair-history-view'
-import { QuickActionsBar } from '@/components/quick-actions-bar'
 import { ToastProvider, useToast } from '@/components/vader-toast'
 import {
   getVpeApi,
   msc_formatUnknownIPCError,
-  msc_rowHasDocumentationEnabled,
   msc_rowToDashboardProject,
   msc_withIpcTimeout,
   VPE_GET_PROJECTS_TIMEOUT_MS,
@@ -38,14 +33,10 @@ import {
   msc_computeTacticalCounts,
   type VpeTacticalProjectFilter,
 } from '@/lib/project-tactical-filter'
-import {
-  useDashboardPersistedSettings,
-  type DashboardActiveFilter,
-} from '@/state/useSettings'
+import { useDashboardPersistedSettings } from '@/state/useSettings'
 import { VpeUiLayoutProvider, useVpeUiLayout } from '@/context/vpe-ui-layout-context'
 import { msc_projectMatchesVaultSearch } from '@/lib/vpe-vault-search'
 
-type FilterType = DashboardActiveFilter
 type NavItem = 'dashboard' | 'maintenance' | 'sandbox' | 'settings'
 
 function msc_dashboardDefaultViewFromSettings(
@@ -144,14 +135,6 @@ const FALLBACK_PROJECTS: Project[] = [
     path: 'C:/Users/Vader/Projects/projectz-msc-hub',
     shield_project_type: 'web',
   },
-]
-
-const FILTERS: { id: FilterType; label: string }[] = [
-  { id: 'ALL', label: 'ALL' },
-  { id: 'RUNNING', label: 'RUNNING' },
-  { id: 'STOPPED', label: 'STOPPED' },
-  { id: 'ERRORS', label: 'ERRORS' },
-  { id: 'ARCHIVE', label: 'ARCHIVE' },
 ]
 
 function DashboardContent() {
@@ -1033,7 +1016,7 @@ function DashboardContent() {
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <AppSidebar 
+        <StationSidebar
           activeItem={activeNav}
           maintenanceTab={maintenanceTab}
           onNavigate={handleNavigation}
@@ -1098,265 +1081,61 @@ function DashboardContent() {
               ) : activeNav === 'sandbox' ? (
                 <Sandbox />
               ) : (
-                <>
-                  <div className="shrink-0">
-                    {/* Filter Pills Bar */}
-                    <div className="px-6 py-3 flex items-center justify-between gap-4">
-                      {/* Left: status filter pills — catalog total lives on TopBar breadcrumb only (v1.3.5). */}
-                      <div className="flex flex-wrap items-center gap-2 min-w-0">
-                        {favoriteFilterActive ? (
-                          <>
-                            <span className="inline-flex h-7 items-center rounded border border-[#ffcc00]/35 bg-[#1a1508] px-3 font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[#facc15]">
-                              Viewing Favorites
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setFavoriteFilterActive(false)}
-                              className="h-7 rounded border border-[#444444] bg-[#1c1c1c] px-3 font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[#eaeaea] transition-colors hover:border-[#555555] hover:bg-[#252525] vader-focus"
-                            >
-                              Show All
-                            </button>
-                          </>
-                        ) : null}
-                        {FILTERS.map((filter) => (
-                          <button
-                            key={filter.id}
-                            onClick={() => setActiveFilter(filter.id)}
-                            className={`
-                              h-7 px-4 rounded font-sans text-[11px] font-medium uppercase tracking-[0.05em] transition-all vader-focus
-                              ${activeFilter === filter.id
-                                ? 'bg-[#2a2a2a] text-white'
-                                : 'bg-transparent text-[#A0A0A0] border border-[#333333] hover:text-white hover:border-[#444444]'
-                              }
-                            `}
-                          >
-                            {filter.label}
-                          </button>
-                        ))}
-                        {commandSearchActive && commandSearchTerm.trim() ? (
-                          <span className="font-sans text-[10px] text-[#888888] uppercase tracking-wide">
-                            Jump mode
-                          </span>
-                        ) : null}
-                        {searchTerm.trim() &&
-                        !(commandSearchActive && commandSearchTerm.trim()) ? (
-                          <span className="font-sans text-[10px] text-[#888888] uppercase tracking-wide">
-                            Vault search
-                          </span>
-                        ) : null}
-                      </div>
-
-                      {/* Right: unified view mode (v1.6.9) */}
-                      <div
-                        className="flex flex-wrap items-center justify-end gap-1 shrink-0"
-                        role="group"
-                        aria-label="Dashboard view mode"
-                      >
-                        {(
-                          [
-                            { mode: 'cinema' as const, label: 'CINEMA', Icon: LayoutGrid },
-                            { mode: 'compact' as const, label: 'COMPACT', Icon: Grid2x2 },
-                            { mode: 'list' as const, label: 'LIST', Icon: List },
-                          ] as const
-                        ).map(({ mode, label, Icon }) => {
-                          const active = effectiveViewMode === mode
-                          return (
-                            <button
-                              key={mode}
-                              type="button"
-                              onClick={() => setViewMode(mode)}
-                              className={`
-                                flex h-7 items-center gap-1.5 rounded border border-transparent px-2.5 font-sans text-[10px] font-medium uppercase tracking-wide transition-all duration-200 vader-focus
-                                ${active
-                                  ? 'bg-[#2a2a2a] text-white border-[#444444]'
-                                  : 'bg-transparent text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]/50'
-                                }
-                              `}
-                              title={`${label} view`}
-                            >
-                              <Icon size={14} className="shrink-0 opacity-90" />
-                              <span className="hidden min-[420px]:inline">{label}</span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="px-6 pb-3 border-b border-[#2a2a2a]">
-                      <Msc_ProjectFilterNav
-                        activeFilter={tacticalProjectFilter}
-                        onFilterChange={setTacticalProjectFilter}
-                        counts={tacticalCounts}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Quick Actions Bar */}
-                  <QuickActionsBar
-                    onStartAll={handleStartAll}
-                    onStopAll={handleStopAll}
-                    onRefreshAll={handleRefreshAll}
-                    onOpenExplorer={handleOpenExplorer}
-                    explorerActionTitle={explorerActionTitle}
-                  />
-
-                  {/* Project Content */}
-                  <div className="flex-1 px-6 pb-6 overflow-y-auto">
-                    {filteredProjects.length === 0 ? (
-                      /* Empty State */
-                      <div className="h-full flex flex-col items-center justify-center">
-                        <FolderPlus size={48} className="text-[#333333] mb-4" />
-                        {commandSearchActive && commandSearchTerm.trim() ? (
-                          <>
-                            <p className="font-sans text-[#A0A0A0] mb-1">
-                              No projects match &apos;{commandSearchTerm.trim()}&apos;
-                            </p>
-                            <button
-                              onClick={() => {
-                                setCommandSearchTerm('')
-                                setCommandSearchActive(false)
-                              }}
-                              className="font-sans text-sm text-[#eaeaea] hover:underline"
-                              type="button"
-                            >
-                              Clear jump search
-                            </button>
-                          </>
-                        ) : searchTerm.trim() ? (
-                          <>
-                            <p className="font-sans text-[#A0A0A0] mb-1">
-                              No projects match &apos;{searchTerm}&apos;
-                            </p>
-                            <button
-                              onClick={() => setSearchTerm('')}
-                              className="font-sans text-sm text-[#eaeaea] hover:underline"
-                              type="button"
-                            >
-                              Clear vault search
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-sans text-[#A0A0A0] mb-1">No projects registered</p>
-                            <p className="font-sans text-sm text-[#555555] mb-4">Add your first project to get started</p>
-                            <button
-                              onClick={() => setAddProjectModalOpen(true)}
-                              className="h-9 px-6 rounded bg-[#2a2a2a] hover:bg-[#333333] border border-[#555555] font-sans text-sm font-medium text-white transition-colors vader-focus"
-                            >
-                              ADD PROJECT
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    ) : isGridLayout ? (
-                      /* Cinema / compact grid */
-                      <motion.div
-                        key={`${tacticalProjectFilter}-${effectiveViewMode}`}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.22 }}
-                        className={`transition-[gap] duration-200 ease-out ${isCompactGrid ? 'vpe-grid-compact' : 'vpe-grid-cinema'}`}
-                      >
-                        <AnimatePresence mode="popLayout">
-                          {filteredProjects.map((project) => (
-                            <motion.div
-                              key={project.id}
-                              layout
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              transition={{ duration: 0.18 }}
-                              className="transition-all duration-200 ease-out"
-                            >
-                              <Msc_ProjectCard
-                                id={project.id}
-                                name={project.name}
-                                isCompact={isCompactGrid}
-                                projectPath={project.path}
-                                project_folder_created_at={
-                                  project.project_folder_created_at
-                                }
-                                project_folder_modified_at={
-                                  project.project_folder_modified_at
-                                }
-                                port={project.port}
-                                status={project.status}
-                                devSessionStartedAt={project.dev_session_started_at ?? null}
-                                health_http_code={project.health_http_code}
-                                health_checked_at={project.health_checked_at}
-                                health_reachable={project.health_reachable}
-                                isFavorite={project.is_favorite}
-                                node_modules_missing={project.node_modules_missing}
-                                onToggleFavorite={() => handleToggleFavorite(project.id)}
-                                thumbnailUrl={
-                                  project.thumbnail_url ?? undefined
-                                }
-                                hasBuilt={project.hasBuilt}
-                                onStart={() => void handleToggleStatus(project.id)}
-                                onStop={() => void handleToggleStatus(project.id)}
-                                onInstallAndStart={() => void handleInstallAndStart(project.id)}
-                                onBuild={() => void handleRunBuild(project.id)}
-                                onLogs={() => handleLogs(project.id)}
-                                onViewErrorConsole={() => handleLogs(project.id)}
-                                onCardInteraction={() => msc_pickProjectMeta(project.name)}
-                                onSettings={() => handleSettings(project.name)}
-                                onUnregister={() => handleUnregister(project.name)}
-                                onContextMenu={(e) => handleContextMenu(e, project.id)}
-                                onOpenInBrowser={() =>
-                                  void handleOpenProjectUrl(project.id)
-                                }
-                                devInstallInProgress={Boolean(
-                                  devInstallUiByProject[project.id],
-                                )}
-                                shieldProjectType={
-                                  project.shield_project_type ?? 'unknown'
-                                }
-                                vaultHasReferenceFiles={
-                                  Boolean(project.vault_has_files) &&
-                                  msc_rowHasDocumentationEnabled(project.has_documentation)
-                                }
-                                isSelected={selectedProjectId === project.id}
-                              />
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
-                      </motion.div>
-                    ) : (
-                      /* List View */
-                      <ProjectListView
-                        projects={filteredProjects}
-                        explorerTargetId={selectedProjectId}
-                        listVariant={sidebarNarrow ? 'slim' : 'default'}
-                        selectedIds={selectedIds}
-                        onSelectProject={(id, selected) => {
-                          setSelectedIds(prev => selected ? [...prev, id] : prev.filter(x => x !== id))
-                        }}
-                        onSelectAll={(selected) => {
-                          setSelectedIds(selected ? filteredProjects.map(p => p.id) : [])
-                        }}
-                        onToggleStatus={handleToggleStatus}
-                        onBuild={(id) => void handleRunBuild(id)}
-                        onLogs={handleLogs}
-                        onProjectRowFocus={(_id, name) => {
-                          msc_pickProjectMeta(name)
-                        }}
-                        onSettings={(id) => {
-                          const project = projects.find(p => p.id === id)
-                          if (project) handleSettings(project.name)
-                        }}
-                        onUnregister={(id) => {
-                          const project = projects.find(p => p.id === id)
-                          if (project) handleUnregister(project.name)
-                        }}
-                        onOpenInBrowser={(id) => void handleOpenProjectUrl(id)}
-                        compact={compactMode}
-                        onToggleCompact={() => setCompactMode(!compactMode)}
-                        devInstallByProjectId={devInstallUiByProject}
-                        tacticalMotionKey={tacticalProjectFilter}
-                      />
-                    )}
-                  </div>
-                </>
+                <ProjectGrid
+                  favoriteFilterActive={favoriteFilterActive}
+                  onClearFavoriteFilter={() => setFavoriteFilterActive(false)}
+                  activeFilter={activeFilter}
+                  onActiveFilterChange={setActiveFilter}
+                  commandSearchActive={commandSearchActive}
+                  commandSearchTerm={commandSearchTerm}
+                  searchTerm={searchTerm}
+                  onClearJumpSearch={() => {
+                    setCommandSearchTerm('')
+                    setCommandSearchActive(false)
+                  }}
+                  onClearVaultSearch={() => setSearchTerm('')}
+                  effectiveViewMode={effectiveViewMode}
+                  onViewModeChange={setViewMode}
+                  isCompactGrid={isCompactGrid}
+                  isGridLayout={isGridLayout}
+                  tacticalProjectFilter={tacticalProjectFilter}
+                  onTacticalFilterChange={setTacticalProjectFilter}
+                  tacticalCounts={tacticalCounts}
+                  onStartAll={handleStartAll}
+                  onStopAll={handleStopAll}
+                  onRefreshAll={handleRefreshAll}
+                  onOpenExplorer={handleOpenExplorer}
+                  explorerActionTitle={explorerActionTitle}
+                  filteredProjects={filteredProjects}
+                  projects={projects}
+                  selectedProjectId={selectedProjectId}
+                  selectedIds={selectedIds}
+                  onListSelectProject={(id, selected) => {
+                    setSelectedIds((prev) =>
+                      selected ? [...prev, id] : prev.filter((x) => x !== id),
+                    )
+                  }}
+                  onListSelectAll={(selected) => {
+                    setSelectedIds(
+                      selected ? filteredProjects.map((p) => p.id) : [],
+                    )
+                  }}
+                  sidebarNarrow={sidebarNarrow}
+                  compactMode={compactMode}
+                  onToggleCompact={() => setCompactMode(!compactMode)}
+                  devInstallUiByProject={devInstallUiByProject}
+                  onAddProject={() => setAddProjectModalOpen(true)}
+                  onToggleFavorite={handleToggleFavorite}
+                  onToggleStatus={handleToggleStatus}
+                  onInstallAndStart={handleInstallAndStart}
+                  onRunBuild={handleRunBuild}
+                  onLogs={handleLogs}
+                  onPickProjectMeta={msc_pickProjectMeta}
+                  onSettings={handleSettings}
+                  onUnregister={handleUnregister}
+                  onContextMenu={handleContextMenu}
+                  onOpenProjectUrl={handleOpenProjectUrl}
+                />
               )}
             </div>
 
