@@ -46,9 +46,15 @@ vader-project-engine/
 
 &#x20;   ├── docs/
 
-&#x20;   │   ├── core/                      # TRUTH, VPE-BUILD-PROTOCOL, AGENT-BOOT, VPE_ENGINE_CAPABILITIES
+&#x20;   │   ├── core/                      # TRUTH, VPE-BUILD-PROTOCOL, AGENT-BOOT, VPE_ENGINE_CAPABILITIES (v2.0+ — no duplicate copies at docs/)
 
-&#x20;   │   └── guides/                    # START-HERE, Custom-Commands, Stability, PRD, Checkpoint
+&#x20;   │   ├── guides/                    # START-HERE, Custom-Commands, Stability, PRD, Checkpoint
+
+&#x20;   │   ├── API-SetUp-Master.md        # adjunct (root of docs/ only)
+
+&#x20;   │   ├── THUMBNAIL-IPC-INVESTIGATION.md
+
+&#x20;   │   └── Rebuid-Commands.md
 
 &#x20;   │
 

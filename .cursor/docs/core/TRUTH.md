@@ -2,6 +2,8 @@
 
 This document is the **Constitution** of the Vader Project Engine. It serves as the absolute technical source of truth. If any document conflicts with this, **this document wins**.
 
+**Filesystem:** This file lives only at **`.cursor/docs/core/TRUTH.md`**. Runbooks and PRD live under **`.cursor/docs/guides/`**; **`.cursor/docs/`** root keeps adjunct references (**`API-SetUp-Master.md`**, **`THUMBNAIL-IPC-INVESTIGATION.md`**, **`Rebuid-Commands.md`**) — **v2.0.0 Phase A** eliminated duplicate “ghost” copies of core/guides docs at the parent level.
+
 **Shipped release vs. this title:** The **v2.0** label names the *architecture constitution*, not the npm/Electron semver. **Authoritative shipped patch** is root **`package.json` → `version`** (currently **1.9.9** — re-read the file if disputed). Product/UI deltas: **[`VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md)** · milestone index: [Checkpoint.md — Build v1.9.9](../guides/Checkpoint.md).
 
 ## 1. Architectural Integrity

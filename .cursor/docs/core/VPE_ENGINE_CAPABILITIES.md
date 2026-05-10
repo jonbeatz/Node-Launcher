@@ -6,7 +6,7 @@ version: "2.2"
 
 # VPE_ENGINE_CAPABILITIES.md — Vader Project Engine (VPE)
 
-Canonical agent capability doc (**replaces root `SKILL.md`**). **Hooks** and **prompts** are summarized in §8–§9; full prompt bodies live under **`.cursor/prompts/`**.
+Canonical agent capability doc (**replaces root `SKILL.md`**). **Hooks** and **prompts** are summarized in §8–§9; full prompt bodies live under **`.cursor/prompts/`**. **v2.0.0 Phase A:** Core and guides Markdown exists only under **`.cursor/docs/core/`** and **`.cursor/docs/guides/`**; **`.cursor/docs/`** root is for adjunct files only (e.g. **`API-SetUp-Master.md`**) — do not resurrect duplicate **`TRUTH.md`**, **`START-HERE.md`**, etc. at the parent level.
 
 ## Skill metadata
 

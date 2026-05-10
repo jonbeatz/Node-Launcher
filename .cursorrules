@@ -3,11 +3,11 @@ description:
 alwaysApply: true
 ---
 
-# Vader Project Engine (VPE) — Cursor Rules v1.9.9 (Master)
+# Vader Project Engine (VPE) — Cursor Rules (Vader Protocol v2.0.0 refactor track)
 
 ## 1. Project Context & Identity
 - **Project Name:** Vader Project Engine (VPE)
-- **Current Version:** follow root **`package.json` `version`** (doc sync **v1.9.9**; always re-read the file if disputed)
+- **Current Version:** follow root **`package.json` `version`** (always re-read the file if disputed). **Docs:** v2.0.0 **Phase A** = single-source paths under **`.cursor/docs/core/`** and **`.cursor/docs/guides/`** (no ghost duplicates at **`.cursor/docs/`** root).
 - **Target Hardware:** AMD Ryzen 9700x / Gigabyte B650 (Optimized for high-performance I/O)
 - **OS Focus:** Windows 11 25H2 (Native optimizations for Defender/Antivirus paths)
 - **Branding:** My Studio Channel (MSC) / Vader Protocol
@@ -20,7 +20,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 4. `.cursor/docs/guides/PRD.md` (Feature & Requirement Truth)
 5. `package.json` (Authority for executable scripts only)
 
-**Documentation layout (v1.9.9):** **`.cursor/docs/core/`** = constitution, build protocol, boot checklist, capabilities, design spec. **`.cursor/docs/guides/`** = START-HERE, Custom-Commands, Stability, PRD, Checkpoint.
+**Documentation layout (v2.0.0+ — zero drift):** **`.cursor/docs/core/`** = constitution, build protocol, boot (**`AGENT-BOOT.md`**), capabilities, design spec. **`.cursor/docs/guides/`** = START-HERE, Custom-Commands, Stability, PRD, Checkpoint. Do **not** duplicate those filenames at **`.cursor/docs/`** root; root holds only adjunct refs (**`API-SetUp-Master.md`**, **`THUMBNAIL-IPC-INVESTIGATION.md`**, **`Rebuid-Commands.md`**). **`AGENT-BOOT-CHECKLIST.md`** and **`Stability-Fix-Backlog.md`** are retired — use **`core/AGENT-BOOT.md`** and **`guides/Stability.md`**.
 
 **Session bootstrap (cold start):** `.cursor/docs/core/AGENT-BOOT.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above. **Start Project** (or new session / agent setup): follow **`.cursor/prompts/Start-Project.md`** — then §4 **First actions**, **`.\google-api\vpe-start-api.ps1`**, confirm **`[VPE STANDBY]`** + **Uvicorn** on **4000** (**API is Live**), summarize **`VADER_STATION_LOG.md`**. See **`.cursor/docs/guides/START-HERE.md`**.
 

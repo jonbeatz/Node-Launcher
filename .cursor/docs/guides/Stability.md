@@ -161,14 +161,11 @@ Additional hardening:
 
 ## Packaged boot crash: main-process parse error from `app.asar` (tray path)
 
-**Symptom:** `win-unpacked` app showed main-process syntax crash (`await is only valid...`) pointing at tray path even though source files were valid.
+**Symptom (historical):** `win-unpacked` app showed main-process syntax crash (`await is only valid...`) pointing at tray path even though source files were valid.
 
-**Cause:** Packaging/runtime issue around ASAR-loaded main files on this environment; source `src/main/*.js` syntax checked clean.
+**Cause:** Packaging/runtime issue around ASAR-loaded main files on some environments; source `src/main/*.js` syntax checked clean.
 
-**Fix in repo (current operational mode):**
-- `package.json` → `build.asar = false`
-
-This de-bricks startup and keeps packaging stable while preserving all runtime fixes.
+**Current repo posture (v1.3.7+):** [`package.json`](../../package.json) uses **`build.asar: true`** with **`asarUnpack`** for **`better-sqlite3`**, **`node-pty`**, and **`pm2`** so native addons load from **`app.asar.unpacked`**. Main resolves PM2 via [`pm2-client.js`](../../src/main/pm2-client.js) when packaged. If you still see ASAR-related main parse errors after a clean **`npm run build:win`**, capture the stack and compare with **`src/main/tray-manager.js`** / Electron version — do **not** flip **`asar`** off without updating **`VPE-BUILD-PROTOCOL.md`** and **`Checkpoint`** (that was an older emergency workaround).
 
 ---
 
