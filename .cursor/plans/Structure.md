@@ -6,11 +6,11 @@ vader-project-engine/
 
 ├── .cursorrules                       # Global Law v1.5 (always-on enforcement)
 
-├── SKILL.md                           # Master Skill (agent identity + quality gates)
+├── .cursor/docs/core/VPE_ENGINE_CAPABILITIES.md  # Agent identity + hooks/prompt index (v1.9.9+)
 
-├── Node-Launcher-PRD.md               # Feature \& Requirement Truth
+├── .cursor/docs/guides/PRD.md         # Feature \& Requirement Truth
 
-├── Vader-Project-Engine.md     # UI Design Generation Prompt
+├── .cursor/docs/core/Vader-Project-Engine.md  # UI Design Generation Prompt
 
 ├── package.json                       # Executable scripts (when created)
 
@@ -46,9 +46,9 @@ vader-project-engine/
 
 &#x20;   ├── docs/
 
-&#x20;   │   ├── TRUTH.md                   # The Constitution
+&#x20;   │   ├── core/                      # TRUTH, VPE-BUILD-PROTOCOL, AGENT-BOOT, VPE_ENGINE_CAPABILITIES
 
-&#x20;   │   └── START-HERE.md              # Session activation checklist
+&#x20;   │   └── guides/                    # START-HERE, Custom-Commands, Stability, PRD, Checkpoint
 
 &#x20;   │
 

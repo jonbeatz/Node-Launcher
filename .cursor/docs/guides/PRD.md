@@ -4,7 +4,7 @@
 | :------ | :--------- | :-------- | :--------------- |
 | 2.1     | 2026-05-07 | Jon Beatz | Approved / Final |
 
-**Shipped desktop build (npm / `package.json` `version`):** **1.9.8** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match. **Living UI/product narrative:** **[`VADER_STATION_LOG.md`](VADER_STATION_LOG.md)** (**v1.9.x**). Dev branch may still be **`VPE-v1.6.x-Dev`** until the next minor rename; see [.cursor/docs/Checkpoint.md](.cursor/docs/Checkpoint.md) **Build v1.9.8** + **Build v1.6.0**. See [.cursor/docs/VPE-BUILD-PROTOCOL.md](.cursor/docs/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts (**`vader:deploy`**, **`vader:clean-sync`**, **`vader:sync`**) and in-app tooling. Prior layers still apply: NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
+**Shipped desktop build (npm / `package.json` `version`):** **1.9.9** — preload **`vpeInfo.version`**, footer, and **`layout.tsx`** metadata must match. **Living UI/product narrative:** **[`VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md)** (**v1.9.x**). Dev branch may still be **`VPE-v1.6.x-Dev`** until the next minor rename; see [Checkpoint.md](Checkpoint.md) **Build v1.9.9** + **Build v1.6.0**. See [VPE-BUILD-PROTOCOL.md](../core/VPE-BUILD-PROTOCOL.md) for **`vader:*`** scripts (**`vader:deploy`**, **`vader:clean-sync`**, **`vader:sync`**) and in-app tooling. Prior layers still apply: NET dev override (**v1.2.3+**), shield + tactical filters (**v1.2.4–v1.2.5**), **`is_archived` + Ctrl+K** (**v1.2.6**).
 
 **v1.3.7 (native / ASAR):** **`asarUnpack`** in **`package.json`** **`build`** for **`better-sqlite3`**, **`node-pty`**, and **`pm2`**. Packaged main must load the PM2 API from **`app.asar.unpacked`** — **`src/main/pm2-client.js`** (**`msc_getPm2`**) used by **`pm2-manager.js`**; **`stopAll`** connects before **`pm2.stop('all')`** and avoids rejecting so unified stop still clears runner + DB.
 
@@ -18,7 +18,7 @@
 
 **v1.3.2 (ghost + UX):** Main **Ghost watcher** (Windows): periodic check for **node.exe** on catalog ports with no matching **running** row → renderer cue on System Health; dashboard **grid/list** and filter pill (**ARCHIVE**) persisted in **LocalStorage**.
 
-**v1.3.1 (ops / branching):** Introduced **`VPE-v1.3.x-Dev`**; CI **`.github/workflows/ci.yml`** runs **`npm ci`** (requires **`package-lock.json`** synced to **`package.json`**) → lint → **`build:renderer`** → AST stub → Playwright **`test:e2e`** (lint strictness superseded by **v1.3.3** relaxed lint above). **Current shipped patch:** root **`package.json`** (**`1.9.8`**); **Checkpoint** — **Build v1.9.8** + **Build v1.6.0** for branch / vault baseline.
+**v1.3.1 (ops / branching):** Introduced **`VPE-v1.3.x-Dev`**; CI **`.github/workflows/ci.yml`** runs **`npm ci`** (requires **`package-lock.json`** synced to **`package.json`**) → lint → **`build:renderer`** → AST stub → Playwright **`test:e2e`** (lint strictness superseded by **v1.3.3** relaxed lint above). **Current shipped patch:** root **`package.json`** (**`1.9.9`**); **Checkpoint** — **Build v1.9.9** + **Build v1.6.0** for branch / vault baseline.
 
 **v1.2.6 (product baseline):** **`projects.is_archived`** in SQLite/JSON; **ARCHIVE** filter; **Project Settings → Archive project**; **Ctrl+K / Cmd+K** jump search; **Add Project** type from **`inspectProject`**; tactical sidebar shields; list **12px** shield dot; catalog **`is_archived`**.
 
@@ -120,13 +120,13 @@ module.exports = {
 *   **Hardware Optimization:** Targets Ryzen 9700x[cite: 13]. Offloads heavy tasks to background worker threads to maintain 60 fps UI performance[cite: 13].
 *   **Windows 11 25H2 Tuning:** Batched file I/O and whitelisted paths to reduce antivirus scanning impact[cite: 13].
 *   **Zombie Prevention:** Uses `tree-kill` to guarantee termination of Next.js/Node processes on stop[cite: 13].
-*   **Hardware telemetry (v1.1.6+; UI v1.1.7):** CPU temperature via WMI / PowerShell in the Electron main process is **removed**; System Health has **no** temperature display and IPC omits **`cpuTemp`**. Do not reintroduce without an explicit product decision ([`.cursor/docs/VPE-BUILD-PROTOCOL.md`](.cursor/docs/VPE-BUILD-PROTOCOL.md)).
+*   **Hardware telemetry (v1.1.6+; UI v1.1.7):** CPU temperature via WMI / PowerShell in the Electron main process is **removed**; System Health has **no** temperature display and IPC omits **`cpuTemp`**. Do not reintroduce without an explicit product decision ([`VPE-BUILD-PROTOCOL.md`](../core/VPE-BUILD-PROTOCOL.md)).
 *   **Footer Purge env:** Clears orphan listeners on **3000 / 3001 / 9222** with **`taskkill /F /PID`** only (no **`/T`**), always skipping the launcher **`process.pid`** and **`process.ppid`**.
 *   **Snapshot Engine:** Backs up SQLite and `.env` files to `.vader-checkpoint` via `%TEMP%` staging and copy-on-write logic to bypass file locks.
 
 ### **5.1 API Orchestration (LiteLLM)**
 *   **Cold session ritual:** **`Start Project`** — follow **`.cursor/prompts/Start-Project.md`** (concise checklist + **`VADER_STATION_LOG.md`** summary).
-*   **Command:** `start API` (or `run litellm`) → from repo root run **`.\vpe-start-api.ps1`** + global **`ngrok http 4000`** in **Cursor integrated split panes** (**v1.7.7** tags the *LiteLLM + ngrok + Cursor* workflow in [`.cursor/docs/API-SetUp-Master.md`](.cursor/docs/API-SetUp-Master.md), **not** the VPE desktop **`package.json`** version).
+*   **Command:** `start API` (or `run litellm`) → from repo root run **`.\google-api\vpe-start-api.ps1`** + global **`ngrok http 4000`** in **Cursor integrated split panes** (**v1.7.7** tags the *LiteLLM + ngrok + Cursor* workflow in [`API-SetUp-Master.md`](../API-SetUp-Master.md), **not** the VPE desktop **`package.json`** version).
 *   **Requirement:** Credentials at **`.\google-api\gcp_key.json`** via **`GOOGLE_APPLICATION_CREDENTIALS`** (script sets this relative to **`$PSScriptRoot`**).
 *   **Startup:** `litellm --config ./google-api/litellm_config.yaml --port 4000`; **ngrok** **`http 4000`** globally in a **second integrated terminal** (script prints the command; **ngrok** on **User PATH** — same **v1.7.7** runbook; external OS windows deprecated).
 *   **Verification:** After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000**; provide feedback **"API is Live"** once the server is listening.

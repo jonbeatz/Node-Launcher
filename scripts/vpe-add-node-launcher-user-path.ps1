@@ -1,7 +1,8 @@
-# v1.7.7 — Append this repo root to User PATH (global `ngrok` via repo `ngrok.exe`).
+# v1.9.9 — Append repo `google-api` to User PATH (global `ngrok` via `google-api\ngrok.exe`).
 # Run: powershell -ExecutionPolicy Bypass -File .\scripts\vpe-add-node-launcher-user-path.ps1
 
-$add = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$add = Join-Path $repoRoot 'google-api'
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 if (-not $userPath) { $userPath = '' }
 $parts = $userPath -split ';' | Where-Object { $_ -ne '' }

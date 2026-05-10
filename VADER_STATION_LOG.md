@@ -1,24 +1,34 @@
 # Vader Station Log
 
-**Purpose:** Single place for operators and agents running **Start Project** to grab a **short** narrative of infra + recent product notes. Prefer **[`.cursor/docs/Checkpoint.md`](.cursor/docs/Checkpoint.md)** for full branch/build history.
+**Purpose:** Single place for operators and agents running **Start Project** to grab a **short** narrative of infra + recent product notes. Prefer **[`.cursor/docs/guides/Checkpoint.md`](.cursor/docs/guides/Checkpoint.md)** for full branch/build history.
+
+---
+
+## Infrastructure Consolidation (v1.9.9) - Centralized root-level docs into `.cursor/docs` and consolidated Google-API utilities to eliminate root clutter.
+
+**Docs:** **`core/`** = constitution & capabilities (**`TRUTH.md`**, **`VPE-BUILD-PROTOCOL.md`**, **`AGENT-BOOT.md`**, **`VPE_ENGINE_CAPABILITIES.md`**, **`Vader-Project-Engine.md`**). **`guides/`** = runbooks (**`START-HERE.md`**, **`Custom-Commands.md`**, **`Stability.md`**, **`PRD.md`**, **`Checkpoint.md`**). Root **`SKILL.md`** retired — merged into **`VPE_ENGINE_CAPABILITIES.md`**.
+
+**Google API:** **`ngrok.exe`**, **`vpe-start-api.ps1`**, and **`litellm_config.yaml`** live under **`google-api/`**; **`scripts/vpe-add-node-launcher-user-path.ps1`** appends **`google-api`** to **User PATH** so **`ngrok`** resolves globally.
+
+**`[VPE STANDBY]`** unchanged (LiteLLM ritual + shell hydration).
 
 ---
 
 ## API stack (v1.6.1 → v1.7.5)
 
-**Self-contained & scripted:** run **`.\vpe-start-api.ps1`** from repo root. Credentials: **`.\google-api\gcp_key.json`** (gitignored). Config: **`.\google-api\litellm_config.yaml`**. **LiteLLM** and **ngrok** target **port 4000** (locked). Details: [.cursor/docs/API-SetUp-Master.md](.cursor/docs/API-SetUp-Master.md).
+**Self-contained & scripted:** run **`.\google-api\vpe-start-api.ps1`** from repo root. Credentials: **`.\google-api\gcp_key.json`** (gitignored). Config: **`.\google-api\litellm_config.yaml`**. **LiteLLM** and **ngrok** target **port 4000** (locked). Details: [.cursor/docs/API-SetUp-Master.md](.cursor/docs/API-SetUp-Master.md).
 
 ## Terminal Integration (v1.7.5)
 
-Deprecated external windows; migrated to **Cursor integrated split panes**. **`vpe-start-api.ps1`** no longer **`Start-Process`**es ngrok — it prints **`ngrok http 4000`** and runs **LiteLLM** in the current pane. **sessionStart** hook prints pane reminders only. See **Terminal Discipline** in **`.cursorrules`**.
+Deprecated external windows; migrated to **Cursor integrated split panes**. **`google-api\vpe-start-api.ps1`** no longer **`Start-Process`**es ngrok — it prints **`ngrok http 4000`** and runs **LiteLLM** in the current pane. **sessionStart** hook prints pane reminders only. See **Terminal Discipline** in **`.cursorrules`**.
 
 ## Vault Protocol Handler (v1.7.6)
 
 Resolved Chromium **local resource** blocks via custom scheme **`vpe-vault:`** (`protocol.registerSchemesAsPrivileged` + **`session.defaultSession.protocol.handle`**). Registry still stores internal thumbs as **`file:`**; IPC maps them to **`vpe-vault://<project-id>/_vpe_thumb.png`** with **`?pulse=`** cache-busting (v1.7.8+). Renderer cards and Project Settings preview use **`<img>`** for scheme compatibility. See **[`vpe-vault-protocol.js`](src/main/vpe-vault-protocol.js)**, **[`vpe-thumbnail-url.js`](src/main/vpe-thumbnail-url.js)**.
 
-## Global Path Alignment (v1.7.7)
+## Global Path Alignment (v1.7.7) — updated v1.9.9
 
-Added this **repo root** to **Windows User PATH** so **`ngrok`** resolves globally (**`ngrok.exe`** lives in the repo). One-time helper: **[`scripts/vpe-add-node-launcher-user-path.ps1`](scripts/vpe-add-node-launcher-user-path.ps1)** (resolves the checkout path automatically). Verify: **`scripts\vpe-verify-ngrok-path.ps1`** or **`ngrok version`** from any cwd after reopening the terminal. **`vpe-start-api.ps1`** documents the global command and warns if **`ngrok`** is missing from PATH.
+**`google-api`** is appended to **Windows User PATH** so **`ngrok`** resolves globally (**`ngrok.exe`** lives in **`google-api/`**). One-time helper: **[`scripts/vpe-add-node-launcher-user-path.ps1`](scripts/vpe-add-node-launcher-user-path.ps1)**. Verify: **`scripts\vpe-verify-ngrok-path.ps1`** or **`ngrok version`** from any cwd after reopening the terminal. **`google-api\vpe-start-api.ps1`** documents the global command and warns if **`ngrok`** is missing from PATH.
 
 ## Active Pulse Caching (v1.7.8)
 
@@ -146,7 +156,7 @@ Replaced dual toggles with a single **`viewMode`**: **`cinema`** (large grid + j
 
 ## Product snapshot
 
-- **Ritual:** [.cursor/prompts/Start-Project.md](.cursor/prompts/Start-Project.md) · entry [.cursor/docs/START-HERE.md](.cursor/docs/START-HERE.md)
-- **Shipped app version / branch:** root **`package.json`** + **[Checkpoint.md](.cursor/docs/Checkpoint.md)** (authoritative for build lines)
+- **Ritual:** [.cursor/prompts/Start-Project.md](.cursor/prompts/Start-Project.md) · entry [.cursor/docs/guides/START-HERE.md](.cursor/docs/guides/START-HERE.md)
+- **Shipped app version / branch:** root **`package.json`** + **[Checkpoint.md](.cursor/docs/guides/Checkpoint.md)** (authoritative for build lines)
 
 *Update this file when a major mission completes or API behavior changes; keep it brief.*

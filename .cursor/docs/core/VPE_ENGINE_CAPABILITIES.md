@@ -1,17 +1,19 @@
 ---
 name: vader-project-engine
-description: Technical and aesthetic authority for the Vader Project Engine (VPE). Use for Electron, Next.js static export, PM2, Studio Dark UI, Suspense repair, Windows packaging, and Vader workstation tuning.
-version: "2.1"
+description: Technical and aesthetic authority for the Vader Project Engine (VPE). Merges legacy SKILL + Cursor hooks/prompt index (v1.9.9 doc layout).
+version: "2.2"
 ---
 
-# SKILL.md: Vader Project Engine (VPE)
+# VPE_ENGINE_CAPABILITIES.md — Vader Project Engine (VPE)
+
+Canonical agent capability doc (**replaces root `SKILL.md`**). **Hooks** and **prompts** are summarized in §8–§9; full prompt bodies live under **`.cursor/prompts/`**.
 
 ## Skill metadata
 
 - **Skill name:** Vader Project Engine (VPE)
-- **Version:** 2.1
+- **Version:** 2.2
 - **Author:** Jon Beatz (MSC)
-- **Primary sources:** `.cursor/docs/TRUTH.md`, `.cursorrules`, `README.md`, `Node-Launcher-PRD.md`, `Vader-Project-Engine.md`, `.cursor/docs/VPE-BUILD-PROTOCOL.md`, `.cursor/docs/AGENT-BOOT-CHECKLIST.md`, `.cursor/prompts/Start-Project.md`, `VADER_STATION_LOG.md`, `.cursor/docs/Checkpoint.md`, `.cursor/docs/Custom-Commands.md`, `.cursor/docs/Stability-Fix-Backlog.md`
+- **Primary sources:** [`.cursor/docs/core/TRUTH.md`](TRUTH.md), **`.cursorrules`**, **`README.md`**, [`.cursor/docs/guides/PRD.md`](../guides/PRD.md), [`.cursor/docs/core/Vader-Project-Engine.md`](Vader-Project-Engine.md), [`.cursor/docs/core/VPE-BUILD-PROTOCOL.md`](VPE-BUILD-PROTOCOL.md), [`.cursor/docs/core/AGENT-BOOT.md`](AGENT-BOOT.md), **`.cursor/prompts/Start-Project.md`**, **`VADER_STATION_LOG.md`**, [`.cursor/docs/guides/Checkpoint.md`](../guides/Checkpoint.md), [`.cursor/docs/guides/Custom-Commands.md`](../guides/Custom-Commands.md), [`.cursor/docs/guides/Stability.md`](../guides/Stability.md)
 
 ## Activation triggers
 
@@ -22,7 +24,7 @@ Activate when the user:
 - Works on Electron main/preload/renderer, IPC, PM2 lifecycle, ports, thumbnails, logs, repair, or packaging.
 - References **Vader Protocol**, **Studio Dark**, **Vader Shield**, or **MSC Media Engine**.
 - Asks about Next.js Suspense / `useSearchParams` patching, AST repair, or `vader-fix-suspense`-style workflows.
-- Needs UI review against the **Master Quality Gate** or parity with `Vader-Project-Engine.md`.
+- Needs UI review against the **Master Quality Gate** or parity with **`Vader-Project-Engine.md`**.
 
 ## Agent guardrails
 
@@ -32,10 +34,10 @@ When this skill applies, **always**:
 - **PM2:** Prefer the **bundled programmatic API** in main; do not assume a globally installed PM2 daemon is required for the product story.
 - **Termination:** Discuss and implement stops with **`tree-kill`** (and project-runner preflight / Windows port sweeps where already implemented).
 - **Repairs:** **`.vader-backup`** before writes; diff-first confirmation for AST changes; align with `scripts/repair` / PRD repair suite.
-- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**, e.g. **v1.9.8**). **Navigation selection** in the shell uses neutral **`#2a2a2a`** (see **`VPE-BUILD-PROTOCOL.md`** Standards — not the green CTA accent).
+- **Design:** Vader palette and tokens as in **§2**; footers include **"Powered by the MSC Media Engine"** plus the **current** app version (match root **`package.json`** / preload **`vpeInfo.version`**). **Navigation selection** in the shell uses neutral **`#2a2a2a`** (see **[VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md)** Standards — not the green CTA accent).
 - **Naming:** Custom CSS/Tailwind-style classes prefixed with **`msc-`**; new main-process helpers follow existing **`msc_`** naming (match surrounding code).
-- **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. **Forge / packaging sequencing:** [`.cursor/docs/VPE-BUILD-PROTOCOL.md`](.cursor/docs/VPE-BUILD-PROTOCOL.md) — e.g. **`vader:sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vpe:cleanup-dist`**.
-- **API Bootstrap / Start Project:** On **each new Cursor session** or **Start Project**, follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** (operator paste block + agent steps). Cross-check **[`.cursor/docs/AGENT-BOOT-CHECKLIST.md`](.cursor/docs/AGENT-BOOT-CHECKLIST.md)** §4 **First actions** and **[`.cursor/docs/API-SetUp-Master.md`](.cursor/docs/API-SetUp-Master.md)**. From repo root, in **split integrated terminals**, run **`.\vpe-start-api.ps1`** and global **`ngrok http 4000`** early unless **4000** is already bound (**v1.7.8** — no external windows). After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000**, then **"API is Live"**. Summarize **`VADER_STATION_LOG.md`** when running the full ritual.
+- **Commands:** Never invent `npm run …` scripts—only those in **`package.json`**. **Forge / packaging sequencing:** [`.cursor/docs/core/VPE-BUILD-PROTOCOL.md`](VPE-BUILD-PROTOCOL.md) — e.g. **`vader:sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`vpe:cleanup-dist`**.
+- **API Bootstrap / Start Project:** On **each new Cursor session** or **Start Project**, follow **[`.cursor/prompts/Start-Project.md`](../prompts/Start-Project.md)** (operator paste block + agent steps). Cross-check **[`AGENT-BOOT.md`](AGENT-BOOT.md)** §4 **First actions** and **[`../API-SetUp-Master.md`](../API-SetUp-Master.md)**. From **repo root**, in **split integrated terminals**, run **`.\google-api\vpe-start-api.ps1`** and global **`ngrok http 4000`** early unless **4000** is already bound — no external windows. After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000**, then **"API is Live"**. Summarize **`VADER_STATION_LOG.md`** when running the full ritual.
 - **Hardware telemetry:** WMI / PowerShell CPU temperature in **`vpe-ipc.js`** was **removed in v1.1.6**; **v1.1.7** removed **`cpuTemp`** from IPC and all System Health temperature UI — do not restore without product sign-off (**`VPE-BUILD-PROTOCOL.md`** §2).
 - **Windows default:** Prefer Windows 11 25H2 and repo-documented pipelines (PowerShell, `CI=true` for E2E) unless the user scopes otherwise.
 - **UI completion:** Run the **Master Quality Gate** (§4) before calling UI work done.
@@ -46,7 +48,7 @@ When this skill applies, **always**:
 
 ### 1.1 Process orchestration (PM2 programmatic)
 
-- **Persistent management:** Start/stop/restart managed dev servers via PM2 API owned by **Electron main**; closing the UI does **not** stop processes unless the user stops them (see `TRUTH.md`).
+- **Persistent management:** Start/stop/restart managed dev servers via PM2 API owned by **Electron main**; closing the UI does **not** stop processes unless the user stops them (see [`TRUTH.md`](TRUTH.md)).
 - **State sync:** On startup, reconcile **persisted project rows** with **live PM2** and **health probes** (e.g. boot reconcile, `pm2.list()`-style sync in main—not in renderer).
 - **Zombie prevention:** Use **`tree-kill`** for controlled teardown; complement with **Windows port preflight** (stale listeners) where `project-runner` already implements it.
 
@@ -60,7 +62,7 @@ When this skill applies, **always**:
 
 ### 1.3 Nuke suite
 
-Mandatory sequence (also in `TRUTH.md`):
+Mandatory sequence (also in [`TRUTH.md`](TRUTH.md)):
 
 1. **`tree-kill`** (terminate process tree).
 2. Delete **`node_modules`** and **`.next`**.
@@ -126,7 +128,7 @@ Never delete **`.next`** while **`next dev`** is actively running for that proje
 - **Repair modal:** max **900px**; split diff (add **green**, remove **red**); **Apply** / **Undo** / **Cancel**.
 - **Destructive confirms (Nuke):** **2px** pulsing Vader Red border on confirm surface when specified.
 
-Detail-level UI spec: **`Vader-Project-Engine.md`** v2.1.
+Detail-level UI spec: **[`Vader-Project-Engine.md`](Vader-Project-Engine.md)** v2.1.
 
 ---
 
@@ -168,19 +170,19 @@ Before marking UI **done**:
 
 ## 6. Documentation and repo operations
 
-- **Authority order:** `.cursor/docs/TRUTH.md` → `.cursorrules` → this **SKILL.md** → **`Node-Launcher-PRD.md`** → **`package.json`** for scripts.
-- When changing ports, persistence paths, IPC contracts, or release steps, update **README**, **Checkpoint**, **Custom-Commands**, **VPE-BUILD-PROTOCOL**, or **Stability-Fix-Backlog** as appropriate—keep **Checkpoint** truthful for handoffs.
+- **Authority order:** [`.cursor/docs/core/TRUTH.md`](TRUTH.md) → **`.cursorrules`** → **this file** → [`.cursor/docs/guides/PRD.md`](../guides/PRD.md) → **`package.json`** for scripts.
+- When changing ports, persistence paths, IPC contracts, or release steps, update **README**, **[Checkpoint](../guides/Checkpoint.md)**, **[Custom-Commands](../guides/Custom-Commands.md)**, **[VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md)**, or **[Stability](../guides/Stability.md)** as appropriate—keep **Checkpoint** truthful for handoffs.
 
-### Release-oriented phrases (see `Custom-Commands.md`)
+### Release-oriented phrases (see [Custom-Commands](../guides/Custom-Commands.md))
 
 - **`rebuild exe`:** Icon staging → *(optional **`npm run build:renderer`** for fail-fast export)* → **`npm run rebuild:natives`** → **`npm run lint`** → **`CI=true npm run test:e2e`** → clean **`dist/`** → **`npm run build:main`** ( **`prebuild:main`** = icon + **`build:renderer`** once ) → **`npm run vpe:cleanup-dist`** ( **`scripts/msc-cleanup-dist.cjs`** — root **`dist/`** junk only).
-- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — runs **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**`node scripts/vpe-forge-pause.cjs`** → **snapshot** → **`vpe:check-readiness`** → **`build:win`**). **`npm run vader:force-forge`** runs the same forge tail without **`vader:dev`** (manual escape hatch). Standalone **`vader:dev`** keeps **`--success first`**. Rules: **`.cursor/docs/VPE-BUILD-PROTOCOL.md`**; phrases: **`Custom-Commands.md`**.
-- **`restart app`** / **`start app`:** Stop stray **node/electron** (per **`Custom-Commands`**), then **`npm run dev`**.
+- **`Vader Sync`:** **`npm run vader:sync`** or **`npm run vader:clean-sync`** — runs **`npm run vader:dev -- --success last`** then **`vader:post-dev-forge`** (**`node scripts/vpe-forge-pause.cjs`** → **snapshot** → **`vpe:check-readiness`** → **`build:win`**). **`npm run vader:force-forge`** runs the same forge tail without **`vader:dev`** (manual escape hatch). Standalone **`vader:dev`** keeps **`--success first`**. Rules: **[VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md)**; phrases: **[Custom-Commands](../guides/Custom-Commands.md)**.
+- **`restart app`** / **`start app`:** Stop stray **node/electron** (per **Custom-Commands**), then **`npm run dev`**.
 - **`hardened setup`:** Install, **`rebuild:natives`**, optional Playwright browsers, **`repair:ast`**, E2E, lint.
 
-- **Cursor Playwright MCP:** Global **`playwright`** uses **Chrome** (CI parity with **`npx playwright install chromium`**). Use **`playwright-electron`** with **CDP** `http://127.0.0.1:9222` when **`npm run dev`** has Electron remote debugging enabled—details in **`Custom-Commands.md`**.
+- **Cursor Playwright MCP:** Global **`playwright`** uses **Chrome** (CI parity with **`npx playwright install chromium`**). Use **`playwright-electron`** with **CDP** `http://127.0.0.1:9222` when **`npm run dev`** has Electron remote debugging enabled—details in **Custom-Commands**.
 
-Packaging caveats (summary): **`build.asar: false`** may be set for stability; **`signAndEditExecutable: false`** + **`afterPack`** **`rcedit`** icon embed avoids **winCodeSign** symlink issues on some Windows setups—details in **`Stability-Fix-Backlog.md`**.
+Packaging caveats (summary): **`build.asar: false`** may be set for stability; **`signAndEditExecutable: false`** + **`afterPack`** **`rcedit`** icon embed avoids **winCodeSign** symlink issues on some Windows setups—details in **[Stability](../guides/Stability.md)**.
 
 ---
 
@@ -222,6 +224,36 @@ Align persisted rows and UI with:
   ]
 }
 ```
+
+---
+
+## 8. Cursor hooks (automation)
+
+**Descriptor:** `.cursor/hooks.json` (version **1**).
+
+| Hook | Command | Purpose |
+|------|---------|--------|
+| **`sessionStart`** | `powershell.exe -ExecutionPolicy Bypass -File .cursor/hooks/start-api.ps1` | Prints the **three-pane** ritual (**`npm run dev`**, **`.\google-api\vpe-start-api.ps1`**, **`ngrok http 4000`**). Verifies the starter script exists. **Does not** launch LiteLLM or ngrok automatically. |
+
+Implementation: **`.cursor/hooks/start-api.ps1`**.
+
+---
+
+## 9. Prompts index (`.cursor/prompts/`)
+
+| File | Role |
+|------|------|
+| **Start-Project.md** | Cold session / Golden Ticket — API panes + **`[VPE STANDBY]`** |
+| **Start-Master.md** | Master bootstrap pointer |
+| **Start-Master-Step2.txt** – **Step6.md** | Phased start ritual |
+| **Start-Master-Build.md**, **Start-Master-Build-Fix1.md** | Build / fix flows |
+| **Run.md** | General run instructions |
+| **Functional.md** | Functional test framing |
+| **Goal-Prompt.md**, **Goal-Prompt-v2.md** | Goal-oriented prompts |
+| **Navigation.md** | Nav / IA |
+| **Google-Sitch.md** | Google / API context |
+| **v0-Dev-Prompt.md** | v0 prototype workflow |
+| **DESIGN-Mobile.md**, **DESIGN.md.txt** | Design notes |
 
 ---
 

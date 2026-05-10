@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-page-custom-font -- v1.9.8 explicit Inter/Noto/Poppins head links for VPE + Electron */
+/* eslint-disable @next/next/no-page-custom-font -- v1.9.9 explicit Inter/Noto/Poppins head links for VPE + Electron */
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import './vpe-central-palette.css'
@@ -11,7 +11,7 @@ const vpeCriticalBlockingCss =
 export const metadata: Metadata = {
   title: 'Vader Project Engine',
   description:
-    'Node.js Process Management Dashboard — MSC Media Engine Station Prime v1.9.8',
+    'Node.js Process Management Dashboard — MSC Media Engine Station Prime v1.9.9',
   generator: 'v0.app',
 }
 

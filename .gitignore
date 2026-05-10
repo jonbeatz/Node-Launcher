@@ -61,9 +61,12 @@ src/main/db/vader.sqlite-*
 
 .playwright-mcp/
 
-# Google API workspace (v1.6.1) — keep folder local; only litellm_config.yaml is tracked
+# Google API workspace — tracked: config + launcher scripts; secrets stay local
 google-api/*
 !google-api/litellm_config.yaml
+!google-api/ngrok.exe
+!google-api/vpe-start-api.ps1
+!google-api/README.md
 # Legacy root paths (if old copies remain)
 gcp_key.json
 /litellm_config.yaml

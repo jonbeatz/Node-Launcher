@@ -1,7 +1,7 @@
 # Thumbnail preview / IPC — investigation handoff
 
 **Status:** **[FINALIZED - INSTANT REFRESH ACTIVE]** (v1.7.8). DevTools **`Not allowed to load local resource: file:///…`** from **`http://localhost:3000`** is addressed by serving vault PNGs through the privileged **`vpe-vault:`** custom scheme (`src/main/vpe-vault-protocol.js` + `src/main/vpe-thumbnail-url.js`). Stale renderer caching is addressed by **`?pulse=`** on internal vault URLs plus IPC return payloads (**`vpe:save-settings`** → **`thumbnail_url_for_renderer`**).  
-**Shipped version (code):** root **`package.json`** — **v1.7.8** finalized the **`vpe-vault:`** / **`?pulse=`** pipeline; **current repo semver** may advance (e.g. **1.9.8**) without changing that protocol story.  
+**Shipped version (code):** root **`package.json`** — **v1.7.8** finalized the **`vpe-vault:`** / **`?pulse=`** pipeline; **current repo semver** may advance (e.g. **1.9.9**) without changing that protocol story.  
 **Purpose:** Historical log of attempted fixes; keep for regression context.
 
 ---

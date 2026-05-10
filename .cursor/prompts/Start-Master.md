@@ -10,9 +10,9 @@
 ## 📂 1. CONTEXTUAL MAPPING (GROUNDING)
 Refer to the following workspace files before generating ANY code:
 - **`README.md`**: Master Execution Plan.
-- **`Node-Launcher-PRD.md`**: Core functional requirements (Nuke/Repair/PM2).
+- **`.cursor/docs/guides/PRD.md`**: Core functional requirements (Nuke/Repair/PM2).
 - **`Vader-Project-Engine.md`**: The System UI Specification v2.1.
-- **`.cursorrules` & `SKILL.md`**: Global development laws and quality gates.
+- **`.cursorrules` & `VPE_ENGINE_CAPABILITIES.md`**: Global development laws and quality gates.
 - **`_design_references/v0-Design`**: Source assets to be mapped to the new architecture.
 
 ---

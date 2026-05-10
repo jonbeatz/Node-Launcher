@@ -4,7 +4,7 @@ This master guide consolidates every technical configuration, fix, and daily rou
 
 **What “v1.7.7” means here:** It labels **this API-setup runbook** (global **`ngrok`**, **Cursor** split panes, port **4000**). It is **not** the **Vader Project Engine** desktop app semver — that is always root **`package.json` → `version`**.
 
-**v1.7.7** keeps the stack **self-contained** under `.\google-api\` and scripted via **`.\vpe-start-api.ps1`** (repo root). **`ngrok`** is invoked as a **global** command (**ngrok** on **Windows User PATH**). Optional one-time **`scripts\vpe-add-node-launcher-user-path.ps1`** can add this repo root to **User PATH** for other conveniences. **External pop-out PowerShell/CMD windows are deprecated** — use **Cursor integrated terminal split panes** only (see **Terminal Discipline** in `.cursorrules`).
+**v1.9.9** keeps credentials and config under `.\google-api\` and starts LiteLLM via **`.\google-api\vpe-start-api.ps1`** (from repo root). **`ngrok.exe`** lives in **`google-api\`**; **`ngrok`** is invoked as a **global** command after **`scripts\vpe-add-node-launcher-user-path.ps1`** adds **`google-api`** to **User PATH**. **External pop-out PowerShell/CMD windows are deprecated** — use **Cursor integrated terminal split panes** only (see **Terminal Discipline** in `.cursorrules`).
 
 **Agents — full cold ritual:** [Start-Project.md](../prompts/Start-Project.md) (paste block + **`[VPE STANDBY]`** → **API is Live** → **`VADER_STATION_LOG.md`**).
 
@@ -26,7 +26,7 @@ Cursor does **not** store your Google service account secret. After you restart 
 | Step | What | Notes |
 |:---:|:---|:---|
 | 1 | **Cursor Terminal** | Split panes as needed — **do not** use `Start-Process` / extra OS windows for API or dev servers |
-| 2 | **Pane A (repo root)** | `.\vpe-start-api.ps1` — sets `GOOGLE_APPLICATION_CREDENTIALS`, prints **`ngrok http 4000`**, runs **`litellm --config ./google-api/litellm_config.yaml --port 4000`** in **this** pane |
+| 2 | **Pane A (repo root)** | `.\google-api\vpe-start-api.ps1` — sets `GOOGLE_APPLICATION_CREDENTIALS`, prints **`ngrok http 4000`**, runs **`litellm --config ./litellm_config.yaml --port 4000`** from **`google-api\`** in **this** pane |
 | 3 | **Pane B (any cwd)** | Open a split pane and run **`ngrok http 4000`** globally (after **LiteLLM** is up, or once **4000** is listening) |
 | 4 | **Cursor → Settings → Models** | **Override OpenAI Base URL:** `https://<your-ngrok-host>/v1` (must end with **`/v1`**) · **API Key:** `sk-vader-protocol-1234` |
 
@@ -66,7 +66,7 @@ Follow these revised steps to re-establish the bridge between Cursor, LiteLLM, a
 From the repo root, in an **integrated** terminal pane:
 
 ```powershell
-.\vpe-start-api.ps1
+.\google-api\vpe-start-api.ps1
 ```
 
 **Note:** The script prints **`ngrok http 4000`** for a **second** integrated pane. Confirm this pane shows Uvicorn on **`http://0.0.0.0:4000`**.
@@ -100,7 +100,7 @@ The `gcp_key.json` file is your identity on Google Cloud.
 - **Port Match:** LiteLLM and ngrok both use **`4000`** for this project.
 - **401 Unauthorized:** This means the API Key field in Cursor is empty or incorrect. Re-enter `sk-vader-protocol-1234`.
 - **Session Expiry:** If you restart ngrok and the URL changes, update the "Override URL" in Cursor.
-- **Workspace layout:** Prefer **three panes** — **`npm run dev`**, **`.\vpe-start-api.ps1`** (repo root), **`ngrok http 4000`** (global) — all inside Cursor.
+- **Workspace layout:** Prefer **three panes** — **`npm run dev`**, **`.\google-api\vpe-start-api.ps1`** (repo root), **`ngrok http 4000`** (global) — all inside Cursor.
 
 ---
 
@@ -120,7 +120,7 @@ The `gcp_key.json` file is your identity on Google Cloud.
 ## 🚀 5. Workspace Automation
 
 - **Keyword:** "start API"
-- **Action:** From repo root, **`.\vpe-start-api.ps1`** in one integrated pane; in another, **`ngrok http 4000`** globally (or the manual fallback above).
+- **Action:** From repo root, **`.\google-api\vpe-start-api.ps1`** in one integrated pane; in another, **`ngrok http 4000`** globally (or the manual fallback above).
 
 ---
 

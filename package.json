@@ -1,7 +1,7 @@
 {
   "name": "vader-project-engine",
-  "version": "1.9.8",
-  "description": "Vader Project Engine — Station Prime (v1.9.8)",
+  "version": "1.9.9",
+  "description": "Vader Project Engine — Station Prime (v1.9.9)",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {

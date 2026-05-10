@@ -2,11 +2,11 @@
 
 This file tracks shorthand commands you want me to execute in this repo.
 
-**Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [.cursor/docs/VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md).
+**Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [`.cursor/docs/core/VPE-BUILD-PROTOCOL.md`](../core/VPE-BUILD-PROTOCOL.md).
 
-**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Shipped semver:** root **`package.json`** (currently **`1.9.8`**) is authoritative for preload/footer/UI labels; it may advance in **patch** while the git branch name stays on an older line until you cut a new **`VPE-v1.{minor}.x-Dev`**. **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (example next line after **`VPE-v1.6.x-Dev`**: **`VPE-v1.7.x-Dev`**). Keep **`package.json` `version`** aligned with the branch line’s **minor** when you open a new line (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.9.8](Checkpoint.md), [Checkpoint — Build v1.6.0](Checkpoint.md)).
+**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Shipped semver:** root **`package.json`** (currently **`1.9.9`**) is authoritative for preload/footer/UI labels; it may advance in **patch** while the git branch name stays on an older line until you cut a new **`VPE-v1.{minor}.x-Dev`**. **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (example next line after **`VPE-v1.6.x-Dev`**: **`VPE-v1.7.x-Dev`**). Keep **`package.json` `version`** aligned with the branch line’s **minor** when you open a new line (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.9.9](Checkpoint.md), [Checkpoint — Build v1.6.0](Checkpoint.md)).
 
-**Solved problems (symptoms → fixes):** [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
+**Solved problems (symptoms → fixes):** [Stability](Stability.md).
 
 ## Update Docs
 
@@ -20,19 +20,19 @@ Use **Update Docs** (or **update docs**, **sync documentation**) when you want a
 
 1. **Version source of truth** — Read root **`package.json` → `"version"`** (and **`description"`** if it carries the build label). That string drives preload, footer copy, and doc headers.
 2. **Enforcement rules** — Update [`.cursorrules`](../../.cursorrules): **Current Version**, footer signature line, and any UI bullets that changed (TopBar, sidebar, log drawer, purge/LED, forge scripts).
-3. **Agent skill** — Update [`SKILL.md`](../../SKILL.md): design/footer guardrails, **`Vader Sync` / `vader:force-forge`** wording, and any version examples to match **`package.json`**.
-4. **Cold-start index** — Update [AGENT-BOOT-CHECKLIST.md](AGENT-BOOT-CHECKLIST.md): **Session verification** version tick, **Quick mental model** table if ports/LED/forge behavior shifted.
-5. **Build protocol** — Update [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md): document title version, master table if **`package.json`** scripts changed, **§4 In-app tooling** for UI/IPC (purge, Net LED, logs, **`vader:clean-sync`** vs **`vader:sync`**). **Hardware telemetry** is **removed** (**v1.1.7+** scrubs **`cpuTemp`** from IPC/UI).
+3. **Agent capabilities** — Update [`.cursor/docs/core/VPE_ENGINE_CAPABILITIES.md`](../core/VPE_ENGINE_CAPABILITIES.md): design/footer guardrails, **`Vader Sync` / `vader:force-forge`** wording, and any version examples to match **`package.json`**.
+4. **Cold-start index** — Update [AGENT-BOOT.md](../core/AGENT-BOOT.md): **Session verification** version tick, **Quick mental model** table if ports/LED/forge behavior shifted.
+5. **Build protocol** — Update [VPE-BUILD-PROTOCOL.md](../core/VPE-BUILD-PROTOCOL.md): document title version, master table if **`package.json`** scripts changed, **§4 In-app tooling** for UI/IPC (purge, Net LED, logs, **`vader:clean-sync`** vs **`vader:sync`**). **Hardware telemetry** is **removed** (**v1.1.7+** scrubs **`cpuTemp`** from IPC/UI).
 6. **This file** — Refresh [Custom-Commands.md](Custom-Commands.md): **Active branch** line (Checkpoint link), **Full protocol** parenthetical version, and any command tables that reference new scripts.
 7. **Checkpoint** — Update [Checkpoint.md](Checkpoint.md): add or extend a **Build vX.Y.Z** section for the release; fix downstream lines that still say an older “current” version.
-8. **Cross-links** — Align [README.md](../../README.md) (packaging line, **[Actions workflow badge](../../README.md)** when CI visibility shipped), [START-HERE.md](START-HERE.md), [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) protocol version string, and [TRUTH.md](TRUTH.md) only if architecture facts changed (do not churn TRUTH for pure marketing bumps).
+8. **Cross-links** — Align [README.md](../../README.md) (packaging line, **[Actions workflow badge](../../README.md)** when CI visibility shipped), [START-HERE.md](START-HERE.md), [Stability.md](Stability.md) protocol version string, and [TRUTH.md](../core/TRUTH.md) only if architecture facts changed (do not churn TRUTH for pure marketing bumps).
 9. **Shipped UI strings** — If the user-facing version label changed: [`src/preload/preload.js`](../../src/preload/preload.js) **`vpeInfo.version`**, [`src/renderer/app/layout.tsx`](../../src/renderer/app/layout.tsx) **`metadata.description`**, and [`src/renderer/components/footer.tsx`](../../src/renderer/components/footer.tsx) fallback to match **`package.json`**.
 10. **Drift sweep** — `rg` (or editor search) for the **previous** patch version and fix stragglers (e.g. **`1.5.0`** / **`v1.5.0`** after **`1.5.1`**).
 11. **Optional** — If **`layout.tsx`** / preload changed: **`npm run lint`** and **`npm run build:renderer`** from repo root.
 
 ### Rules
 
-- **Authority order** stays: [TRUTH.md](TRUTH.md) → **`.cursorrules`** → **`SKILL.md`** → PRD → **`package.json`** scripts. Docs describe reality; they do not invent npm scripts.
+- **Authority order** stays: [TRUTH.md](../core/TRUTH.md) → **`.cursorrules`** → **`VPE_ENGINE_CAPABILITIES.md`** → PRD → **`package.json`** scripts. Docs describe reality; they do not invent npm scripts.
 - **One version story:** every “current build” mention should match **`package.json`** unless explicitly labeled historical (archive bullets in Checkpoint).
 
 ## rebuild exe
@@ -82,11 +82,11 @@ Run **in order**, unless you explicitly ask to skip a gate (e.g. skip E2E):
 
 ### Notes
 
-- **Custom `.exe` icon:** With **`build.win.signAndEditExecutable: false`** (avoids winCodeSign symlink failures on some Windows setups), **`npm run build:main`** runs **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) + **`rcedit`** to embed **`media/icon.ico`** (legacy **`build/icon.ico`** if missing) into the main executable. See [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
+- **Custom `.exe` icon:** With **`build.win.signAndEditExecutable: false`** (avoids winCodeSign symlink failures on some Windows setups), **`npm run build:main`** runs **`build.afterPack`** → [`scripts/msc-after-pack-embed-icon.cjs`](../../scripts/msc-after-pack-embed-icon.cjs) + **`rcedit`** to embed **`media/icon.ico`** (legacy **`build/icon.ico`** if missing) into the main executable. See [Stability](Stability.md).
 - **`src/renderer/out/`** is **gitignored**; **`npm run build:main`** / **`npm run build:win`** always triggers **`prebuild:main`** (icon + **`build:renderer`**). **`npm run build`** is an alias that runs **`build:main` only**, so Next is not built twice unless you separately run **`build:renderer`** and then **`build:main`**.
 - Electron **`asar`** is **`true`** in **`package.json`** (archive app payload). Keep **`npmRebuild`** at **`false`** for faster packs when natives are already aligned via **`npm run rebuild:natives`**.
 - For a lighter loop (no installer, no E2E), use **restart app**, **start app**, or **hardened setup** instead.
-- **Smoke (unpacked):** after a build, **`dist\win-unpacked\Vader Project Engine.exe`** is the fastest way to validate static UI + main-process IPC; open DevTools and confirm **`vpe:get-system-stats`** completes without clone/module errors (see [Stability-Fix-Backlog](Stability-Fix-Backlog.md) telemetry entries).
+- **Smoke (unpacked):** after a build, **`dist\win-unpacked\Vader Project Engine.exe`** is the fastest way to validate static UI + main-process IPC; open DevTools and confirm **`vpe:get-system-stats`** completes without clone/module errors (see [Stability](Stability.md) telemetry entries).
 
 ## start app
 
@@ -122,7 +122,7 @@ Embedded **Log Drawer** slash commands (**`vpe:execute-terminal-command`**) stay
 
 Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), then the same **`vader:post-dev-forge`** tail (**`vpe-forge-pause`** → snapshot → syntax guard → **`build:win`** → **`vpe:cleanup-dist`**). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **`post-dev-forge`** until **all** dev children have exited. **`npm run vader:clean-sync`** runs **`vpe-clean-sync.cjs`** (PM2 optional, **`dist/`** delete, settle) **then** **`vader:dev`** — interactive only (**v1.9.7+**); no automatic forge. **`npm run vader:deploy`** runs **`vader:clean-sync`** and, after you close dev, **`build:win`** (no snapshot/syntax/cleanup-dist — use **`vader:sync`** for the full gate). If the syntax guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) — **v1.2.3** catalog **`install && dev`** (§2 managed dev); forge chain keyed to **`vader:sync`** / **`vader:deploy`** / **`vader:clean-sync`** / **`&&`** / **`VPE_LAUNCHER_FORGE`** / **`vpe-forge-pause`** (**v1.1.8** baseline).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](../core/VPE-BUILD-PROTOCOL.md) — **v1.2.3** catalog **`install && dev`** (§2 managed dev); forge chain keyed to **`vader:sync`** / **`vader:deploy`** / **`vader:clean-sync`** / **`&&`** / **`VPE_LAUNCHER_FORGE`** / **`vpe-forge-pause`** (**v1.1.8** baseline).
 
 ### How **`vader:sync`** works
 
@@ -317,7 +317,7 @@ Run from PowerShell:
    - **CDP / Electron** (optional, for **`playwright-electron`**): run **`npm run dev`**, then `Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9222/json/version` — expect JSON; failures mean Electron is not up with **`--remote-debugging-port=9222`**. Same flow as [**Playwright MCP (aligned)**](#playwright-mcp-aligned-with-vpe) above.
 
 # Custom Command Shortcuts
-- **Start Project** (or **start project**, **cold session**, **new chat bootstrap**): Follow **[`Start-Project.md`](../prompts/Start-Project.md)** — load **START-HERE** + **AGENT-BOOT-CHECKLIST** concisely, run **`.\vpe-start-api.ps1`** + global **`ngrok http 4000`** in **split Cursor integrated terminals** (**v1.7.7** = LiteLLM/ngrok *runbook* revision, not VPE **`package.json`** semver), confirm **`[VPE STANDBY]`** + **Uvicorn** on **4000** (**API is Live**), summarize **`VADER_STATION_LOG.md`**, close with *ready for VPE-Dev; standing by*.
-- **New agent session / project setup:** Same as **Start Project** when the operator expects full context; otherwise proactively run **`.\vpe-start-api.ps1`** at **repo root** (and global **`ngrok http 4000`** in another pane) after **`AGENT-BOOT-CHECKLIST.md`** §4 **First actions**. See **`START-HERE.md`**.
-- If the user says "start API" (or any variation like "start server" or "run litellm"), use **Cursor integrated terminal panes**: run **`.\vpe-start-api.ps1`** from **repo root** in one pane (sets **`GOOGLE_APPLICATION_CREDENTIALS`** to **`.\google-api\gcp_key.json`**, prints **`ngrok http 4000`**, starts **LiteLLM** on **4000**), and **`ngrok http 4000`** globally in **another** pane — **no** external PowerShell windows (**v1.7.7** integrated-terminal discipline for this stack). Manual fallback (same port): `$env:GOOGLE_APPLICATION_CREDENTIALS=".\google-api\gcp_key.json"` then `litellm --config ./google-api/litellm_config.yaml --port 4000`, plus **`ngrok http 4000`** in a second integrated terminal.
+- **Start Project** (or **start project**, **cold session**, **new chat bootstrap**): Follow **[`Start-Project.md`](../prompts/Start-Project.md)** — load **START-HERE** + **AGENT-BOOT** concisely, run **`.\google-api\vpe-start-api.ps1`** + global **`ngrok http 4000`** in **split Cursor integrated terminals** (**v1.7.7** = LiteLLM/ngrok *runbook* revision, not VPE **`package.json`** semver), confirm **`[VPE STANDBY]`** + **Uvicorn** on **4000** (**API is Live**), summarize **`VADER_STATION_LOG.md`**, close with *ready for VPE-Dev; standing by*.
+- **New agent session / project setup:** Same as **Start Project** when the operator expects full context; otherwise proactively run **`.\google-api\vpe-start-api.ps1`** at **repo root** (and global **`ngrok http 4000`** in another pane) after **`AGENT-BOOT.md`** §4 **First actions**. See **`START-HERE.md`**.
+- If the user says "start API" (or any variation like "start server" or "run litellm"), use **Cursor integrated terminal panes**: run **`.\google-api\vpe-start-api.ps1`** from **repo root** in one pane (sets **`GOOGLE_APPLICATION_CREDENTIALS`** to **`.\google-api\gcp_key.json`**, prints **`ngrok http 4000`**, starts **LiteLLM** on **4000**), and **`ngrok http 4000`** globally in **another** pane — **no** external PowerShell windows (**v1.7.7** integrated-terminal discipline for this stack). Manual fallback from **`google-api\`**: `$env:GOOGLE_APPLICATION_CREDENTIALS=".\gcp_key.json"`; `Set-Location .\google-api`; `litellm --config ./litellm_config.yaml --port 4000`, plus **`ngrok http 4000`** in a second integrated terminal.
 

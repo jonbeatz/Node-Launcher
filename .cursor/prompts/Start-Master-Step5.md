@@ -8,9 +8,9 @@
 ## 🛰️ 1. OPERATIONAL CONTEXT
 Initialize the session by reading the following 'Truth' files:
 - **`.cursorrules`**: Global Law & Security protocols.
-- **`SKILL.md`**: Agent identity & quality gates.
+- **`.cursor/docs/core/VPE_ENGINE_CAPABILITIES.md`**: Agent identity & quality gates.
 - **`Vader-Project-Engine.md`**: Studio Dark / Vader Protocol UI Specs.
-- **`Node-Launcher-PRD.md`**: Core Engine functional requirements.
+- **`.cursor/docs/guides/PRD.md`**: Core Engine functional requirements.
 
 ---
 
