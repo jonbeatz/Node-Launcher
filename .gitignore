@@ -53,8 +53,19 @@ Thumbs.db
 *.pid
 
 # intentional repo content (keep tracked)
-# - media/: launcher thumbnails etc.
+# - media/icon.ico, media/_vpe_archive/ (if present), vault placeholders (.gitkeep, .vpe_keep) only
+# - Project vault *blobs* (wallpapers, _vpe_thumb.png, vpe-version.lock) are local runtime — ignore below
 # - _design_references/: layout / UI reference snapshots
+
+# Portable dev profile: SQLite + full Chromium userData (Code Cache, Session Storage, …). Never commit.
+vpe-local-data/
+
+# Per-machine vault assets (app writes these; reconcile with npm run vault:reconcile-msc if needed)
+media/vault/**/*.jpg
+media/vault/**/*.jpeg
+media/vault/**/*.png
+media/vault/**/*.webp
+media/vault/vpe-version.lock
 src/main/db/vader-engine.json
 src/main/db/vader.sqlite
 src/main/db/vader.sqlite-*
