@@ -30,7 +30,7 @@ interface ContextMenuProps {
   onOpenExplorer?: () => void
   /** Opens the project media vault folder via `vpe:vault-open-folder` (shell). */
   onOpenVaultFolderInExplorer?: () => void
-  onOpenVSCode?: () => void
+  onOpenCursor?: () => void
   onOpenTerminal?: () => void
   onRecaptureThumbnail?: () => void
   onRunBuild?: () => void
@@ -46,7 +46,7 @@ export function ContextMenu({
   onClose,
   onOpenExplorer,
   onOpenVaultFolderInExplorer,
-  onOpenVSCode,
+  onOpenCursor,
   onOpenTerminal,
   onRecaptureThumbnail,
   onRunBuild,
@@ -91,7 +91,7 @@ export function ContextMenu({
       icon: <Folder size={14} />,
       action: onOpenVaultFolderInExplorer,
     },
-    { label: 'Open in VS Code', icon: <Code2 size={14} />, action: onOpenVSCode },
+    { label: 'Open in Cursor', icon: <Code2 size={14} />, action: onOpenCursor },
     { label: 'Open in Terminal', icon: <Terminal size={14} />, action: onOpenTerminal },
     { divider: true, label: '' },
     { label: 'Update Project Thumbnail', icon: <Camera size={14} />, action: onRecaptureThumbnail },

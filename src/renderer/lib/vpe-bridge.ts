@@ -190,6 +190,8 @@ export interface VpeAppSettings {
   /** v1.8.5 — inclusive managed-port window hint (persisted). */
   port_range_start?: number
   port_range_end?: number
+  /** v2.1.x — write portable DB snapshot under `process.cwd()/vpe-backups` on app quit. */
+  auto_sync_db_on_close?: boolean
 }
 
 export interface VpeApi {
@@ -327,9 +329,18 @@ export interface VpeApi {
     scriptName?: string
   }>
   takeStateSnapshot?: () => Promise<{ ok: boolean; path?: string; error?: string }>
+  /** Portable vault: copy active catalog DB into `vpe-backups` under repo / portable root. */
+  backupLocalDb?: () => Promise<{ ok: boolean; path?: string; error?: string }>
+  /** Manual registry order: swap `sort_order` with neighbor, optional portable auto-sync. */
+  reorderProject?: (
+    projectId: string,
+    direction: 'up' | 'down',
+  ) => Promise<{ ok: boolean; error?: string }>
   restoreStateSnapshot?: () => Promise<{ ok: boolean; error?: string }>
   executeTerminalCommand?: (command: string, activeProjectId?: string) => Promise<{ ok: boolean; output: string }>
   openExplorer?: (folderPath: string) => Promise<{ ok: boolean; error?: string }>
+  /** Windows: spawn Cursor with project folder as argv. */
+  openCursor?: (projectPath: string) => Promise<{ ok: boolean; error?: string }>
   openShell?: (path: string, type: 'powershell' | 'cmd') => Promise<{ ok: boolean; error?: string }>
   killProcessOnPort?: (port: number) => Promise<{ ok: boolean; message: string }>
   setProjectFavorite?: (projectId: string, isFavorite: boolean) => Promise<{ ok: boolean }>

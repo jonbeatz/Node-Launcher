@@ -4,6 +4,22 @@
 
 ---
 
+## v2.1.x (dev) — Cinema dashboard scale, status strip parity, grid gaps
+
+**Renderer — Cinema (`Msc_ProjectCard.tsx`, non-compact):** Cards use **`w-full min-w-0`** so each cell fills the grid track (no max-width cap). Thumbnails stay **`aspect-[4/3]`**. Body padding and title row match the pre–density-experiment layout (**`p-4` / `px-4 pt-3 pb-2`**, **`text-base`** title, **`h-7`** favorite/settings/trash tiles). Primary action row uses **`h-7`**, **`px-4`**, **`gap-2`**; **LOGS** width tracks three **`1.75rem`** tiles via **`msc_logsStripWidthCinema`**.
+
+**Fixed status strip:** **`MSC_STATUS_BAR_HEIGHT` (`h-6`)** is always rendered. **Idle (stopped, no error/build):** muted **`READY`** (**`text-[#888888]/30`**) reserves the line. **Live + HTTP + collapsed:** **`● LIVE - {port}`** + **Activity** toggle (**`h-6 w-6`**, vertically centered). Other states (**ERROR**, **BUILDING**, running without HTTP, HTTP expanded placeholder) stay inside the same height so card rhythm does not jump when toggling run state.
+
+**Grid (`ProjectGrid.tsx` + `globals.css`):** **`items-start`** on the motion wrapper. Spacing is defined on the grid classes again: **`.vpe-grid-cinema`** **`gap: 1.25rem`**, four responsive columns; **`.vpe-grid-compact`** **`gap: 0.75rem`**, **`minmax(250px, 1fr)`** auto-fill.
+
+**Compact:** Primary **START** / **STOP** share **`box-border`**, **`min-h-7` / `max-h-7` / `h-7`**, and a **`border-transparent` / `border-[#…]`** pattern so solid and outline variants share the same vertical footprint; **Open** and **LOGS** use the same height lock.
+
+**Main / SQLite:** **`user_version` 15** — projects **`sort_order`**, settings **`auto_sync_db_on_close`** (optional **`vpe-backups`** write on quit when enabled in App Settings). See **`persistent-store.js`**, **`app-settings-modal.tsx`**, migrations in **`test/verify-migrations.js`**.
+
+**`[VPE STANDBY]`** unchanged.
+
+---
+
 ## Session handoff — 2026-05-09 (pause)
 
 **Git:** Work continues on **`VPE-v2.1.x-Dev`** (pushed; same tip as **`VPE-v2.0.x-Dev`** through **`017524d`** — v2.1.0 vault/Iron Curtain/docs).

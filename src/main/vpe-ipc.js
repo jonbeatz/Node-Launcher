@@ -133,6 +133,17 @@ function msc_summarizeAppSettingsChanges(before, after, patch) {
       `Port Range set to ${Number(after.port_range_start)}-${Number(after.port_range_end)}.`,
     );
   }
+  if (
+    keys.includes('auto_sync_db_on_close') &&
+    Boolean(before.auto_sync_db_on_close === true || before.auto_sync_db_on_close === 1) !==
+      Boolean(after.auto_sync_db_on_close === true || after.auto_sync_db_on_close === 1)
+  ) {
+    parts.push(
+      after.auto_sync_db_on_close === true || after.auto_sync_db_on_close === 1
+        ? 'Auto-sync DB on close enabled.'
+        : 'Auto-sync DB on close disabled.',
+    );
+  }
   if (!parts.length) return 'No field changes (values already matched)';
   return PREFIX + parts.join(' ');
 }

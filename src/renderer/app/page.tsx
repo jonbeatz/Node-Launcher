@@ -1205,7 +1205,24 @@ function DashboardContent() {
               addToast('Vault folder', 'error', msc_formatUnknownIPCError(err))
             }
           }}
-          onOpenVSCode={() => addToast('Opening VS Code...', 'info')}
+          onOpenCursor={async () => {
+            const project = projects.find((p) => p.id === contextMenu.projectId)
+            if (!project?.path?.trim()) {
+              addToast('Open in Cursor', 'warning', 'No project path.')
+              return
+            }
+            const api = getVpeApi()
+            if (!api?.openCursor) {
+              addToast('Open in Cursor', 'warning', 'Run the VPE desktop app to open Cursor.')
+              return
+            }
+            try {
+              const res = await api.openCursor(project.path)
+              if (!res.ok) addToast('Cursor failed', 'error', res.error ?? 'Unknown error')
+            } catch (err: unknown) {
+              addToast('Cursor failed', 'error', msc_formatUnknownIPCError(err))
+            }
+          }}
           onOpenTerminal={async () => {
             const project = projects.find(p => p.id === contextMenu.projectId)
             if (project?.path) {

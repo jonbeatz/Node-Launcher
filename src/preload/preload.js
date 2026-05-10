@@ -116,6 +116,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     }
   },
   openExplorer: (folderPath) => msc_invoke('vpe:open-explorer', folderPath),
+  openCursor: (projectPath) => msc_invoke('vpe:open-cursor', projectPath),
   openShell: (path, type) => msc_invoke('vpe:open-shell', { path, type }),
   killProcessOnPort: (port) => msc_invoke('vpe:kill-process-on-port', port),
   setProjectFavorite: (projectId, isFavorite) =>
@@ -127,6 +128,9 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   scorchedEarth: () => msc_invoke('vpe:scorched-earth'),
   purgeUnusedMedia: () => msc_invoke('vpe:purge-unused-media'),
   generateSupportBundle: () => msc_invoke('vpe:generate-support-bundle'),
+  backupLocalDb: () => msc_invoke('vpe:backup-local-db'),
+  reorderProject: (projectId, direction) =>
+    msc_invoke('vpe:reorder-project', { projectId, direction }),
   runForgeDiagnostics: () => msc_invoke('vpe:run-diagnostics'),
   promptVaultRead: () => msc_invoke('vpe:prompt-vault-read'),
   promptVaultWrite: (data) => msc_invoke('vpe:prompt-vault-write', data),

@@ -138,12 +138,13 @@ export function ProjectListView({
   }
 
   const sortedProjects = [...projects].sort((a, b) => {
-    let aVal = a[sortField]
-    let bVal = b[sortField]
-    
+    const key = sortField
+    let aVal = a[key]
+    let bVal = b[key]
+
     if (typeof aVal === 'string') aVal = aVal.toLowerCase()
     if (typeof bVal === 'string') bVal = bVal.toLowerCase()
-    
+
     if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
     if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
     return 0
@@ -151,9 +152,11 @@ export function ProjectListView({
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null
-    return sortDirection === 'asc' ? 
-      <ChevronUp size={12} className="text-[#4fde82]" /> : 
+    return sortDirection === 'asc' ? (
+      <ChevronUp size={12} className="text-[#4fde82]" />
+    ) : (
       <ChevronDown size={12} className="text-[#4fde82]" />
+    )
   }
 
   const allSelected = projects.length > 0 && selectedIds.length === projects.length
@@ -276,7 +279,8 @@ export function ProjectListView({
                   onMouseEnter={() => setHoveredProject(project.id)}
                   onMouseLeave={() => setHoveredProject(null)}
                   onClick={(e) => {
-                    if ((e.target as HTMLElement).closest('input,button')) return
+                    if ((e.target as HTMLElement).closest('input,button,a,[role="button"]'))
+                      return
                     onProjectRowFocus?.(project.id, project.name)
                   }}
                   className={`

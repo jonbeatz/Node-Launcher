@@ -60,6 +60,9 @@ Thumbs.db
 # Portable dev profile: SQLite + full Chromium userData (Code Cache, Session Storage, …). Never commit.
 vpe-local-data/
 
+# Portable catalog snapshots (`vpe:backup-local-db` / auto-sync on close). Never commit.
+vpe-backups/
+
 # Per-machine vault assets (app writes these; reconcile with npm run vault:reconcile-msc if needed)
 media/vault/**/*.jpg
 media/vault/**/*.jpeg

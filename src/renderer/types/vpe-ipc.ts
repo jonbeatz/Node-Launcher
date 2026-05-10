@@ -43,6 +43,8 @@ export interface VpeProjectRow {
   vault_has_files?: boolean
   /** SQLite v13+ — 0/1 in DB; treat via `msc_rowHasDocumentationEnabled` for UI. */
   has_documentation?: VpeHasDocumentation
+  /** SQLite v14+ — dashboard manual order (lower first). */
+  sort_order?: number | null
   node_modules_missing?: boolean
   /** ISO timestamps from `fs.statSync` on project `path` (main enrich). */
   project_folder_created_at?: string | null
@@ -80,6 +82,8 @@ export interface Project {
   vault_has_files?: boolean
   /** Registry (SQLite v13+); paperclip requires enabled + vault reference files. */
   has_documentation?: VpeHasDocumentation
+  /** Registry (SQLite v14+); manual dashboard order. */
+  sort_order?: number | null
   project_folder_created_at?: string | null
   project_folder_modified_at?: string | null
   dev_session_started_at?: string | null

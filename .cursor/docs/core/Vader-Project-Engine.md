@@ -39,7 +39,7 @@
 ---
 
 ## 📊 Dashboard Project Grid
-*   **Grid System**: Responsive grid using `repeat(auto-fill, minmax(320px, 1fr))` with a 20px gap.
+*   **Grid System**: Spec baseline remains `repeat(auto-fill, minmax(320px, 1fr))` with ~20px gap. **Implementation (v2.1.x):** **Cinema** — **`.vpe-grid-cinema`** in **`globals.css`**: `grid-template-columns: repeat(4, minmax(0, 1fr))` (2 cols ≤1280px, 1 col ≤560px), **`gap: 1.25rem`**, wrapper **`items-start`**. **Compact** — **`.vpe-grid-compact`**: `repeat(auto-fill, minmax(250px, 1fr))`, **`gap: 0.75rem`**. See **`ProjectGrid.tsx`**.
 *   **Project Cards**:
     *   **Visuals**: 4:3 WebP thumbnail at top, border-radius top only, border-bottom 1px `#333`.
     *   **Telemetry**: Project name (bold, `#FFF`), pulsing status LED (8px circle, `#e02b20` pulse), port, and uptime indicators.

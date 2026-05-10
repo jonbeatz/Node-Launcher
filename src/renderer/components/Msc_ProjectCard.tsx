@@ -1,7 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, type MouseEvent } from 'react'
-import { motion } from 'framer-motion'
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  forwardRef,
+  type MouseEvent,
+} from 'react'
+import { motion, type HTMLMotionProps } from 'framer-motion'
 import {
   Play,
   Square,
@@ -15,10 +22,12 @@ import {
   Loader2,
   Paperclip,
   ChevronDown,
+  ChevronUp,
   Copy,
+  Activity,
 } from 'lucide-react'
 
-import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
+import { getVpeApi, type VpeShieldProjectType } from '@/lib/vpe-bridge'
 import { msc_shieldColorHex, msc_shieldTypeTitle } from '@/lib/shield-colors'
 import { useToast } from '@/components/vader-toast'
 import { VpeHealthEqualizerIcon } from '@/components/vpe-health-equalizer-icon'
@@ -97,6 +106,11 @@ function ProjectMetaAccordion({
     healthLabel: string | null
     healthCls: string | null
     uptimeLabel: string
+    port?: number
+    /** HTTP 2xx — enables collapsible “green connection” strip in compact accordion. */
+    isHttpConnected?: boolean
+    isConnectionExpanded?: boolean
+    onToggleConnectionExpanded?: (e: React.MouseEvent) => void
   } | null
 }) {
   const { addToast } = useToast()
@@ -127,7 +141,11 @@ function ProjectMetaAccordion({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-center gap-1 bg-[#121212] py-1 text-[10px] uppercase tracking-wide text-[#888888] transition-colors hover:text-white vader-focus"
+        className={`flex w-full items-center justify-center gap-1 bg-[#121212] py-1 text-[10px] uppercase tracking-wide transition-colors vader-focus ${
+          isCompact
+            ? 'text-[#888888] hover:text-white'
+            : 'text-[#eaeaea] hover:text-[#4fde82]'
+        }`}
         aria-expanded={open}
         title={open ? 'Hide project details' : 'Show project details'}
       >
@@ -144,30 +162,111 @@ function ProjectMetaAccordion({
       >
         <div className={`space-y-2 bg-[#121212] ${pad} pb-3 pt-2 text-[#A0A0A0]`}>
           {isCompact && runningStrip && (
-            <div className="rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2 py-1.5">
-              <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                Started on
-              </span>
-              <span
-                className="block truncate text-[12px] leading-tight text-[#7dcea0]/95"
-                title={runningStrip.runUrl}
-              >
-                {runningStrip.runUrl}
-              </span>
-              {runningStrip.healthLabel && (
-                <span
-                  className={`mt-0.5 block text-[11px] leading-snug ${runningStrip.healthCls ?? 'text-[#4fde82]'}`}
-                >
-                  {runningStrip.healthLabel}
-                </span>
+            <>
+              {runningStrip.isHttpConnected &&
+              runningStrip.onToggleConnectionExpanded &&
+              runningStrip.isConnectionExpanded === false ? (
+                <div className="flex min-h-6 items-center justify-between gap-2 rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2 py-0.5">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span
+                      className="size-1.5 shrink-0 rounded-full bg-[#4fde82] shadow-[0_0_6px_rgba(74,222,128,0.45)]"
+                      aria-hidden
+                    />
+                    <span className="truncate text-[10px] font-semibold uppercase tracking-[0.06em] text-[#7dcea0]/95">
+                      LIVE — {runningStrip.port ?? '—'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      runningStrip.onToggleConnectionExpanded?.(e)
+                    }}
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/25 bg-[#121212]/90 text-white transition-colors hover:border-[#4fde82] hover:bg-[#1a2620] hover:text-[#4fde82] vader-focus"
+                    title="Show connection details"
+                    aria-expanded={false}
+                    aria-label="Expand connection details"
+                  >
+                    <Activity size={13} strokeWidth={2} className="text-white" />
+                  </button>
+                </div>
+              ) : (
+                <div className="rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2 py-2">
+                  {runningStrip.isHttpConnected && runningStrip.onToggleConnectionExpanded ? (
+                    <>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1 pt-0">
+                          <span className="mt-0 mb-0.5 block text-[9px] uppercase leading-none tracking-[0.12em] text-[#5c6b62]">
+                            Started on
+                          </span>
+                          <span
+                            className="block truncate text-[12px] leading-tight text-[#7dcea0]/95"
+                            title={runningStrip.runUrl}
+                          >
+                            {runningStrip.runUrl}
+                          </span>
+                          {runningStrip.healthLabel && (
+                            <span
+                              className={`mt-0.5 block text-[11px] leading-snug ${runningStrip.healthCls ?? 'text-[#4fde82]'}`}
+                            >
+                              {runningStrip.healthLabel}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            runningStrip.onToggleConnectionExpanded?.(e)
+                          }}
+                          className="mt-0 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/25 bg-[#121212]/90 text-white transition-colors hover:border-[#4fde82] hover:bg-[#1a2620] hover:text-[#4fde82] vader-focus"
+                          title="Hide connection details"
+                          aria-expanded
+                          aria-label="Collapse connection details"
+                        >
+                          <ChevronUp size={13} strokeWidth={2.5} className="text-white" />
+                        </button>
+                      </div>
+                      <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
+                        <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                          Uptime
+                        </span>
+                        <span className="tabular-nums text-[12px] text-[#7dcea0]/95">
+                          {runningStrip.uptimeLabel}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                        Started on
+                      </span>
+                      <span
+                        className="block truncate text-[12px] leading-tight text-[#7dcea0]/95"
+                        title={runningStrip.runUrl}
+                      >
+                        {runningStrip.runUrl}
+                      </span>
+                      {runningStrip.healthLabel && (
+                        <span
+                          className={`mt-0.5 block text-[11px] leading-snug ${runningStrip.healthCls ?? 'text-[#4fde82]'}`}
+                        >
+                          {runningStrip.healthLabel}
+                        </span>
+                      )}
+                      <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
+                        <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                          Uptime
+                        </span>
+                        <span className="tabular-nums text-[12px] text-[#7dcea0]/95">
+                          {runningStrip.uptimeLabel}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
-              <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
-                <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                  Uptime
-                </span>
-                <span className="tabular-nums text-[12px] text-[#7dcea0]/95">{runningStrip.uptimeLabel}</span>
-              </div>
-            </div>
+            </>
           )}
           <div>
             <span className={`mb-0.5 block uppercase tracking-wider text-[#555555] ${labelCls}`}>
@@ -214,7 +313,8 @@ function ProjectMetaAccordion({
   )
 }
 
-interface Msc_ProjectCardProps {
+interface Msc_ProjectCardOwnProps {
+  id: string
   name: string
   port: number
   status: 'running' | 'stopped' | 'error' | 'building'
@@ -260,43 +360,85 @@ interface Msc_ProjectCardProps {
   devSessionStartedAt?: string | null
 }
 
-export function Msc_ProjectCard({
-  name,
-  port,
-  status,
-  errorMessage,
-  thumbnailUrl,
-  hasBuilt = true,
-  node_modules_missing,
-  isFavorite,
-  onInstallAndStart,
-  onToggleFavorite,
-  onStart,
-  onStop,
-  onBuild,
-  onLogs,
-  onSettings,
-  onUnregister,
-  onContextMenu,
-  onOpenInBrowser,
-  health_http_code,
-  health_checked_at,
-  health_reachable,
-  onViewErrorConsole,
-  devInstallInProgress,
-  shieldProjectType,
-  vaultHasReferenceFiles = false,
-  isCompact = false,
-  projectPath = '',
-  project_folder_created_at,
-  project_folder_modified_at,
-  onCardInteraction,
-  isSelected = false,
-  devSessionStartedAt = null,
-}: Msc_ProjectCardProps) {
-  const cardShellRef = useRef<HTMLDivElement>(null)
+export type Msc_ProjectCardProps = Msc_ProjectCardOwnProps &
+  Omit<HTMLMotionProps<'div'>, keyof Msc_ProjectCardOwnProps>
+
+const MSC_PROJECT_CARD_LAYOUT_SPRING = {
+  type: 'spring' as const,
+  stiffness: 300,
+  damping: 30,
+  mass: 1,
+}
+
+const MSC_PROJECT_CARD_MOTION_TRANSITION = {
+  layout: MSC_PROJECT_CARD_LAYOUT_SPRING,
+  opacity: { duration: 0.2 },
+  scale: { duration: 0.2 },
+}
+
+/** Cinema: fixed status strip height — idle ↔ live (collapsed/expanded) does not shift card vertical rhythm. */
+const MSC_STATUS_BAR_HEIGHT = 'h-6'
+
+export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
+  function Msc_ProjectCard(props, forwardedRef) {
+  const {
+    id,
+    name,
+    port,
+    status,
+    errorMessage,
+    thumbnailUrl,
+    hasBuilt = true,
+    node_modules_missing,
+    isFavorite,
+    onInstallAndStart,
+    onToggleFavorite,
+    onStart,
+    onStop,
+    onBuild,
+    onLogs,
+    onSettings,
+    onUnregister,
+    onContextMenu,
+    onOpenInBrowser,
+    health_http_code,
+    health_checked_at,
+    health_reachable,
+    onViewErrorConsole,
+    devInstallInProgress,
+    shieldProjectType,
+    vaultHasReferenceFiles = false,
+    isCompact = false,
+    projectPath = '',
+    project_folder_created_at,
+    project_folder_modified_at,
+    onCardInteraction,
+    isSelected = false,
+    devSessionStartedAt = null,
+    initial,
+    animate,
+    exit,
+    transition,
+    layout = true,
+    ...motionPassThrough
+  } = props
+  const { className: motionExtraClassName, ...motionDivAttrs } = motionPassThrough
+  const { addToast } = useToast()
+  const cardShellRef = useRef<HTMLDivElement | null>(null)
+  const setShellRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      cardShellRef.current = node
+      if (typeof forwardedRef === 'function') forwardedRef(node)
+      else if (forwardedRef) forwardedRef.current = node
+    },
+    [forwardedRef],
+  )
   const [cinemaInspectOpen, setCinemaInspectOpen] = useState(false)
   const [compactInfoOpen, setCompactInfoOpen] = useState(false)
+  const [reorderBusy, setReorderBusy] = useState(false)
+  const [isStatusExpanded, setIsStatusExpanded] = useState(false)
+  /** `null` = first run (skip pop so already-connected projects stay collapsed on load). */
+  const wasHttpConnectedRef = useRef<boolean | null>(null)
   const accordionExpanded = isCompact ? compactInfoOpen : cinemaInspectOpen
 
   useEffect(() => {
@@ -314,6 +456,29 @@ export function Msc_ProjectCard({
   const runUrl = `http://localhost:${port}`
   const isError = status === 'error'
   const isBuilding = status === 'building'
+
+  const isHttpConnected =
+    isRunning &&
+    typeof health_http_code === 'number' &&
+    health_http_code >= 200 &&
+    health_http_code < 300
+
+  useEffect(() => {
+    if (!isRunning) {
+      setIsStatusExpanded(false)
+      wasHttpConnectedRef.current = false
+      return
+    }
+    if (wasHttpConnectedRef.current === null) {
+      wasHttpConnectedRef.current = isHttpConnected
+      return
+    }
+    const prev = wasHttpConnectedRef.current
+    if (isHttpConnected && !prev) {
+      setIsStatusExpanded(true)
+    }
+    wasHttpConnectedRef.current = isHttpConnected
+  }, [isRunning, isHttpConnected])
 
   const getPrimaryButton = () => {
     if (devInstallInProgress && isRunning) {
@@ -417,6 +582,59 @@ export function Msc_ProjectCard({
   /** High-contrast icon tiles (Favorite, Settings, Delete). */
   const msc_actionDarkTile =
     'shrink-0 flex items-center justify-center rounded-md border border-[#2a2a2a]/50 bg-[#121212] transition-colors vader-focus hover:bg-[#2a2a2a]'
+  /** Cinema + compact: tighter vertical padding on management tiles. */
+  const msc_actionTilePy1 = `${msc_actionDarkTile} py-1`
+
+  const msc_reorderArrowTile =
+    'inline-flex h-6 w-6 items-center justify-center rounded-md border border-[#2a2a2a]/50 bg-[#121212]/80 backdrop-blur-sm text-[#eaeaea] transition-colors vader-focus hover:bg-[#2a2a2a]/90 disabled:opacity-40 disabled:pointer-events-none'
+
+  const handleReorder = async (dir: 'up' | 'down') => {
+    if (reorderBusy) return
+    const api = getVpeApi()
+    if (!api?.reorderProject) return
+    setReorderBusy(true)
+    try {
+      const r = await api.reorderProject(id, dir)
+      if (!r?.ok && r?.error && r.error !== 'no_neighbor') {
+        addToast('Reorder failed', 'error', r.error)
+      }
+    } catch (e) {
+      addToast('Reorder failed', 'error', e instanceof Error ? e.message : String(e))
+    } finally {
+      setReorderBusy(false)
+    }
+  }
+
+  const msc_reorderArrowStack = (
+    <div className="absolute left-2 top-1/2 z-30 hidden md:flex -translate-y-1/2 flex-col gap-0.5 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
+      <button
+        type="button"
+        disabled={reorderBusy}
+        onClick={(e) => {
+          e.stopPropagation()
+          void handleReorder('up')
+        }}
+        className={msc_reorderArrowTile}
+        title="Move project up"
+        aria-label="Move project up"
+      >
+        <ChevronUp size={12} strokeWidth={2.5} />
+      </button>
+      <button
+        type="button"
+        disabled={reorderBusy}
+        onClick={(e) => {
+          e.stopPropagation()
+          void handleReorder('down')
+        }}
+        className={msc_reorderArrowTile}
+        title="Move project down"
+        aria-label="Move project down"
+      >
+        <ChevronDown size={12} strokeWidth={2.5} />
+      </button>
+    </div>
+  )
 
   const msc_onCardSurfaceDown = (e: MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, a, [role="button"]')) return
@@ -430,27 +648,42 @@ export function Msc_ProjectCard({
 
   const cardChromeSelected = !isError && isSelected ? 'vpe-card-chrome-selected' : ''
 
-  /** v1.9.5 — LOGS width matches [Favorite, Settings, Trash] (paperclip lives on thumbnail). */
-  const msc_mgmtTileRem = isCompact ? 1.5 : 1.75
+  /** LOGS strip width matches header icon tiles (compact 1.5rem, cinema 1.75rem). */
+  const msc_mgmtTileRem = 1.5
+  const msc_mgmtTileRemCinema = 1.75
   const msc_mgmtCount = 3
   const msc_logsStripWidth = `${msc_mgmtCount * msc_mgmtTileRem + (msc_mgmtCount - 1) * 0.25}rem`
+  const msc_logsStripWidthCinema = `${msc_mgmtCount * msc_mgmtTileRemCinema + (msc_mgmtCount - 1) * 0.25}rem`
 
   const primaryIsPlayCta =
     primaryBtn.label === 'START' || primaryBtn.label === 'INSTALL & START'
   const primaryIsStopCta =
     'active' in primaryBtn && primaryBtn.active === true && primaryBtn.label === 'STOP'
 
+  const msc_cardShellMotionProps = {
+    ...motionDivAttrs,
+    ref: setShellRef,
+    layout,
+    initial: initial ?? { opacity: 0, scale: 0.95 },
+    animate: animate ?? { opacity: 1, scale: 1 },
+    exit: exit ?? { opacity: 0, scale: 0.95 },
+    transition: transition ?? MSC_PROJECT_CARD_MOTION_TRANSITION,
+    onContextMenu,
+    onMouseDown: msc_onCardSurfaceDown,
+  }
+
   if (isCompact) {
     return (
-      <div
-        ref={cardShellRef}
-        className={`vader-card vpe-theme-font vpe-project-card boxBling relative w-[250px] max-w-full transition-all duration-200 ease-out ${
+      <motion.div
+        {...msc_cardShellMotionProps}
+        className={`group vader-card vpe-theme-font vpe-project-card boxBling relative w-[250px] max-w-full ${
           compactInfoOpen ? 'overflow-visible' : 'overflow-hidden'
-        } ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'} ${cardChromeSelected}`}
-        onContextMenu={onContextMenu}
-        onMouseDown={msc_onCardSurfaceDown}
+        } ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'} ${cardChromeSelected}${
+          motionExtraClassName ? ` ${motionExtraClassName}` : ''
+        }`}
       >
         <div className="relative aspect-[4/3] bg-[#121212] overflow-hidden border-b border-[#333333]">
+          {msc_reorderArrowStack}
           {thumbnailUrl ? (
             // v1.7.6 — native img for `vpe-vault:` (privileged custom scheme); avoids Next/Image URL restrictions.
             // eslint-disable-next-line @next/next/no-img-element
@@ -517,7 +750,7 @@ export function Msc_ProjectCard({
                 e.stopPropagation()
                 onToggleFavorite?.()
               }}
-              className={`${msc_actionDarkTile} h-6 w-6 ${
+              className={`${msc_actionTilePy1} h-6 w-6 ${
                 isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
               }`}
               title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
@@ -530,7 +763,7 @@ export function Msc_ProjectCard({
                 e.stopPropagation()
                 onSettings?.()
               }}
-              className={`${msc_actionDarkTile} h-6 w-6 text-[#A0A0A0] hover:text-[#4fde82]`}
+              className={`${msc_actionTilePy1} h-6 w-6 text-[#A0A0A0] hover:text-[#4fde82]`}
               title="Project Settings"
             >
               <Settings size={12} />
@@ -541,7 +774,7 @@ export function Msc_ProjectCard({
                 e.stopPropagation()
                 onUnregister?.()
               }}
-              className={`${msc_actionDarkTile} h-6 w-6 text-[#A0A0A0] hover:text-[#e02b20]`}
+              className={`${msc_actionTilePy1} h-6 w-6 text-[#A0A0A0] hover:text-[#e02b20]`}
               title="Remove from Registry"
             >
               <Trash2 size={12} />
@@ -561,16 +794,16 @@ export function Msc_ProjectCard({
             }}
             disabled={Boolean('disabled' in primaryBtn && primaryBtn.disabled === true)}
             className={`
-              flex-1 min-w-[72px] flex items-center justify-center gap-1 h-7 rounded text-[10px] transition-all vader-focus
+              box-border min-h-7 max-h-7 h-7 flex-1 min-w-[72px] flex items-center justify-center gap-1 rounded border border-transparent py-0 leading-tight text-[10px] transition-all vader-focus
               ${primaryBtn.active
-                ? 'border-0 bg-[#e02b20] text-white hover:bg-[#c41e17] hover:text-white'
+                ? 'border-transparent bg-[#e02b20] text-white hover:bg-[#c41e17] hover:text-white'
                 : primaryBtn.disabled
-                  ? 'bg-transparent border border-[#333333] text-[#555555] cursor-not-allowed'
+                  ? 'border-[#333333] bg-transparent text-[#555555] cursor-not-allowed'
                   : primaryBtn.label === 'Installing…'
-                    ? 'bg-transparent border border-[#ffcc00] text-[#ffcc00]'
+                    ? 'border-[#ffcc00] bg-transparent text-[#ffcc00]'
                     : primaryIsPlayCta
-                      ? 'border-0 bg-[#181818] text-white hover:bg-[#22c55e] hover:text-white'
-                      : 'bg-transparent border border-[#555555] text-white hover:border-[#22c55e] hover:bg-[#22c55e] hover:text-white'
+                      ? 'border-transparent bg-[#181818] text-white hover:bg-[#22c55e] hover:text-white'
+                      : 'border-[#555555] bg-transparent text-white hover:border-[#22c55e] hover:bg-[#22c55e] hover:text-white'
               }
             `}
           >
@@ -595,7 +828,7 @@ export function Msc_ProjectCard({
               e.stopPropagation()
               if (isRunning && onOpenInBrowser) onOpenInBrowser()
             }}
-            className={`flex min-w-[4.25rem] flex-1 items-center justify-center gap-1 h-7 rounded border text-[10px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
+            className={`box-border flex min-h-7 max-h-7 min-w-[4.25rem] flex-1 items-center justify-center gap-1 h-7 rounded border text-[10px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
               isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
             }`}
             title={
@@ -611,7 +844,7 @@ export function Msc_ProjectCard({
             type="button"
             onClick={onLogs}
             style={{ width: msc_logsStripWidth }}
-            className="h-7 shrink-0 rounded bg-[#2a2a2a] border border-[#333333] flex items-center justify-center text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
+            className="box-border min-h-7 max-h-7 h-7 shrink-0 rounded border border-[#333333] bg-[#2a2a2a] flex items-center justify-center text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
             title="Logs"
           >
             <Terminal size={12} />
@@ -630,30 +863,36 @@ export function Msc_ProjectCard({
                   healthLabel: healthLine?.label ?? null,
                   healthCls: healthLine?.cls ?? null,
                   uptimeLabel: liveUptime,
+                  port,
+                  isHttpConnected,
+                  isConnectionExpanded: isStatusExpanded,
+                  onToggleConnectionExpanded: (e) => {
+                    e.stopPropagation()
+                    setIsStatusExpanded((v) => !v)
+                  },
                 }
               : null
           }
         />
-      </div>
+      </motion.div>
     )
   }
 
   return (
-    <div
-      ref={cardShellRef}
+    <motion.div
+      {...msc_cardShellMotionProps}
       className={`
-        vader-card vpe-theme-font vpe-project-card boxBling relative min-w-0 transition-all duration-200 ease-out
+        group vader-card vpe-theme-font vpe-project-card boxBling relative w-full min-w-0
         ${cinemaInspectOpen ? 'overflow-visible' : 'overflow-hidden'}
         ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'}
-        ${cardChromeSelected}
+        ${cardChromeSelected}${motionExtraClassName ? ` ${motionExtraClassName}` : ''}
       `}
-      onContextMenu={onContextMenu}
-      onMouseDown={msc_onCardSurfaceDown}
     >
         <div
           className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]"
           style={{ borderRadius: '4px 4px 0 0' }}
         >
+        {msc_reorderArrowStack}
         {thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -708,18 +947,18 @@ export function Msc_ProjectCard({
 
       <div className={isIdleStopped ? 'px-4 pt-3 pb-2' : 'p-4'}>
           <div
-            className={`flex min-w-0 items-center justify-between gap-2.5 ${isIdleStopped ? 'mb-1' : 'mb-2'}`}
+            className={`flex min-w-0 items-center justify-between gap-2 ${isIdleStopped ? 'mb-1' : 'mb-2'}`}
           >
             <div className="flex min-h-7 min-w-0 flex-1 items-center gap-2 pr-0.5">
               <h3
-                className="vpe-card-title min-w-0 truncate text-base leading-snug text-white"
+                className="vpe-card-title min-w-0 truncate text-base leading-tight text-white"
                 title={name}
               >
                 {name}
               </h3>
               {isError && <AlertTriangle size={14} className="text-[#ff4444] shrink-0" />}
             </div>
-            <div className="inline-flex shrink-0 items-center gap-1.5 self-center">
+            <div className="inline-flex shrink-0 items-center gap-1 self-center">
               <button
                 type="button"
                 onClick={(e) => {
@@ -758,13 +997,48 @@ export function Msc_ProjectCard({
             </div>
           </div>
 
-          <p
-            className={`text-[10px] uppercase tracking-[0.08em] ${
-              isRunning || isError ? 'mb-2' : isIdleStopped ? 'mb-0' : 'mb-1'
-            } ${isError ? 'text-[#e02b20]' : devInstallInProgress && isRunning ? 'text-[#ffcc00]' : isRunning ? 'text-[#6ee7a8]/90' : 'text-[#888888]'}`}
+          <div
+            className={`mb-2 flex w-full shrink-0 items-center justify-between gap-2 ${MSC_STATUS_BAR_HEIGHT}`}
           >
-            {getStatusLabel()}
-          </p>
+            {isRunning && isHttpConnected && !isStatusExpanded ? (
+              <>
+                <span className="min-w-0 flex-1 truncate text-left text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-[#4fde82]">
+                  ● LIVE - {port}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsStatusExpanded((v) => !v)
+                  }}
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#4fde82] transition-colors hover:bg-[#4fde82]/15 hover:text-white vader-focus"
+                  title="Show connection details"
+                  aria-label="Expand connection details"
+                  aria-expanded={false}
+                >
+                  <Activity size={12} strokeWidth={2} className="text-[#4fde82]" />
+                </button>
+              </>
+            ) : isRunning && isHttpConnected && isStatusExpanded ? null : isIdleStopped ? (
+              <span className="min-w-0 flex-1 truncate text-left text-[10px] font-medium uppercase leading-none tracking-[0.08em] text-[#888888]/30">
+                READY
+              </span>
+            ) : (
+              <span
+                className={`min-w-0 flex-1 truncate text-left text-[10px] uppercase leading-none tracking-[0.08em] ${
+                  isError
+                    ? 'text-[#e02b20]'
+                    : devInstallInProgress && isRunning
+                      ? 'text-[#ffcc00]'
+                      : isRunning
+                        ? 'text-[#6ee7a8]/90'
+                        : 'text-[#888888]'
+                }`}
+              >
+                {getStatusLabel()}
+              </span>
+            )}
+          </div>
 
           {isError && errorMessage && (
             <div className="mt-3 p-2 rounded bg-[#ff4444]/10 border border-[#ff4444]/30">
@@ -772,45 +1046,106 @@ export function Msc_ProjectCard({
             </div>
           )}
 
-          {isRunning && (
-            <div className="mt-3 rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2.5 py-1.5">
-              <div className="min-w-0">
-                <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                  Started on
-                </span>
-                <span
-                  className="block truncate text-[11px] leading-tight text-[#7dcea0]/95"
-                  title={runUrl}
-                >
-                  {runUrl}
-                </span>
-                {healthLine && (
-                  <span
-                    className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
-                    title="GET / on project port after start"
-                  >
-                    {healthLine.label}
-                  </span>
-                )}
-                <div className="mt-1.5 pt-1.5 border-t border-[#2d4a38]/50">
-                  <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                    Uptime
-                  </span>
-                  <span className="tabular-nums text-[11px] text-[#7dcea0]/95">{liveUptime}</span>
+          {isRunning && (!isHttpConnected || isStatusExpanded) && (
+            <div
+              className={`rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2.5 py-2 ${
+                isHttpConnected ? 'mb-2' : 'mt-3'
+              }`}
+            >
+              {isHttpConnected ? (
+                <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 pt-0">
+                      <span className="mt-0 mb-0.5 block text-[8px] uppercase leading-none tracking-[0.12em] text-[#5c6b62]">
+                        Started on
+                      </span>
+                      <span
+                        className="block truncate text-[11px] leading-tight text-[#7dcea0]/95"
+                        title={runUrl}
+                      >
+                        {runUrl}
+                      </span>
+                      {healthLine && (
+                        <span
+                          className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
+                          title="GET / on project port after start"
+                        >
+                          {healthLine.label}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setIsStatusExpanded((v) => !v)
+                      }}
+                      className="mt-0 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/25 bg-[#121212]/90 text-white transition-colors hover:border-[#4fde82] hover:bg-[#1a2620] hover:text-[#4fde82] vader-focus"
+                      title="Hide connection details"
+                      aria-label="Collapse connection details"
+                      aria-expanded
+                    >
+                      <ChevronUp size={14} strokeWidth={2.5} className="text-white" />
+                    </button>
+                  </div>
+                  <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
+                    <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                      Uptime
+                    </span>
+                    <span className="tabular-nums text-[11px] text-[#7dcea0]/95">{liveUptime}</span>
+                  </div>
+                  {healthLine?.showErrorCta && onViewErrorConsole && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onViewErrorConsole()
+                      }}
+                      className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
+                    >
+                      View error console →
+                    </button>
+                  )}
                 </div>
-                {healthLine?.showErrorCta && onViewErrorConsole && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onViewErrorConsole()
-                    }}
-                    className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
+              ) : (
+                <div className="min-w-0">
+                  <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                    Started on
+                  </span>
+                  <span
+                    className="block truncate text-[11px] leading-tight text-[#7dcea0]/95"
+                    title={runUrl}
                   >
-                    View error console →
-                  </button>
-                )}
-              </div>
+                    {runUrl}
+                  </span>
+                  {healthLine && (
+                    <span
+                      className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
+                      title="GET / on project port after start"
+                    >
+                      {healthLine.label}
+                    </span>
+                  )}
+                  <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
+                    <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                      Uptime
+                    </span>
+                    <span className="tabular-nums text-[11px] text-[#7dcea0]/95">{liveUptime}</span>
+                  </div>
+                  {healthLine?.showErrorCta && onViewErrorConsole && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onViewErrorConsole()
+                      }}
+                      className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
+                    >
+                      View error console →
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -836,16 +1171,16 @@ export function Msc_ProjectCard({
               : undefined
           }
           className={`
-            min-w-[5rem] flex-1 flex min-h-0 items-center justify-center gap-1.5 h-9 rounded text-xs transition-all vader-focus
+            box-border min-h-7 max-h-7 min-w-[5rem] flex-1 flex items-center justify-center gap-1.5 h-7 rounded border border-transparent text-xs transition-all vader-focus
             ${primaryBtn.active
-              ? 'border-0 bg-[#e02b20] text-white hover:bg-[#c41e17] hover:text-white'
+              ? 'border-transparent bg-[#e02b20] text-white hover:bg-[#c41e17] hover:text-white'
               : primaryBtn.disabled
-                ? 'bg-transparent border border-[#333333] text-[#555555] cursor-not-allowed'
+                ? 'border-[#333333] bg-transparent text-[#555555] cursor-not-allowed'
                 : primaryBtn.label === 'Installing…'
-                  ? 'bg-transparent border border-[#ffcc00] text-[#ffcc00] hover:border-[#e02b20] hover:text-[#e02b20]'
+                  ? 'border-[#ffcc00] bg-transparent text-[#ffcc00] hover:border-[#e02b20] hover:text-[#e02b20]'
                 : primaryIsPlayCta
-                  ? 'border-0 bg-[#181818] text-white hover:bg-[#22c55e] hover:text-white'
-                  : 'bg-transparent border border-[#555555] text-white hover:border-[#22c55e] hover:bg-[#22c55e] hover:text-white'
+                  ? 'border-transparent bg-[#181818] text-white hover:bg-[#22c55e] hover:text-white'
+                  : 'border-[#555555] bg-transparent text-white hover:border-[#22c55e] hover:bg-[#22c55e] hover:text-white'
             }
           `}
         >
@@ -871,7 +1206,7 @@ export function Msc_ProjectCard({
             e.stopPropagation()
             if (isRunning && onOpenInBrowser) onOpenInBrowser()
           }}
-          className={`min-w-[5.5rem] flex-1 flex min-h-0 items-center justify-center gap-1.5 h-9 rounded border text-[11px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
+          className={`box-border min-h-7 max-h-7 min-w-[5.5rem] flex-1 flex items-center justify-center gap-1.5 h-7 rounded border text-[11px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
             isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
           }`}
           title={
@@ -887,8 +1222,8 @@ export function Msc_ProjectCard({
         <button
           type="button"
           onClick={onLogs}
-          style={{ width: msc_logsStripWidth }}
-          className="h-9 shrink-0 flex items-center justify-center gap-1.5 rounded bg-[#2a2a2a] border border-[#333333] text-xs text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
+          style={{ width: msc_logsStripWidthCinema }}
+          className="box-border min-h-7 max-h-7 h-7 shrink-0 flex items-center justify-center gap-1.5 rounded bg-[#2a2a2a] border border-[#333333] text-xs text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
         >
           <Terminal size={12} className="shrink-0" />
           <span>LOGS</span>
@@ -901,6 +1236,9 @@ export function Msc_ProjectCard({
         folderModifiedAt={project_folder_modified_at}
         onOpenChange={setCinemaInspectOpen}
       />
-    </div>
+    </motion.div>
   )
-}
+  },
+)
+
+Msc_ProjectCard.displayName = 'Msc_ProjectCard'

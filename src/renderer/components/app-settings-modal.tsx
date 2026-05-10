@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, FolderOpen, Download, Upload, Trash2, LifeBuoy } from 'lucide-react'
+import { X, FolderOpen, Download, Upload, Trash2, LifeBuoy, Save } from 'lucide-react'
 import { useToast } from '@/components/vader-toast'
 import { getVpeApi, type VpeAppSettings } from '@/lib/vpe-bridge'
 import { useVpeUiLayout } from '@/context/vpe-ui-layout-context'
@@ -61,6 +61,7 @@ export function AppSettingsModal({
   const portRangeSavedRef = useRef({ start: 3000, end: 3020 })
   const [fontStyle, setFontStyle] = useState<VpeFontStyleKey>('mulish_studio')
   const [autoStart, setAutoStart] = useState(false)
+  const [autoSyncDbOnClose, setAutoSyncDbOnClose] = useState(false)
   const [buildOnAdd, setBuildOnAdd] = useState(false)
   const [autoRepairSuspense, setAutoRepairSuspense] = useState(true)
   const [preBuildChecks, setPreBuildChecks] = useState(true)
@@ -146,6 +147,7 @@ export function AppSettingsModal({
       setLaunchOnStartup(!!s.launch_at_login)
       setMinimizeToTray(!!s.minimize_to_tray)
       setAutoStart(!!s.auto_start_projects)
+      setAutoSyncDbOnClose(!!s.auto_sync_db_on_close)
       setDefaultView(msc_normalizeDefaultViewFromApi(s.default_view))
       const fs = msc_normalizeFontStyle(s.font_style)
       setFontStyle(fs)
@@ -175,6 +177,7 @@ export function AppSettingsModal({
         | 'font_style'
         | 'port_range_start'
         | 'port_range_end'
+        | 'auto_sync_db_on_close'
       >
     >,
   ) => {
@@ -240,6 +243,34 @@ export function AppSettingsModal({
     setMinimizeToTray(next)
     const ok = await persistAppSettingsPatch({ minimize_to_tray: next })
     if (!ok) setMinimizeToTray(prev)
+  }
+
+  const handlePortableBackup = async () => {
+    const api = getVpeApi()
+    if (!api?.backupLocalDb) {
+      addToast('Backup unavailable', 'error', 'Run inside Electron with VPE preload.')
+      return
+    }
+    setDbBusy(true)
+    try {
+      const res = await api.backupLocalDb()
+      if (res?.ok && res.path) {
+        addToast('Database snapshot saved', 'success', res.path)
+      } else {
+        addToast('Snapshot failed', 'error', res?.error ?? 'Unknown error')
+      }
+    } catch (e) {
+      addToast('Snapshot failed', 'error', e instanceof Error ? e.message : String(e))
+    } finally {
+      setDbBusy(false)
+    }
+  }
+
+  const handleAutoSyncDbOnCloseToggle = async (next: boolean) => {
+    const prev = autoSyncDbOnClose
+    setAutoSyncDbOnClose(next)
+    const ok = await persistAppSettingsPatch({ auto_sync_db_on_close: next })
+    if (!ok) setAutoSyncDbOnClose(prev)
   }
 
   const handleAutoStartToggle = async (next: boolean) => {
@@ -729,6 +760,37 @@ export function AppSettingsModal({
               </AccordionTrigger>
               <AccordionContent className="px-10">
                 <div className="space-y-6 pt-1">
+          <section className="border-b border-[#333333] pb-6">
+            <h3 className="text-[10px] text-[#4fde82] uppercase tracking-[0.1em] mb-2">
+              Portable Engine Management
+            </h3>
+            <p className="text-[11px] text-[#555555] mb-4">
+              Lock the live catalog into this folder&apos;s <span className="text-[#888888]">vpe-backups</span> so a
+              copied tree carries registry state alongside vault assets.
+            </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                disabled={dbBusy}
+                onClick={() => void handlePortableBackup()}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded border border-[#333333] bg-[#121212] px-4 text-xs font-medium text-white transition-all hover:border-[#4fde82] vader-focus disabled:opacity-50"
+              >
+                <Save size={16} className="shrink-0 text-[#A0A0A0]" />
+                Create Manual DB Snapshot
+              </button>
+              <div className="flex items-center justify-between gap-4 sm:justify-end sm:min-w-[220px]">
+                <div>
+                  <span className="text-sm text-white">Auto-Sync on Close</span>
+                  <p className="text-[11px] text-[#555555]">Final backup to this folder when VPE exits</p>
+                </div>
+                <Toggle
+                  checked={autoSyncDbOnClose}
+                  onChange={(v) => void handleAutoSyncDbOnCloseToggle(v)}
+                />
+              </div>
+            </div>
+          </section>
+
           <section className="border-t border-[#333333] pt-6 sm:border-t-0 sm:pt-0">
             <h3 className="text-[10px] text-[#4fde82] uppercase tracking-[0.1em] mb-2">
               DATABASE & STATE ACTIONS

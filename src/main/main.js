@@ -9,6 +9,7 @@ const isDev = require('electron-is-dev');
 const MSC_PM2Manager = require('./pm2-manager');
 const MSC_TrayManager = require('./tray-manager');
 const { msc_createDatabase, msc_getDatabase } = require('./db/database');
+const { msc_vpePortableBackupFromStore } = require('./db/persistent-store');
 const MSC_ProjectRunner = require('./project-runner');
 const {
   msc_registerVpeIpc,
@@ -814,6 +815,21 @@ app.on('before-quit', () => {
 });
 
 app.on('will-quit', () => {
+  try {
+    const store = msc_getDatabase();
+    const s = typeof store.getSettings === 'function' ? store.getSettings() : {};
+    const syncOn =
+      s.auto_sync_db_on_close === true ||
+      s.auto_sync_db_on_close === 1 ||
+      String(s.auto_sync_db_on_close).toLowerCase() === 'true';
+    if (syncOn) {
+      const r = msc_vpePortableBackupFromStore(store, process.cwd());
+      if (r.ok) console.log(`[VPE] Portable DB snapshot (quit): ${r.path}`);
+      else console.warn('[VPE] Portable DB snapshot (quit) failed:', r.error);
+    }
+  } catch (e) {
+    console.warn('[VPE] Portable quit snapshot error:', e?.message ?? e);
+  }
   if (isDev && process.env.VPE_LAUNCHER_FORGE === '1') {
     process.exit(0);
   }

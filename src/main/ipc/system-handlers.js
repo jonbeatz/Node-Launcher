@@ -2,6 +2,7 @@
 
 const { msc_logInfo, msc_logError } = require('../lib/logger');
 const { msc_generateSupportBundle } = require('../lib/support-bundle');
+const { msc_vpePortableBackupFromStore } = require('../db/persistent-store');
 
 /**
  * Best-effort removal of leftover VPE dirs/zips under OS temp (snapshots / restore scratch).
@@ -366,6 +367,31 @@ function msc_registerSystemIpc(ipcMain, c) {
     }
   });
 
+  /** Open project folder in Cursor (Windows install path). */
+  ipcMain.handle('vpe:open-cursor', async (_event, projectPath) => {
+    const { spawn } = require('child_process');
+    const CURSOR_EXE =
+      'C:\\Users\\JONBEATZ\\AppData\\Local\\Programs\\cursor\\Cursor.exe';
+    if (!projectPath) throw new Error('VPE: Missing project path');
+    try {
+      if (!fs.existsSync(projectPath)) {
+        return { ok: false, error: `Path does not exist: ${projectPath}` };
+      }
+      if (!fs.existsSync(CURSOR_EXE)) {
+        return { ok: false, error: `Cursor not found at ${CURSOR_EXE}` };
+      }
+      const child = spawn(CURSOR_EXE, [projectPath], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+      child.unref();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? String(err.message) : String(err) };
+    }
+  });
+
   ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => {
     if (!projectPath) throw new Error('VPE: Missing project path');
     const { exec } = require('child_process');
@@ -449,6 +475,24 @@ function msc_registerSystemIpc(ipcMain, c) {
   ipcMain.handle('vpe:generate-support-bundle', async () => {
     const pm2Manager = vpeRuntime?.pm2Manager ?? null;
     return msc_generateSupportBundle({ app, store, pm2Manager });
+  });
+
+  /** Portable vault: snapshot active catalog DB into `process.cwd()/vpe-backups/` (last 5 rotated). */
+  ipcMain.handle('vpe:backup-local-db', () => {
+    try {
+      const cwd = typeof process.cwd === 'function' ? process.cwd() : '.';
+      const result = msc_vpePortableBackupFromStore(store, cwd);
+      if (result.ok) {
+        msc_logInfo(`[VPE] Portable DB snapshot: ${result.path}`);
+      } else {
+        msc_logError(`[VPE] Portable DB snapshot failed: ${result.error}`);
+      }
+      return result;
+    } catch (err) {
+      const m = err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
+      msc_logError(`[VPE] Portable DB snapshot failed: ${m}`);
+      return { ok: false, error: m };
+    }
   });
 }
 

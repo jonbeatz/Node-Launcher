@@ -5,6 +5,7 @@ process.env.VPE_VAULT_DELETION_LOCKED = String(process.env.VPE_VAULT_DELETION_LO
 
 const fs = require('fs');
 const path = require('path');
+const { msc_vpePortableBackupFromStore } = require('../db/persistent-store');
 const { pathToFileURL, fileURLToPath } = require('node:url');
 const { nativeImage } = require('electron');
 const {
@@ -198,6 +199,7 @@ function msc_registerProjectIpc(ipcMain, c) {
     msc_normalizeCatalogArchived,
     fs,
     path,
+    process,
     app,
     BrowserWindow,
     dialog,
@@ -247,6 +249,7 @@ function msc_registerProjectIpc(ipcMain, c) {
     return { ok: true, settings: next, changeSummary };
   });
 
+  // `listProjectsAlphabetical` orders by `sort_order` (SQLite v14+) then name — backups include manual order.
   ipcMain.handle('vpe:getProjects', () =>
     store.listProjectsAlphabetical().map((row) => {
       const enriched = msc_ipcEnrichProjectsRow(row);
@@ -256,6 +259,40 @@ function msc_registerProjectIpc(ipcMain, c) {
       };
     }),
   );
+
+  ipcMain.handle('vpe:reorder-project', (_evt, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      return { ok: false, error: 'invalid_payload' };
+    }
+    const projectId = payload.projectId != null ? String(payload.projectId) : '';
+    const direction = payload.direction === 'down' ? 'down' : payload.direction === 'up' ? 'up' : '';
+    if (!projectId || (direction !== 'up' && direction !== 'down')) {
+      return { ok: false, error: 'invalid_args' };
+    }
+    if (typeof store.reorderProjectNeighbor !== 'function') {
+      return { ok: false, error: 'unsupported_store' };
+    }
+    const result = store.reorderProjectNeighbor(projectId, direction);
+    if (!result.ok) return result;
+    try {
+      const settings = typeof store.getSettings === 'function' ? store.getSettings() : {};
+      const syncOn =
+        settings.auto_sync_db_on_close === true ||
+        settings.auto_sync_db_on_close === 1 ||
+        String(settings.auto_sync_db_on_close).toLowerCase() === 'true';
+      if (syncOn) {
+        const cwd = typeof process.cwd === 'function' ? process.cwd() : '.';
+        const b = msc_vpePortableBackupFromStore(store, cwd);
+        if (!b.ok) {
+          console.warn('[VPE] reorder auto-sync backup failed:', b.error);
+        }
+      }
+    } catch (e) {
+      console.warn('[VPE] reorder auto-sync', e?.message ?? e);
+    }
+    msc_emitProjectsUpdated();
+    return { ok: true };
+  });
 
   ipcMain.handle('vpe:get-repair-runs', (_event, limit) => {
     const n = Number(limit);

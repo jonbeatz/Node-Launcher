@@ -50,6 +50,7 @@ const expectedProjectCols = [
   'notes',
   'dev_session_started_at',
   'has_documentation',
+  'sort_order',
 ];
 for (const c of expectedProjectCols) {
   assert(projectCols.includes(c), `projects missing column: ${c}`);
@@ -70,6 +71,7 @@ const expectedSettingsCols = [
   'font_style',
   'port_range_start',
   'port_range_end',
+  'auto_sync_db_on_close',
 ];
 for (const c of expectedSettingsCols) {
   assert(settingsCols.includes(c), `settings missing column: ${c}`);

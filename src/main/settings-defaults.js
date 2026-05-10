@@ -6,6 +6,8 @@ const MSC_VPE_APP_SETTINGS_DEFAULTS = Object.freeze({
   launch_at_login: false,
   minimize_to_tray: false,
   auto_start_projects: false,
+  /** v2.1.x — write `vpe-backups` under `process.cwd()` on app quit when enabled. */
+  auto_sync_db_on_close: false,
   /** v1.6.9 — `cinema` | `compact` | `list` (legacy `card` → cinema). */
   default_view: 'cinema',
   theme_accent: '#4fde82',
@@ -76,6 +78,10 @@ function msc_normalizeAppSettingsRow(row) {
     auto_start_projects: asBool(
       r.auto_start_projects,
       MSC_VPE_APP_SETTINGS_DEFAULTS.auto_start_projects,
+    ),
+    auto_sync_db_on_close: asBool(
+      r.auto_sync_db_on_close,
+      MSC_VPE_APP_SETTINGS_DEFAULTS.auto_sync_db_on_close,
     ),
     default_view: dv,
     font_style: msc_normalizeFontStyle(r.font_style),

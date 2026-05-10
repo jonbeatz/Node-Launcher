@@ -64,7 +64,7 @@ The UI follows a tactical "Studio Dark" and "Glassmorphic" aesthetic engineered 
 * **Typography**: **JetBrains Mono** for all terminal, code, and monospace data contexts.
 
 ### **Layout & Responsiveness**
-* **Desktop Grid**: `repeat(auto-fill, minmax(320px, 1fr))` with 20px gap.
+* **Desktop Grid**: Design target remains `repeat(auto-fill, minmax(320px, 1fr))` with ~20px gap. The live dashboard implements **Cinema** via **`.vpe-grid-cinema`** (**`globals.css`**): four responsive columns, **`1.25rem`** gap, **`items-start`**; **Compact** uses **`.vpe-grid-compact`** with **`0.75rem`** gap and **`minmax(250px, 1fr)`** tracks. Cinema cards fill their track (**`w-full min-w-0`** on **`Msc_ProjectCard`**).
 * **Mobile/Tablet**: Transitions to single-column; log drawer becomes full-screen overlay.
 * **Accessibility**: All touch targets ≥ 44px with visible 2px #e02b20 focus rings.
 

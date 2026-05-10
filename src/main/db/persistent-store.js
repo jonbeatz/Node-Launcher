@@ -12,8 +12,8 @@ const {
 /** One-time migrate source; cwd file is archived to media/_vpe_archive after boot. */
 const LEGACY_REGISTRY = path.join(process.cwd(), 'projects.json');
 
-/** Final `PRAGMA user_version` after `msc_sqliteMigrateSchemaAndPorts` (v1.9.8: `has_documentation`). */
-const VPE_SQLITE_USER_VERSION = 13;
+/** Final `PRAGMA user_version` after `msc_sqliteMigrateSchemaAndPorts` (v2.1.x: `sort_order`, `auto_sync_db_on_close`). */
+const VPE_SQLITE_USER_VERSION = 15;
 
 /**
  * Initial DDL before incremental migrations (see `msc_sqliteMigrateSchemaAndPorts`).
@@ -139,7 +139,21 @@ function rowFromTuple(tuple) {
     notes: null,
     dev_session_started_at: null,
     has_documentation: 1,
+    sort_order: 0,
   };
+}
+
+/**
+ * When multiple projects share a `sort_order`, re-index 1..n by name so manual reorder swaps work.
+ * @param {{ needsSortOrderSanitize?: () => boolean, sanitizeSortOrderAlphabetical?: () => void }} store
+ * @returns {boolean} true if rows were rewritten
+ */
+function msc_vpeSanitizeSortOrder(store) {
+  if (!store || typeof store.needsSortOrderSanitize !== 'function') return false;
+  if (typeof store.sanitizeSortOrderAlphabetical !== 'function') return false;
+  if (!store.needsSortOrderSanitize()) return false;
+  store.sanitizeSortOrderAlphabetical();
+  return true;
 }
 
 class SqlitePersistence {
@@ -154,7 +168,11 @@ class SqlitePersistence {
   }
 
   listProjectsAlphabetical() {
-    return this._db.prepare(`SELECT * FROM projects ORDER BY name COLLATE NOCASE`).all();
+    return this._db
+      .prepare(
+        `SELECT * FROM projects ORDER BY sort_order ASC, name COLLATE NOCASE`,
+      )
+      .all();
   }
 
   /** @returns {unknown | undefined} */
@@ -353,6 +371,7 @@ class SqlitePersistence {
     const minimize = merged.minimize_to_tray ? 1 : 0;
     const launch = merged.launch_at_login ? 1 : 0;
     const autoStart = merged.auto_start_projects ? 1 : 0;
+    const autoSyncClose = merged.auto_sync_db_on_close ? 1 : 0;
     const dv = msc_normalizeDefaultView(merged.default_view);
     const accent = merged.theme_accent || MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent;
     const fontStyle = msc_normalizeFontStyle(merged.font_style);
@@ -360,10 +379,10 @@ class SqlitePersistence {
     const pre = merged.port_range_end;
     this._db
       .prepare(
-        `UPDATE settings SET minimize_to_tray = ?, theme_accent = ?, launch_at_login = ?, auto_start_projects = ?, default_view = ?, font_style = ?, port_range_start = ?, port_range_end = ?
+        `UPDATE settings SET minimize_to_tray = ?, theme_accent = ?, launch_at_login = ?, auto_start_projects = ?, default_view = ?, font_style = ?, port_range_start = ?, port_range_end = ?, auto_sync_db_on_close = ?
          WHERE id = 1`,
       )
-      .run(minimize, accent, launch, autoStart, dv, fontStyle, prs, pre);
+      .run(minimize, accent, launch, autoStart, dv, fontStyle, prs, pre, autoSyncClose);
     return this.getSettings();
   }
 
@@ -430,6 +449,73 @@ class SqlitePersistence {
          FROM repair_runs ORDER BY datetime(created_at) DESC LIMIT ?`,
       )
       .all(cap);
+  }
+
+  /**
+   * Portable vault: snapshot open SQLite into `<projectRoot>/vpe-backups/vpe_backup_*.sqlite`
+   * via `VACUUM INTO` (WAL-safe). Rotates to the last 5 files.
+   * @param {string} projectRootAbs
+   * @returns {{ ok: true, path: string }}
+   */
+  portableVaultBackupToProjectRoot(projectRootAbs) {
+    const root = path.resolve(projectRootAbs);
+    const dir = path.join(root, 'vpe-backups');
+    fs.mkdirSync(dir, { recursive: true });
+    const stamp = msc_vpePortableBackupTimestamp();
+    const dest = path.join(dir, `vpe_backup_${stamp}.sqlite`);
+    const posix = path.resolve(dest).replace(/\\/g, '/').replace(/'/g, "''");
+    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    this._db.exec(`VACUUM INTO '${posix}'`);
+    msc_vpeRotatePortableBackups(dir, '.sqlite', 5);
+    return { ok: true, path: dest };
+  }
+
+  needsSortOrderSanitize() {
+    const row = this._db.prepare(`SELECT COUNT(*) AS n FROM projects`).get();
+    const n = row && typeof row.n === 'number' ? row.n : 0;
+    if (n <= 1) return false;
+    const dRow = this._db.prepare(`SELECT COUNT(DISTINCT sort_order) AS d FROM projects`).get();
+    const d = dRow && typeof dRow.d === 'number' ? dRow.d : 0;
+    return d < n;
+  }
+
+  sanitizeSortOrderAlphabetical() {
+    const rows = this._db
+      .prepare(`SELECT id FROM projects ORDER BY name COLLATE NOCASE`)
+      .all();
+    const tx = this._db.transaction(() => {
+      const u = this._db.prepare(`UPDATE projects SET sort_order = ? WHERE id = ?`);
+      for (let i = 0; i < rows.length; i += 1) {
+        u.run(i + 1, rows[i].id);
+      }
+    });
+    tx();
+  }
+
+  /**
+   * @param {string} projectId
+   * @param {'up' | 'down'} direction
+   * @returns {{ ok: true } | { ok: false, error: string }}
+   */
+  reorderProjectNeighbor(projectId, direction) {
+    msc_vpeSanitizeSortOrder(this);
+    const ordered = this.listProjectsAlphabetical();
+    const i = ordered.findIndex((r) => r.id === projectId);
+    if (i < 0) return { ok: false, error: 'not_found' };
+    const j = direction === 'up' ? i - 1 : i + 1;
+    if (j < 0 || j >= ordered.length) return { ok: false, error: 'no_neighbor' };
+    const a = ordered[i];
+    const b = ordered[j];
+    const sa = Number(a.sort_order);
+    const sb = Number(b.sort_order);
+    const va = Number.isFinite(sa) ? sa : 0;
+    const vb = Number.isFinite(sb) ? sb : 0;
+    const tx = this._db.transaction(() => {
+      this._db.prepare(`UPDATE projects SET sort_order = ? WHERE id = ?`).run(vb, a.id);
+      this._db.prepare(`UPDATE projects SET sort_order = ? WHERE id = ?`).run(va, b.id);
+    });
+    tx();
+    return { ok: true };
   }
 }
 
@@ -512,6 +598,10 @@ class JsonPersistence {
         p.dev_session_started_at = null;
         changed = true;
       }
+      if (p.sort_order === undefined) {
+        p.sort_order = 0;
+        changed = true;
+      }
       if (p.has_documentation === undefined) {
         p.has_documentation = 1;
         changed = true;
@@ -580,6 +670,7 @@ class JsonPersistence {
         start_script: (p.detectedStartScript || 'dev').toString(),
         build_script: (p.buildScript || 'build').toString(),
         pkg_manager: (p.detectedPackageManager || 'npm').toString(),
+        sort_order: 0,
         health_http_code: null,
         health_checked_at: null,
         health_reachable: null,
@@ -613,9 +704,14 @@ class JsonPersistence {
   }
 
   listProjectsAlphabetical() {
-    return Object.values(this._data.projects).sort((a, b) =>
-      String(a.name).localeCompare(String(b.name)),
-    );
+    return Object.values(this._data.projects).sort((a, b) => {
+      const sa = Number(a.sort_order);
+      const sb = Number(b.sort_order);
+      const oa = Number.isFinite(sa) ? sa : 0;
+      const ob = Number.isFinite(sb) ? sb : 0;
+      if (oa !== ob) return oa - ob;
+      return String(a.name).localeCompare(String(b.name));
+    });
   }
 
   getProject(projectId) {
@@ -680,11 +776,14 @@ class JsonPersistence {
       payload.notes != null && String(payload.notes).trim() !== ''
         ? String(payload.notes)
         : null;
+    const soRaw = Number(payload.sort_order);
+    const sortOrder = Number.isFinite(soRaw) ? Math.floor(soRaw) : 0;
     this._data.projects[payload.id] = {
       ...payload,
       project_type: pt,
       is_archived: Boolean(payload.is_archived),
       notes: notesIni,
+      sort_order: sortOrder,
       health_http_code: null,
       health_checked_at: null,
       health_reachable: null,
@@ -799,6 +898,75 @@ class JsonPersistence {
       level: row.level,
       message: row.message,
     }));
+  }
+
+  needsSortOrderSanitize() {
+    const list = Object.values(this._data.projects);
+    if (list.length <= 1) return false;
+    const distinct = new Set(
+      list.map((p) => {
+        const n = Number(p.sort_order);
+        return Number.isFinite(n) ? n : 0;
+      }),
+    );
+    return distinct.size < list.length;
+  }
+
+  sanitizeSortOrderAlphabetical() {
+    const rows = Object.values(this._data.projects).sort((a, b) =>
+      String(a.name).localeCompare(String(b.name)),
+    );
+    for (let i = 0; i < rows.length; i += 1) {
+      const p = this._data.projects[rows[i].id];
+      if (p) p.sort_order = i + 1;
+    }
+    this.save();
+  }
+
+  /**
+   * @param {string} projectId
+   * @param {'up' | 'down'} direction
+   * @returns {{ ok: true } | { ok: false, error: string }}
+   */
+  reorderProjectNeighbor(projectId, direction) {
+    msc_vpeSanitizeSortOrder(this);
+    const ordered = this.listProjectsAlphabetical();
+    const i = ordered.findIndex((r) => r.id === projectId);
+    if (i < 0) return { ok: false, error: 'not_found' };
+    const j = direction === 'up' ? i - 1 : i + 1;
+    if (j < 0 || j >= ordered.length) return { ok: false, error: 'no_neighbor' };
+    const a = ordered[i];
+    const b = ordered[j];
+    const pa = this._data.projects[a.id];
+    const pb = this._data.projects[b.id];
+    if (!pa || !pb) return { ok: false, error: 'not_found' };
+    const sa = Number(pa.sort_order);
+    const sb = Number(pb.sort_order);
+    const va = Number.isFinite(sa) ? sa : 0;
+    const vb = Number.isFinite(sb) ? sb : 0;
+    pa.sort_order = vb;
+    pb.sort_order = va;
+    this.save();
+    return { ok: true };
+  }
+
+  /**
+   * JSON fallback engine: copy `vader-engine.json` into `vpe-backups` (rotated).
+   * @param {string} projectRootAbs
+   * @returns {{ ok: true, path: string }}
+   */
+  portableVaultBackupToProjectRoot(projectRootAbs) {
+    const root = path.resolve(projectRootAbs);
+    const dir = path.join(root, 'vpe-backups');
+    fs.mkdirSync(dir, { recursive: true });
+    const stamp = msc_vpePortableBackupTimestamp();
+    const dest = path.join(dir, `vpe_backup_${stamp}.json`);
+    if (!fs.existsSync(this._jsonPath)) {
+      throw new Error('VPE: JSON engine store file not found');
+    }
+    fs.copyFileSync(this._jsonPath, dest);
+    msc_vpeRotatePortableBackups(dir, '.json', 5);
+    return { ok: true, path: dest };
   }
 
   getSettings() {
@@ -1007,7 +1175,65 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
     ver = 13;
   }
 
+  if (ver < 14) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('sort_order')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`);
+    }
+    ver = 14;
+  }
+
+  if (ver < 15) {
+    let sn = msc_sqliteTableColumnNames(db, 'settings');
+    if (!sn.includes('auto_sync_db_on_close')) {
+      db.exec(
+        `ALTER TABLE settings ADD COLUMN auto_sync_db_on_close INTEGER NOT NULL DEFAULT 0`,
+      );
+      sn = msc_sqliteTableColumnNames(db, 'settings');
+    }
+    ver = 15;
+  }
+
   db.pragma(`user_version = ${ver}`);
+}
+
+/**
+ * @param {string} backupDir
+ * @param {string} suffix — e.g. `.sqlite` or `.json`
+ * @param {number} keep
+ */
+function msc_vpeRotatePortableBackups(backupDir, suffix, keep) {
+  let names = [];
+  try {
+    names = fs.readdirSync(backupDir);
+  } catch {
+    return;
+  }
+  const matches = names.filter((n) => n.startsWith('vpe_backup_') && n.endsWith(suffix));
+  const scored = matches.map((n) => {
+    const full = path.join(backupDir, n);
+    let ms = 0;
+    try {
+      ms = fs.statSync(full).mtimeMs;
+    } catch {
+      /* */
+    }
+    return { full, ms };
+  });
+  scored.sort((a, b) => b.ms - a.ms);
+  for (let i = keep; i < scored.length; i += 1) {
+    try {
+      fs.unlinkSync(scored[i].full);
+    } catch {
+      /* */
+    }
+  }
+}
+
+function msc_vpePortableBackupTimestamp() {
+  const d = new Date();
+  const pad = (n, w = 2) => String(n).padStart(w, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
 function msc_seedSqlite(database) {
@@ -1079,9 +1305,29 @@ function msc_getPersistentStore() {
   return storeSingleton;
 }
 
+/**
+ * @param {unknown} store — `SqlitePersistence` | `JsonPersistence`
+ * @param {string} projectRootAbs — portable tree root (`process.cwd()` for checkout layout)
+ * @returns {{ ok: true, path: string } | { ok: false, error: string }}
+ */
+function msc_vpePortableBackupFromStore(store, projectRootAbs) {
+  if (!store || typeof store.portableVaultBackupToProjectRoot !== 'function') {
+    return { ok: false, error: 'VPE: Portable backup requires active persistence engine.' };
+  }
+  try {
+    return store.portableVaultBackupToProjectRoot(projectRootAbs);
+  } catch (e) {
+    const m = e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e);
+    return { ok: false, error: m };
+  }
+}
+
 module.exports = {
   msc_createPersistentStore,
   msc_getPersistentStore,
+  msc_getStorePaths,
+  msc_vpePortableBackupFromStore,
+  msc_vpeSanitizeSortOrder,
   msc_sqliteApplyBaseSchema,
   msc_sqliteMigrateSchemaAndPorts,
   VPE_SQLITE_USER_VERSION,

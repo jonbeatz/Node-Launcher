@@ -271,68 +271,60 @@ export function ProjectGrid({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.22 }}
-            className={`transition-[gap] duration-200 ease-out ${isCompactGrid ? 'vpe-grid-compact' : 'vpe-grid-cinema'}`}
+            className={`items-start transition-[gap] duration-200 ease-out ${isCompactGrid ? 'vpe-grid-compact' : 'vpe-grid-cinema'}`}
           >
             <AnimatePresence mode="popLayout">
               {filteredProjects.map((project) => (
-                <motion.div
+                <Msc_ProjectCard
                   key={project.id}
-                  layout
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="transition-all duration-200 ease-out"
-                >
-                  <Msc_ProjectCard
-                    name={project.name}
-                    isCompact={isCompactGrid}
-                    projectPath={project.path}
-                    project_folder_created_at={
-                      project.project_folder_created_at
-                    }
-                    project_folder_modified_at={
-                      project.project_folder_modified_at
-                    }
-                    port={project.port}
-                    status={project.status}
-                    devSessionStartedAt={project.dev_session_started_at ?? null}
-                    health_http_code={project.health_http_code}
-                    health_checked_at={project.health_checked_at}
-                    health_reachable={project.health_reachable}
-                    isFavorite={project.is_favorite}
-                    node_modules_missing={project.node_modules_missing}
-                    onToggleFavorite={() => onToggleFavorite(project.id)}
-                    thumbnailUrl={
-                      project.thumbnail_url ?? undefined
-                    }
-                    hasBuilt={project.hasBuilt}
-                    onStart={() => void onToggleStatus(project.id)}
-                    onStop={() => void onToggleStatus(project.id)}
-                    onInstallAndStart={() => void onInstallAndStart(project.id)}
-                    onBuild={() => void onRunBuild(project.id)}
-                    onLogs={() => onLogs(project.id)}
-                    onViewErrorConsole={() => onLogs(project.id)}
-                    onCardInteraction={() => onPickProjectMeta(project.name)}
-                    onSettings={() => onSettings(project.name)}
-                    onUnregister={() => onUnregister(project.name)}
-                    onContextMenu={(e) => onContextMenu(e, project.id)}
-                    onOpenInBrowser={() =>
-                      void onOpenProjectUrl(project.id)
-                    }
-                    devInstallInProgress={Boolean(
-                      devInstallUiByProject[project.id],
-                    )}
-                    shieldProjectType={
-                      project.shield_project_type ?? 'unknown'
-                    }
-                    vaultHasReferenceFiles={
-                      Boolean(project.vault_has_files) &&
-                      msc_rowHasDocumentationEnabled(project.has_documentation)
-                    }
-                    isSelected={selectedProjectId === project.id}
-                  />
-                </motion.div>
+                  id={project.id}
+                  name={project.name}
+                  isCompact={isCompactGrid}
+                  projectPath={project.path}
+                  project_folder_created_at={
+                    project.project_folder_created_at
+                  }
+                  project_folder_modified_at={
+                    project.project_folder_modified_at
+                  }
+                  port={project.port}
+                  status={project.status}
+                  devSessionStartedAt={project.dev_session_started_at ?? null}
+                  health_http_code={project.health_http_code}
+                  health_checked_at={project.health_checked_at}
+                  health_reachable={project.health_reachable}
+                  isFavorite={project.is_favorite}
+                  node_modules_missing={project.node_modules_missing}
+                  onToggleFavorite={() => onToggleFavorite(project.id)}
+                  thumbnailUrl={
+                    project.thumbnail_url ?? undefined
+                  }
+                  hasBuilt={project.hasBuilt}
+                  onStart={() => void onToggleStatus(project.id)}
+                  onStop={() => void onToggleStatus(project.id)}
+                  onInstallAndStart={() => void onInstallAndStart(project.id)}
+                  onBuild={() => void onRunBuild(project.id)}
+                  onLogs={() => onLogs(project.id)}
+                  onViewErrorConsole={() => onLogs(project.id)}
+                  onCardInteraction={() => onPickProjectMeta(project.name)}
+                  onSettings={() => onSettings(project.name)}
+                  onUnregister={() => onUnregister(project.name)}
+                  onContextMenu={(e) => onContextMenu(e, project.id)}
+                  onOpenInBrowser={() =>
+                    void onOpenProjectUrl(project.id)
+                  }
+                  devInstallInProgress={Boolean(
+                    devInstallUiByProject[project.id],
+                  )}
+                  shieldProjectType={
+                    project.shield_project_type ?? 'unknown'
+                  }
+                  vaultHasReferenceFiles={
+                    Boolean(project.vault_has_files) &&
+                    msc_rowHasDocumentationEnabled(project.has_documentation)
+                  }
+                  isSelected={selectedProjectId === project.id}
+                />
               ))}
             </AnimatePresence>
           </motion.div>

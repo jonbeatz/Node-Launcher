@@ -439,7 +439,7 @@ body {
   background-color: #121212;
 }
 
-/* v1.7.9 — dashboard grids */
+/* Dashboard grids — gap on the grid class (full-width cinematic rhythm). */
 .vpe-grid-cinema {
   display: grid;
   gap: 1.25rem;
