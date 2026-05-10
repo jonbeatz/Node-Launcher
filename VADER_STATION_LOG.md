@@ -90,6 +90,14 @@ Sidebar **Favorites** toggles a **favorites-only** dashboard filter (**`is_favor
 
 **STOP** (**Cinema** + **Compact**): **`#e02b20`** surface, **white** label + **Square** with **`fill="currentColor"`**, **`strokeWidth={0}`** (including hover **`#c41e17`**). **PLAY** (**List**): same solid triangle treatment as cards; **STOP** (**List**) matches. Thumbnail **paperclip** / equalizer spacers unchanged (**v1.9.5**). **`[VPE STANDBY]`** unchanged.
 
+## Orchestration Update (v1.9.7) - Added automated `vader:deploy` pipeline to bridge sync and production builds.
+
+**`vader:clean-sync`** is now **`node scripts/vpe-clean-sync.cjs`** (optional PM2 kill, **`dist/`** wipe, settle delay) **then** **`vader:dev`** in the **same shell** — run the app, verify manually, **close the window** so **`concurrently`** exits and the chain can continue. **`vader:deploy`** runs **`vader:clean-sync`** and, after dev exits, **`build:win`** → **`dist/`** **`.exe`**. Gated **snapshot / syntax / cleanup-dist** still live on **`vader:sync`** / **`vader:post-dev-forge`**, not on **`vader:deploy`**. Shell hydration still logs **`[VPE STANDBY]`** from **`VpeUiLayoutProvider`** after layout prefs load.
+
+## Type-Safe Forge (v1.9.8) - Resolved TypeScript mismatch in vpe-bridge.ts blocking production builds.
+
+**`has_documentation`** mapping uses **`msc_rowHasDocumentationEnabled`** (**`unknown`** input): **`null`/`undefined`** → default **on**; **`false`**, **`0`**, and **`'0'`** → **off**; then **`Number(v)`** with zero check for other loose values. Typed boundary: **`src/renderer/types/vpe-ipc.ts`** — **`VpeHasDocumentation`** = **`number | boolean`** on **`VpeProjectRow`** and dashboard **`Project`** (**`vpe-bridge.ts`** re-exports). JSON store load coerces legacy boolean/string to **0/1**; SQLite remains **INTEGER**. List paperclip and cards (**`vaultHasReferenceFiles`** on **`page.tsx`**) share the same gate with **`vault_has_files`**. **STOP** / **START** / thumbnail **paperclip** (**`top-2 right-2`**, **`bg-[#00000066]`**) unchanged in **Card** + **List**. **`[VPE STANDBY]`** unchanged (**`VpeUiLayoutProvider`**).
+
 ---
 
 ## Vault UX Polish (v1.6.2) [COMPLETE]

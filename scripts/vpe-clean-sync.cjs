@@ -1,30 +1,27 @@
 'use strict';
 
 /**
- * Aggressive clean-sync — lock-clear via `vpe-pm2-kill-optional.cjs` + `npx rimraf dist` in npm,
- * second dist wipe here, hard delay so PM2/Electron teardown can settle,
- * then detached `vader:dev` + settle window + `vader:post-dev-forge`.
+ * Pre-dev clean — optional PM2 sweep, remove `dist/`, hard settle delay.
+ * Invoked by `npm run vader:clean-sync` **before** `npm run vader:dev` (see `package.json`).
  *
- * Note: `(npm run vader:dev || exit 0) && forge` cannot be inlined in package.json because
- * `vader:dev` is long-running (concurrently keeps the process alive). This script mirrors the
- * intent: never fail the pipeline if the dev spawn errors (`|| exit 0`).
+ * Does **not** spawn Electron or run `vader:post-dev-forge`. For gated snapshot + syntax
+ * + pack after dev, use `vader:sync` or `vader:dev-to-forge`. For deploy after manual
+ * verification, use `vader:deploy` (clean + dev, then `build:win` when dev exits).
  *
  * Only `dist/` is removed. Never deletes `media/` or repo `build/`.
  */
 
 const fs = require('fs');
 const path = require('path');
-const { spawn, spawnSync } = require('child_process');
+const { spawnSync } = require('child_process');
 const { setTimeout: delay } = require('timers/promises');
 
 const root = path.join(__dirname, '..');
 const distDir = path.join(root, 'dist');
+const pm2Kill = path.join(__dirname, 'vpe-pm2-kill-optional.cjs');
 
-const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 /** After rimraf / PM2 kill — let Windows release handles and ports. */
 const HARD_DELAY_MS = 15_000;
-/** After spawning detached dev — stack warm-up before forge. */
-const SETTLE_AFTER_DEV_MS = 10_000;
 
 function msc_spawnEnv() {
   return {
@@ -40,37 +37,17 @@ function msc_rimrafDist() {
 }
 
 (async () => {
-  msc_rimrafDist();
-
-  await delay(HARD_DELAY_MS);
-
-  try {
-    const dev = spawn(NPM, ['run', '--silent', 'vader:dev'], {
-      cwd: root,
-      shell: process.platform === 'win32',
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-      env: msc_spawnEnv(),
-    });
-    dev.unref();
-  } catch {
-    /* Treat like `|| exit 0` — still attempt forge */
-  }
-
-  await delay(SETTLE_AFTER_DEV_MS);
-
-  const post = spawnSync(NPM, ['run', '--silent', 'vader:post-dev-forge'], {
+  spawnSync(process.execPath, [pm2Kill], {
     cwd: root,
-    shell: process.platform === 'win32',
-    stdio: ['ignore', process.stdout, process.stderr],
+    stdio: 'inherit',
     env: msc_spawnEnv(),
     windowsHide: true,
   });
 
-  const code = post.status === null ? 1 : post.status ?? 1;
-  if (code === 0) {
-    console.log('[VPE STANDBY]');
-  }
-  process.exit(code);
+  msc_rimrafDist();
+
+  await delay(HARD_DELAY_MS);
+
+  console.log('[VPE CLEAN-SYNC] dist cleared; next: vader:dev (close app to continue deploy chain).')
+  process.exit(0);
 })().catch(() => process.exit(1));

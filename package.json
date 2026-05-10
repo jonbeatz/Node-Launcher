@@ -1,7 +1,7 @@
 {
   "name": "vader-project-engine",
-  "version": "1.9.6",
-  "description": "Vader Project Engine — Station Prime (v1.9.6)",
+  "version": "1.9.8",
+  "description": "Vader Project Engine — Station Prime (v1.9.8)",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {
@@ -12,7 +12,8 @@
     "vpe:cleanup-dist": "node scripts/msc-cleanup-dist.cjs",
     "vader:dev-to-forge": "npm run vader:dev && npm run vader:post-dev-forge",
     "vader:sync": "npm run vader:dev -- --success last && npm run vader:post-dev-forge",
-    "vader:clean-sync": "node scripts/vpe-pm2-kill-optional.cjs && npx rimraf dist && node scripts/vpe-clean-sync.cjs",
+    "vader:clean-sync": "node scripts/vpe-clean-sync.cjs && npm run vader:dev",
+    "vader:deploy": "npm run vader:clean-sync && npm run build:win",
     "vpe:force-clear": "taskkill /F /IM node.exe /T /FI \"MEMUSAGE gt 1000\" || node -e \"process.exit(0)\"",
     "vpe:take-state-snapshot": "node scripts/vpe-prebuild-snapshot.cjs",
     "vpe:check-readiness": "node scripts/vpe-syntax-guard.cjs",

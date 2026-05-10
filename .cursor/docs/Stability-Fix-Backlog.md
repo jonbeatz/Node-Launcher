@@ -1,6 +1,6 @@
 # Stability & fix backlog (resolved)
 
-Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** (**`--success last`**), **`vader:clean-sync`** (**`rimraf` + hardened `||`**), **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.8**). For **v1.3.2+** **Ghost watcher** behavior (orphan **node.exe** on catalog ports + **TopBar Activity** amber cue), see **§ Windows ghost process** below (**Related — UI visibility**).
+Living notes for **problems we hit and how we fixed them**—mostly Windows packaging, Electron, and Next static export. For day-to-day commands, see [Custom-Commands](Custom-Commands.md). For **deterministic build sequencing** ( **`vader:sync`** (**`--success last`**), **`vader:clean-sync`** / **`vader:deploy`** (**v1.9.7+** — see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md)), **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`asar`** / natives, **`dist/` hygiene**), see [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) (**v1.1.8**). For **v1.3.2+** **Ghost watcher** behavior (orphan **node.exe** on catalog ports + **TopBar Activity** amber cue), see **§ Windows ghost process** below (**Related — UI visibility**).
 
 ---
 
@@ -214,4 +214,4 @@ This de-bricks startup and keeps packaging stable while preserving all runtime f
 
 ---
 
-*Last updated: 2026-05-09 — shipped **`package.json` `1.9.6`** (git branch may still read **`VPE-v1.6.x-Dev`**); **v1.3.7** ASAR **`asarUnpack`** for natives (above); **v1.3.2** Ghost watcher (see **Windows ghost process**); [Checkpoint](Checkpoint.md). Forge / `concurrently` baseline **v1.1.8** in [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md). Footer string: match **`package.json`** / preload — not frozen in this doc.*
+*Last updated: 2026-05-09 — shipped **`package.json` `1.9.8`** (git branch may still read **`VPE-v1.6.x-Dev`**); **v1.3.7** ASAR **`asarUnpack`** for natives (above); **v1.3.2** Ghost watcher (see **Windows ghost process**); [Checkpoint](Checkpoint.md). Forge / `concurrently` baseline **v1.1.8** in [VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md). Footer string: match **`package.json`** / preload — not frozen in this doc.*

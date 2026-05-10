@@ -1,49 +1,13 @@
 /** SQLite / IPC row from main process */
 
-export type VpeShieldProjectType =
-  | 'v0'
-  | 'electron'
-  | 'web'
-  | 'node'
-  | 'unknown'
+import type { VpeProjectRow, VpeShieldProjectType } from '@/types/vpe-ipc'
 
-export interface VpeProjectRow {
-  id: string
-  name: string
-  path: string
-  port: number
-  status: 'running' | 'stopped'
-  thumbnail_url: string | null
-  start_script: string
-  build_script: string
-  pkg_manager: string
-  /** User override (`null`/empty → auto classify). SQLite v6+ */
-  project_type?: string | null
-  /** Live classifier for current path */
-  detected_project_type?: VpeShieldProjectType
-  /** Resolved shield icon on cards (`project_type` or detected). */
-  shield_project_type?: VpeShieldProjectType
-  /** Last HTTP status from GET / on project port after dev start; null if unreachable. */
-  health_http_code?: number | null
-  health_checked_at?: string | null
-  /** Whether TCP/HTTP reply was received (vs connection error). SQLite may return 0/1. */
-  health_reachable?: boolean | number | null
-  is_favorite?: number | boolean | null
-  /** SQLite v7+ — hidden from default dashboard until Archive filter */
-  is_archived?: number | boolean | null
-  /** SQLite v8+ — Project Settings notes */
-  notes?: string | null
-  /** Renderer enrich: reference vault has ≥1 user file (not internal thumb / keep). */
-  vault_has_files?: boolean
-  /** SQLite v13+ — when false/0, hide documentation (paperclip) even if vault has files. */
-  has_documentation?: number | boolean | null
-  node_modules_missing?: boolean
-  /** ISO timestamps from `fs.statSync` on project `path` (main enrich). */
-  project_folder_created_at?: string | null
-  project_folder_modified_at?: string | null
-  /** ISO time when dev session last started (SQLite v11+); drives live uptime in renderer. */
-  dev_session_started_at?: string | null
-}
+export type {
+  Project,
+  VpeHasDocumentation,
+  VpeProjectRow,
+  VpeShieldProjectType,
+} from '@/types/vpe-ipc'
 
 export interface VpeUnifiedLogRow {
   project_id: string
@@ -469,6 +433,14 @@ export function msc_formatUnknownIPCError(reason: unknown): string {
   return n ? `[${n}]` : '[unserializable]'
 }
 
+/** SQLite / IPC: integer booleans + loose `'0'` from legacy paths; default on when null/undefined. */
+export function msc_rowHasDocumentationEnabled(v: unknown): boolean {
+  if (v === null || typeof v === 'undefined') return true
+  if (v === false || v === 0 || v === '0') return false
+  const n = Number(v)
+  return !(Number.isFinite(n) && n === 0)
+}
+
 export function msc_rowToDashboardProject(row: VpeProjectRow): {
   id: string
   name: string
@@ -544,11 +516,7 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
         ? null
         : String(row.notes),
     vault_has_files: row.vault_has_files === true,
-    has_documentation: !(
-      row.has_documentation === false ||
-      row.has_documentation === 0 ||
-      row.has_documentation === '0'
-    ),
+    has_documentation: msc_rowHasDocumentationEnabled(row.has_documentation),
     project_folder_created_at: row.project_folder_created_at ?? null,
     project_folder_modified_at: row.project_folder_modified_at ?? null,
   }

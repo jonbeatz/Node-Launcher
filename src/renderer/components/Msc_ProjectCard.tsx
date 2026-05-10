@@ -676,10 +676,10 @@ export function Msc_ProjectCard({
             title="Vault reference files"
           >
             <span
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#00000066] text-[#eaeaea]"
+              className="inline-flex size-6 items-center justify-center rounded-md bg-[#00000066] text-[#eaeaea]"
               aria-hidden
             >
-              <Paperclip size={12} strokeWidth={2} />
+              <Paperclip size={11} strokeWidth={2} />
             </span>
           </div>
         ) : null}

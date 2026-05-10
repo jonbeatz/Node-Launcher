@@ -17,29 +17,14 @@ import {
   Paperclip,
 } from 'lucide-react'
 import { VpeHealthEqualizerIcon } from '@/components/vpe-health-equalizer-icon'
-
-interface Project {
-  id: string
-  name: string
-  port: number
-  uptime: string
-  status: 'running' | 'stopped' | 'error' | 'building'
-  cpu: number
-  ram: string
-  pkgManager: 'npm' | 'yarn' | 'pnpm'
-  path: string
-  hasBuilt?: boolean
-  health_http_code?: number | null
-  health_checked_at?: string | null
-  health_reachable?: boolean | null
-  shield_project_type?: string | null
-  notes?: string | null
-  vault_has_files?: boolean
-  has_documentation?: boolean
-}
+import { msc_rowHasDocumentationEnabled } from '@/lib/vpe-bridge'
+import type { Project } from '@/types/vpe-ipc'
 
 function msc_listDocPaperclip(project: Project): boolean {
-  return project.vault_has_files === true
+  return (
+    project.vault_has_files === true &&
+    msc_rowHasDocumentationEnabled(project.has_documentation)
+  )
 }
 
 function msc_listEqualizerTone(

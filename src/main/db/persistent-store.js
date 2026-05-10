@@ -466,6 +466,21 @@ class JsonPersistence {
       if (p.has_documentation === undefined) {
         p.has_documentation = 1;
         changed = true;
+      } else {
+        const hd = p.has_documentation;
+        let n = null;
+        if (hd === false || hd === 0 || hd === '0') n = 0;
+        else if (hd === true || hd === 1 || hd === '1') n = 1;
+        else if (typeof hd === 'string') {
+          const parsed = Number(hd);
+          n = Number.isFinite(parsed) && parsed === 0 ? 0 : 1;
+        } else if (typeof hd === 'number' && Number.isFinite(hd)) {
+          n = hd === 0 ? 0 : 1;
+        }
+        if (n !== null && p.has_documentation !== n) {
+          p.has_documentation = n;
+          changed = true;
+        }
       }
     }
     const list = Object.values(this._data.projects);
@@ -932,6 +947,7 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
     ver = 12;
   }
 
+  // Registry: documentation/paperclip gate — INTEGER 0/1 only (never TEXT).
   if (ver < 13) {
     const names = msc_sqliteTableColumnNames(db, 'projects');
     if (!names.includes('has_documentation')) {

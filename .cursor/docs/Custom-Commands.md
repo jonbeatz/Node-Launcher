@@ -4,7 +4,7 @@ This file tracks shorthand commands you want me to execute in this repo.
 
 **Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [.cursor/docs/VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md).
 
-**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Shipped semver:** root **`package.json`** (currently **`1.9.6`**) is authoritative for preload/footer/UI labels; it may advance in **patch** while the git branch name stays on an older line until you cut a new **`VPE-v1.{minor}.x-Dev`**. **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (example next line after **`VPE-v1.6.x-Dev`**: **`VPE-v1.7.x-Dev`**). Keep **`package.json` `version`** aligned with the branch line’s **minor** when you open a new line (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.9.6](Checkpoint.md), [Checkpoint — Build v1.6.0](Checkpoint.md)).
+**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Shipped semver:** root **`package.json`** (currently **`1.9.8`**) is authoritative for preload/footer/UI labels; it may advance in **patch** while the git branch name stays on an older line until you cut a new **`VPE-v1.{minor}.x-Dev`**. **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (example next line after **`VPE-v1.6.x-Dev`**: **`VPE-v1.7.x-Dev`**). Keep **`package.json` `version`** aligned with the branch line’s **minor** when you open a new line (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.9.8](Checkpoint.md), [Checkpoint — Build v1.6.0](Checkpoint.md)).
 
 **Solved problems (symptoms → fixes):** [Stability-Fix-Backlog](Stability-Fix-Backlog.md).
 
@@ -120,9 +120,9 @@ Embedded **Log Drawer** slash commands (**`vpe:execute-terminal-command`**) stay
 
 ## Vader Sync
 
-Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), then the same **`vader:post-dev-forge`** tail (**`vpe-forge-pause`** → snapshot → syntax guard → **`build:win`** → **`vpe:cleanup-dist`**). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **`post-dev-forge`** until **all** dev children have exited. **`npm run vader:clean-sync`** runs **`rimraf dist`** first, then **`(vader:dev || …)`** so **`post-dev-forge`** still runs after dev teardown even if **`vader:dev`** exits non-zero (**no** **`--success last`**). If the syntax guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
+Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Electron), then the same **`vader:post-dev-forge`** tail (**`vpe-forge-pause`** → snapshot → syntax guard → **`build:win`** → **`vpe:cleanup-dist`**). **`npm run vader:sync`** adds **`-- --success last`** so **`concurrently`** does not release the shell to **`post-dev-forge`** until **all** dev children have exited. **`npm run vader:clean-sync`** runs **`vpe-clean-sync.cjs`** (PM2 optional, **`dist/`** delete, settle) **then** **`vader:dev`** — interactive only (**v1.9.7+**); no automatic forge. **`npm run vader:deploy`** runs **`vader:clean-sync`** and, after you close dev, **`build:win`** (no snapshot/syntax/cleanup-dist — use **`vader:sync`** for the full gate). If the syntax guard fails, the chain stops and the terminal shows **`VPE_SYNTAX_GUARD:`** lines.
 
-**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) — **v1.2.3** catalog **`install && dev`** (§2 managed dev); forge chain still keyed to **`vader:clean-sync`** / **`vader:sync`** / **`&&`** / **`VPE_LAUNCHER_FORGE`** / **`rimraf dist`** / **`vpe-forge-pause`** (**v1.1.8** baseline).
+**Full protocol:** [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) — **v1.2.3** catalog **`install && dev`** (§2 managed dev); forge chain keyed to **`vader:sync`** / **`vader:deploy`** / **`vader:clean-sync`** / **`&&`** / **`VPE_LAUNCHER_FORGE`** / **`vpe-forge-pause`** (**v1.1.8** baseline).
 
 ### How **`vader:sync`** works
 
@@ -138,7 +138,8 @@ Sequential flow: validate UI + IPC in **`npm run vader:dev`** (full Next + Elect
 | :--- | :--- |
 | **`npm run vader:dev-to-forge`** | **`vader:dev`** then **`vader:post-dev-forge`** when dev exits. For **no race** with **Next** on **3000**, prefer **`vader:sync`** (**`--success last`**) instead. |
 | **`npm run vader:sync`** | **`vader:dev` with `--success last`**, then snapshot → syntax guard → pack. Waits for **full** dev teardown before forge. |
-| **`npm run vader:clean-sync`** | **`rimraf dist`**, then **`vader:dev`** (with **`||`** fallback so forge still runs if dev exits non-zero), then **`vader:post-dev-forge`**. For **`--success last`** gating, use **`vader:sync`** instead. |
+| **`npm run vader:clean-sync`** | **`vpe-clean-sync.cjs`** then **`vader:dev`** — delete **`dist/`**, verify in the shell; close app to exit. |
+| **`npm run vader:deploy`** | **`vader:clean-sync`** then **`build:win`** after dev exits — primary production compile path (**no** snapshot/syntax/cleanup-dist). |
 | **`npm run vader:post-dev-forge`** | Usually internal: **3s** **`vpe-forge-pause`** → snapshot + **`vpe:check-readiness`** + **`build:win`** + **`vpe:cleanup-dist`**. Same order as the tail of **`vader:sync`**. |
 | **`npm run vader:force-forge`** | Same as **`vader:post-dev-forge`**. |
 | **`npm run vpe:cleanup-dist`** | **`scripts/msc-cleanup-dist.cjs`** — strip **`dist/`** root **`.blockmap`**, **`.yml`**, **`builder-effective-config.yaml`** only (never **`media/`**). Also runnable standalone after **`npm run build:main`**. |
@@ -162,7 +163,7 @@ Intent: **restart** the VPE dev stack—same as **start app** after killing stra
 
 ### How to say it
 
-Use **restart app**, **restart the app**, or **restart dev** when you want the agent to stop existing **node/electron** then run **`npm run dev`** again. Use **`npm run vader:sync`** when you want **`--success last`** before the forge tail, or **`npm run vader:clean-sync`** when you also need **`rimraf dist`** first (**hardened `||` gate** — see **[Vader Sync](#vader-sync)**).
+Use **restart app**, **restart the app**, or **restart dev** when you want the agent to stop existing **node/electron** then run **`npm run dev`** again. Use **`npm run vader:sync`** when you want **`--success last`** before the full forge tail, **`npm run vader:deploy`** for clean + dev + **`build:win`**, or **`npm run vader:clean-sync`** when you only need **`dist/`** wiped then **`vader:dev`** (see **[Vader Sync](#vader-sync)**).
 
 ### Steps I will run when you say **restart app**
 

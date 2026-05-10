@@ -27,10 +27,12 @@ import { ToastProvider, useToast } from '@/components/vader-toast'
 import {
   getVpeApi,
   msc_formatUnknownIPCError,
+  msc_rowHasDocumentationEnabled,
   msc_rowToDashboardProject,
   msc_withIpcTimeout,
   VPE_GET_PROJECTS_TIMEOUT_MS,
 } from '@/lib/vpe-bridge'
+import type { Project } from '@/types/vpe-ipc'
 import {
   msc_applyTacticalProjectFilter,
   msc_computeTacticalCounts,
@@ -52,49 +54,6 @@ function msc_dashboardDefaultViewFromSettings(
   if (v === 'list' || v === 'compact' || v === 'cinema') return v
   if (v === 'card') return 'cinema'
   return 'cinema'
-}
-
-interface Project {
-  id: string
-  name: string
-  port: number
-  uptime: string
-  status: 'running' | 'stopped' | 'error' | 'building'
-  cpu: number
-  ram: string
-  pkgManager: 'npm' | 'yarn' | 'pnpm'
-  path: string
-  group?: string
-  hasBuilt?: boolean
-  start_script?: string
-  build_script?: string
-  thumbnail_url?: string | null
-  health_http_code?: number | null
-  health_checked_at?: string | null
-  health_reachable?: boolean | null
-  is_favorite?: boolean
-  node_modules_missing?: boolean
-  project_type?: string | null
-  detected_project_type?:
-    | 'v0'
-    | 'electron'
-    | 'web'
-    | 'node'
-    | 'unknown'
-  shield_project_type?:
-    | 'v0'
-    | 'electron'
-    | 'web'
-    | 'node'
-    | 'unknown'
-  is_archived?: boolean
-  notes?: string | null
-  vault_has_files?: boolean
-  /** Registry (SQLite v13+); paperclip requires true + vault reference files. */
-  has_documentation?: boolean
-  project_folder_created_at?: string | null
-  project_folder_modified_at?: string | null
-  dev_session_started_at?: string | null
 }
 
 /** Browser fallback when `window.vpeAPI` is unavailable (Next standalone). */
@@ -1352,7 +1311,10 @@ function DashboardContent() {
                                 shieldProjectType={
                                   project.shield_project_type ?? 'unknown'
                                 }
-                                vaultHasReferenceFiles={Boolean(project.vault_has_files)}
+                                vaultHasReferenceFiles={
+                                  Boolean(project.vault_has_files) &&
+                                  msc_rowHasDocumentationEnabled(project.has_documentation)
+                                }
                                 isSelected={selectedProjectId === project.id}
                               />
                             </motion.div>
