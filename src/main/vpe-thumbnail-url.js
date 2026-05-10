@@ -35,7 +35,7 @@ function msc_bumpVaultThumbPulse(projectId, ts = Date.now()) {
 function msc_internalVaultThumbAbsForRow(row) {
   if (!row?.name) return '';
   return msc_normalizeResolvedPath(
-    path.join(msc_projectVaultProjectDir(String(row.name)), VPE_VAULT_INTERNAL_THUMB),
+    path.join(msc_projectVaultProjectDir(String(row.name), row.id), VPE_VAULT_INTERNAL_THUMB),
   );
 }
 
@@ -132,6 +132,13 @@ function msc_enrichRowThumbnailForRenderer(row) {
 /** Map renderer `vpe-vault:` back to `file:` for SQLite (internal thumb only). */
 function msc_normalizeThumbnailUrlForPersistence(row, incoming) {
   if (!incoming || typeof incoming !== 'string') return incoming;
+  /** Draft modal preview uses `data:image/png;base64,...`; on-disk vault PNG is canonical for SQLite. */
+  if (incoming.startsWith('data:')) {
+    if (!row?.name) return null;
+    const abs = msc_internalVaultThumbAbsForRow(row);
+    if (abs && fs.existsSync(abs)) return pathToFileURL(abs).href;
+    return null;
+  }
   if (!incoming.startsWith('vpe-vault:') || !row?.id) return incoming;
   try {
     const u = new URL(incoming);

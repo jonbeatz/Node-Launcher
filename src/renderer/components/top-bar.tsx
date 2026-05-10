@@ -84,7 +84,7 @@ export function TopBar({
   }
 
   return (
-    <header className="h-12 w-full bg-[#1c1c1c] border-b border-[#333333] flex items-center justify-between px-4 shrink-0">
+    <header className="flex h-12 w-full shrink-0 items-center justify-between border-b border-[#333333] bg-[#1c1c1c] pl-4 pr-12">
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <span className="font-sans font-bold text-white text-sm uppercase tracking-[0.05em] shrink-0">
           VPE
@@ -105,7 +105,7 @@ export function TopBar({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0 mr-[13px]">
+      <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           onClick={onOpenSettings}

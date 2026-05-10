@@ -1,5 +1,48 @@
 'use strict';
 
+/** Windows file dialog: Electron skips a lone `*.*` row when picking a default type, so multi-row lists default to the second row; one combined row fixes “All Files” as the active filter. */
+const MSC_WIN32 = process.platform === 'win32';
+
+/** @type {{ name: string; extensions: string[] }[]} */
+const MSC_VAULT_ADD_FILTERS_STANDARD = [
+  { name: 'All Files', extensions: ['*'] },
+  { name: 'Archives', extensions: ['zip', 'rar', '7z', 'tar', 'gz'] },
+  { name: 'Documents', extensions: ['pdf', 'md', 'txt', 'html', 'exe'] },
+];
+
+/** @type {{ name: string; extensions: string[] }[]} */
+const MSC_VAULT_ADD_FILTERS_WIN32 = [
+  {
+    name: 'All Files',
+    extensions: [
+      '*',
+      'zip',
+      'rar',
+      '7z',
+      'tar',
+      'gz',
+      'pdf',
+      'md',
+      'txt',
+      'html',
+      'htm',
+      'exe',
+      'msi',
+    ],
+  },
+];
+
+/** @type {{ name: string; extensions: string[] }[]} */
+const MSC_THUMB_FILTERS_STANDARD = [
+  { name: 'All Files', extensions: ['*'] },
+  { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] },
+];
+
+/** @type {{ name: string; extensions: string[] }[]} */
+const MSC_THUMB_FILTERS_WIN32 = [
+  { name: 'All Files', extensions: ['*', 'png', 'jpg', 'jpeg', 'webp', 'gif'] },
+];
+
 /**
  * IPC domain: per-project vault files, thumbnails, prompt vault JSON, external URLs.
  *
@@ -22,6 +65,8 @@ function msc_registerVaultIpc(ipcMain, c) {
     msc_projectVaultProjectDir,
     msc_isVaultInternalThumbBase,
     msc_isVaultKeepFile,
+    msc_isVaultNonUserNoiseFile,
+    msc_normalizeThumbnailUrlForPersistence,
     msc_promptVaultPath,
     msc_promptVaultMasterItems,
     msc_mergePromptVaultMasters,
@@ -62,10 +107,9 @@ function msc_registerVaultIpc(ipcMain, c) {
     const win = BrowserWindow.getFocusedWindow();
     const result = await dialog.showOpenDialog(win || undefined, {
       title: 'Select project thumbnail image',
+      filters: MSC_WIN32 ? MSC_THUMB_FILTERS_WIN32 : MSC_THUMB_FILTERS_STANDARD,
       properties: ['openFile'],
-      filters: [
-        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] },
-      ],
+      defaultFilterIndex: 0,
     });
     if (result.canceled || !result.filePaths?.[0]) return null;
 
@@ -74,7 +118,7 @@ function msc_registerVaultIpc(ipcMain, c) {
 
     let outPath;
     try {
-      outPath = await msc_writeVaultInternalThumbnail(src, displayName);
+      outPath = await msc_writeVaultInternalThumbnail(src, displayName, row?.id);
     } catch (err) {
       const m =
         err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
@@ -89,12 +133,17 @@ function msc_registerVaultIpc(ipcMain, c) {
           ? null
           : String(row.project_type).trim();
 
+      const thumbnailPersist =
+        typeof msc_normalizeThumbnailUrlForPersistence === 'function'
+          ? msc_normalizeThumbnailUrlForPersistence(row, hrefBase)
+          : hrefBase;
+
       store.updateProject({
         id: row.id,
         name: row.name,
         path: row.path,
         port: row.port,
-        thumbnail_url: hrefBase,
+        thumbnail_url: thumbnailPersist ?? hrefBase,
         start_script: row.start_script,
         build_script: row.build_script,
         pkg_manager: row.pkg_manager,
@@ -108,11 +157,17 @@ function msc_registerVaultIpc(ipcMain, c) {
       } catch (_) {
         /* */
       }
-      const merged = { ...row, thumbnail_url: hrefBase };
+      const merged = { ...row, thumbnail_url: thumbnailPersist ?? hrefBase };
       return msc_rendererVaultThumbnailHref(merged, Date.now());
     }
 
-    return `${hrefBase}?pulse=${encodeURIComponent(String(Date.now()))}`;
+    /** Draft / add-project modal: `file:` is blocked from `http://localhost` in dev — return PNG data URL for preview only. */
+    try {
+      const buf = await fs.promises.readFile(outPath);
+      return `data:image/png;base64,${buf.toString('base64')}`;
+    } catch (_) {
+      return `${hrefBase}?pulse=${encodeURIComponent(String(Date.now()))}`;
+    }
   });
 
   ipcMain.handle('vpe:vault-add-file', async (event, projectId) => {
@@ -124,18 +179,12 @@ function msc_registerVaultIpc(ipcMain, c) {
       BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
     const picked = await dialog.showOpenDialog(win || undefined, {
       title: 'Add file to Project Vault — all types',
+      filters: MSC_WIN32 ? MSC_VAULT_ADD_FILTERS_WIN32 : MSC_VAULT_ADD_FILTERS_STANDARD,
       properties: ['openFile'],
-      filters: [
-        { name: 'All Files', extensions: ['*'] },
-        { name: 'Archives', extensions: ['zip', 'rar', '7z', 'tar', 'gz'] },
-        {
-          name: 'Documents & bundles',
-          extensions: ['pdf', 'md', 'txt', 'html', 'htm', 'exe', 'msi'],
-        },
-      ],
+      defaultFilterIndex: 0,
     });
     if (picked.canceled || !picked.filePaths?.[0]) return { ok: false, canceled: true };
-    const dest = msc_vault_copyFile(row.name, picked.filePaths[0]);
+    const dest = msc_vault_copyFile(row.name, picked.filePaths[0], row.id);
     return { ok: true, dest, name: path.basename(dest) };
   });
 
@@ -144,7 +193,7 @@ function msc_registerVaultIpc(ipcMain, c) {
     if (!id) throw new Error('VPE: Missing project id');
     const row = store.getProject(id);
     if (!row) throw new Error('VPE: Project not found');
-    const dir = msc_projectVaultProjectDir(row.name);
+    const dir = msc_projectVaultProjectDir(row.name, row.id);
     if (!fs.existsSync(dir)) return { ok: true, dir, files: [] };
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     const files = entries
@@ -152,7 +201,8 @@ function msc_registerVaultIpc(ipcMain, c) {
         (e) =>
           e.isFile() &&
           !msc_isVaultInternalThumbBase(e.name) &&
-          !msc_isVaultKeepFile(e.name),
+          !msc_isVaultKeepFile(e.name) &&
+          !msc_isVaultNonUserNoiseFile(e.name),
       )
       .map((e) => ({
         name: e.name,
@@ -167,7 +217,7 @@ function msc_registerVaultIpc(ipcMain, c) {
     if (!id) throw new Error('VPE: Missing project id');
     const row = store.getProject(id);
     if (!row) throw new Error('VPE: Project not found');
-    const dir = msc_projectVaultProjectDir(row.name);
+    const dir = msc_projectVaultProjectDir(row.name, row.id);
     fs.mkdirSync(dir, { recursive: true });
     await shell.openPath(dir);
     return { ok: true, dir };
@@ -191,7 +241,7 @@ function msc_registerVaultIpc(ipcMain, c) {
     }
     const row = store.getProject(id);
     if (!row) throw new Error('VPE: Project not found');
-    const dir = msc_projectVaultProjectDir(row.name);
+    const dir = msc_projectVaultProjectDir(row.name, row.id);
     const target = path.resolve(path.join(dir, base));
     const rootResolved = path.resolve(dir);
     const rel = path.relative(rootResolved, target);
@@ -336,7 +386,7 @@ function msc_registerVaultIpc(ipcMain, c) {
       if (!srcPath) throw new Error('VPE E2E: Missing srcPath.');
       const row = store.getProject(projectId);
       if (!row) throw new Error('VPE: Project not found');
-      const dest = msc_vault_copyFile(row.name, srcPath);
+      const dest = msc_vault_copyFile(row.name, srcPath, row.id);
       return { ok: true, dest, name: path.basename(dest) };
     });
   }

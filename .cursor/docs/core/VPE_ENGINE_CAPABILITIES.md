@@ -1,7 +1,7 @@
 ---
 name: vader-project-engine
-description: Technical and aesthetic authority for the Vader Project Engine (VPE). Merges legacy SKILL + Cursor hooks/prompt index (v1.9.9 doc layout).
-version: "2.2"
+description: Technical and aesthetic authority for the Vader Project Engine (VPE). Merges legacy SKILL + Cursor hooks/prompt index (v2.1.0 doc layout).
+version: "2.1"
 ---
 
 # VPE_ENGINE_CAPABILITIES.md — Vader Project Engine (VPE)
@@ -11,7 +11,7 @@ Canonical agent capability doc (**replaces root `SKILL.md`**). **Hooks** and **p
 ## Skill metadata
 
 - **Skill name:** Vader Project Engine (VPE)
-- **Version:** 2.2
+- **Version:** 2.1 (tracks **`package.json`**; ship line **2.1.0**)
 - **Author:** Jon Beatz (MSC)
 - **Primary sources:** [`.cursor/docs/core/TRUTH.md`](TRUTH.md), **`.cursorrules`**, **`README.md`**, [`.cursor/docs/guides/PRD.md`](../guides/PRD.md), [`.cursor/docs/core/Vader-Project-Engine.md`](Vader-Project-Engine.md), [`.cursor/docs/core/VPE-BUILD-PROTOCOL.md`](VPE-BUILD-PROTOCOL.md), [`.cursor/docs/core/AGENT-BOOT.md`](AGENT-BOOT.md), **`.cursor/prompts/Start-Project.md`**, **`VADER_STATION_LOG.md`**, [`.cursor/docs/guides/Checkpoint.md`](../guides/Checkpoint.md), [`.cursor/docs/guides/Custom-Commands.md`](../guides/Custom-Commands.md), [`.cursor/docs/guides/Stability.md`](../guides/Stability.md)
 

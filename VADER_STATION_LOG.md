@@ -4,9 +4,45 @@
 
 ---
 
+## Session handoff — 2026-05-09 (pause)
+
+**Stopped for today.** Next session (**priority backlog**):
+
+1. **Dashboard:** Add **arrow controls** to **reorder** projects in the registry (persist order; align with list/grid).
+2. **Regression:** Smoke an **old Node-Launcher / pre–2.1.0** checkout or packaged build — confirm **Iron Curtain** (`main.js`) exits cleanly (**`dialog.showErrorBox`** + **`process.exit(0)`**) and does **not** crash into vault sync / wipes. Use **`VPE_SKIP_IRON_CURTAIN=1`** only for intentional legacy debugging on this tree.
+3. **Optional:** Wire UI for **`vpe:repair-vault-links`** (already in main) if operators need a button beside maintenance purge.
+
+**Start Project / full context:** Follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** canonical order: **`.cursorrules`** → **`AGENT-BOOT.md`** §1 + §4 → **`API-SetUp-Master.md`** → **`.\google-api\vpe-start-api.ps1`** + **`ngrok http 4000`** → confirm **`[VPE STANDBY]`** / **API is Live** → **`VADER_STATION_LOG.md`**.
+
+---
+
+## v2.1.0 — Vault sovereignty & legacy kill-switch (Iron Curtain + rm guard)
+
+**Ship:** **`package.json` `2.1.0`** · preload **`vpeInfo.version`** · footer fallback **2.1.0**.
+
+**Main / safety:** **Iron Curtain** inside **`msc_vpeDetectLocalFirstUserData()`** — blocks legacy engine if **`package.json` &lt; 2.1.0** or path segment **`NODE-LAUNCHER`** / exe basename match; **`VPE_SKIP_IRON_CURTAIN=1`** / **`VPE_E2E_USER_DATA`** bypass. **`vpe-vault-rm-guard.js`** — **`process.env.VPE_VAULT_DELETION_LOCKED=1`**, patches **`fs.rmSync`** so paths under **`media/vault`** (and alt roots) cannot be removed unless **`global.__vpeVaultHardDeleteActive`** ( **`vpe:delete-project`** + vault rename empty-target cleanup). **`vpe-version.lock`** semver gate (older app vs newer vault) unchanged in spirit — see **`main.js`** comments.
+
+**IPC / UI:** **`vpe:repair-vault-links`**, context **Update Project Thumbnail**, vault folder from context menu, compact card **accordion** scroll (**300ms** + **`scrollIntoView`**), dark action tiles — see repo diff / **`Msc_ProjectCard.tsx`**.
+
+**`[VPE STANDBY]`** unchanged (LiteLLM ritual in **`google-api/vpe-start-api.ps1`**).
+
+---
+
 ## v2.0.0 - THE VADER STATION CORE. Full modular refactor complete. Components: ProjectGrid, StationSidebar, Domain IPC, Schema Guards, and Support Bundle.
 
 **Ship:** **`package.json` `2.0.0`** · preload **`vpeInfo.version`**. **Support:** App Settings → **Database & State** → **Generate Support Bundle** (Desktop JSON: OS/Node/Electron, redacted paths, last 100 unified log lines, PM2 list) · IPC **`vpe:generate-support-bundle`**. **API / ngrok:** only under **`google-api/`** (global **`ngrok`** via User PATH — **`scripts/vpe-verify-ngrok-path.ps1`** is a PATH check, not a second binary).
+
+**`[VPE STANDBY]`** unchanged.
+
+---
+
+## v2.0.0 - Vault Alignment & Dev-Safe Purge. Fixed folder name mismatches and hardened scorched-earth logic for Dev environments.
+
+**Vault:** **`msc_projectVaultProjectDir`** in **`src/main/vpe-vault-paths.js`** resolves **`media/vault/<msc_safeVaultFolderName(name)>`** first; if that directory is missing, **`media/vault/<project_id>`** when present (stable when display name drifts). **`vpe:getProjects`** / vault IPC / **`vpe-vault:`** / internal thumbnail paths thread **`row.id`** into resolution. **`msc_vaultDirHasUserReferenceFiles`** still ignores **`.vpe_keep`** and **`_vpe_thumb*`** — paperclip only when real user files exist.
+
+**MSC_MEDIA_PRO_V2:** run **`npm run vault:reconcile-msc`** (optional **`--db=`**) if the registry name no longer matches the **`MSC_MEDIA_PRO_V2`** vault leaf but the project path or name clearly refers to that app.
+
+**Scorched Earth:** **`vpe:scorched-earth`** in dev (**`electron-is-dev`**) performs a **soft purge** only — skips **`taskkill node.exe /T`** and the orphan **`electron.exe`** sweep so CDP / Next / this shell are not torn down.
 
 **`[VPE STANDBY]`** unchanged.
 

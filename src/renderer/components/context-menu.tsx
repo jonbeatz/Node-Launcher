@@ -1,15 +1,16 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { 
-  FolderOpen, 
-  Code2, 
-  Terminal, 
-  Camera, 
-  Hammer, 
-  Copy, 
-  Clipboard, 
-  Trash2 
+import {
+  FolderOpen,
+  Folder,
+  Code2,
+  Terminal,
+  Camera,
+  Hammer,
+  Copy,
+  Clipboard,
+  Trash2,
 } from 'lucide-react'
 
 interface ContextMenuItem {
@@ -27,6 +28,8 @@ interface ContextMenuProps {
   onClose: () => void
   items?: ContextMenuItem[]
   onOpenExplorer?: () => void
+  /** Opens the project media vault folder via `vpe:vault-open-folder` (shell). */
+  onOpenVaultFolderInExplorer?: () => void
   onOpenVSCode?: () => void
   onOpenTerminal?: () => void
   onRecaptureThumbnail?: () => void
@@ -42,6 +45,7 @@ export function ContextMenu({
   isOpen,
   onClose,
   onOpenExplorer,
+  onOpenVaultFolderInExplorer,
   onOpenVSCode,
   onOpenTerminal,
   onRecaptureThumbnail,
@@ -82,10 +86,15 @@ export function ContextMenu({
 
   const menuItems: ContextMenuItem[] = [
     { label: 'Open in Explorer', icon: <FolderOpen size={14} />, action: onOpenExplorer },
+    {
+      label: 'Open Project Folder in Explorer',
+      icon: <Folder size={14} />,
+      action: onOpenVaultFolderInExplorer,
+    },
     { label: 'Open in VS Code', icon: <Code2 size={14} />, action: onOpenVSCode },
     { label: 'Open in Terminal', icon: <Terminal size={14} />, action: onOpenTerminal },
     { divider: true, label: '' },
-    { label: 'Recapture Thumbnail', icon: <Camera size={14} />, action: onRecaptureThumbnail },
+    { label: 'Update Project Thumbnail', icon: <Camera size={14} />, action: onRecaptureThumbnail },
     { label: 'Run Build', icon: <Hammer size={14} />, action: onRunBuild },
     { divider: true, label: '' },
     { label: 'Copy Path', icon: <Clipboard size={14} />, action: onCopyPath },

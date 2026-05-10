@@ -119,7 +119,8 @@ export function ProjectGrid({
     >
       <div className="shrink-0">
         {/* Filter Pills Bar */}
-        <div className="px-6 py-3 flex items-center justify-between gap-4">
+        {/* pl-6 + pr-14: same left gutter as grid; right = px-6 + w-8 log rail (overlay no longer shrinks layout). */}
+        <div className="flex items-center justify-between gap-4 py-3 pl-6 pr-14">
           {/* Left: status filter pills — catalog total lives on TopBar breadcrumb only (v1.3.5). */}
           <div className="flex flex-wrap items-center gap-2 min-w-0">
             {favoriteFilterActive ? (
@@ -200,7 +201,7 @@ export function ProjectGrid({
           </div>
         </div>
 
-        <div className="px-6 pb-3 border-b border-[#2a2a2a]">
+        <div className="border-b border-[#2a2a2a] pb-3 pl-6 pr-14">
           <Msc_ProjectFilterNav
             activeFilter={tacticalProjectFilter}
             onFilterChange={onTacticalFilterChange}
@@ -219,7 +220,7 @@ export function ProjectGrid({
       />
 
       {/* Project Content */}
-      <div className="flex-1 px-6 pb-6 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-6 pl-6 pr-14">
         {filteredProjects.length === 0 ? (
           /* Empty State */
           <div className="h-full flex flex-col items-center justify-center">
@@ -284,7 +285,6 @@ export function ProjectGrid({
                   className="transition-all duration-200 ease-out"
                 >
                   <Msc_ProjectCard
-                    id={project.id}
                     name={project.name}
                     isCompact={isCompactGrid}
                     projectPath={project.path}

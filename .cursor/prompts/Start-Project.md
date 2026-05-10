@@ -14,6 +14,8 @@ Paste into a new Agent chat (`@`-attach optional):
 
 ## Agent procedure (canonical order)
 
+**Full stack context (LiteLLM + ngrok + Cursor):** Re-read in this order so nothing is skipped — **`.cursorrules`** (terminal panes + enforcement) → **`AGENT-BOOT.md`** §1 authority table + §4 checklist → **`API-SetUp-Master.md`** (ports, `gcp_key.json`, Cursor Base URL) → **steps 2–3 below** → **`VADER_STATION_LOG.md`**. **`package.json`** is authoritative only for **`npm run …`** script names.
+
 1. **Load context:** Skim [.cursor/docs/guides/START-HERE.md](../docs/guides/START-HERE.md); read [.cursor/docs/core/AGENT-BOOT.md](../docs/core/AGENT-BOOT.md) §1 (read order), §2 (mental model), §4 (**First actions**). Ensure **`.cursorrules`** / **`VPE_ENGINE_CAPABILITIES.md`** constraints are respected if in scope.
 
 2. **§4 First actions — API:** From **repo root**, in **split integrated terminals**, run **`.\google-api\vpe-start-api.ps1`** and global **`ngrok http 4000`** unless LiteLLM is **already** listening on **4000** (and ngrok forwarding **4000**) — then report **skipped (already live)**.

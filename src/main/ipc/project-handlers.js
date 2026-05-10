@@ -1,5 +1,155 @@
 'use strict';
 
+/** Write-protect vault trees from stray `fs.rmSync` (see `vpe-vault-rm-guard.js`). */
+process.env.VPE_VAULT_DELETION_LOCKED = String(process.env.VPE_VAULT_DELETION_LOCKED || '1');
+
+const fs = require('fs');
+const path = require('path');
+const { pathToFileURL, fileURLToPath } = require('node:url');
+const { nativeImage } = require('electron');
+const {
+  msc_projectVaultRootDir,
+  msc_projectVaultProjectDir: msc_projectVaultProjectDirFromPaths,
+  msc_safeVaultFolderName,
+  msc_isSafeVaultIdSegment,
+  VPE_VAULT_INTERNAL_THUMB,
+  msc_isVaultInternalThumbBase,
+  msc_isVaultKeepFile,
+  msc_isVaultNonUserNoiseFile,
+} = require('../vpe-vault-paths');
+
+/** True when `targetAbs` is a subdirectory of `approvedRootAbs` (defense-in-depth before `rmSync`). */
+function msc_vpeResolvedPathInsideRoot(approvedRootAbs, targetAbs) {
+  const root = path.resolve(approvedRootAbs);
+  const resolved = path.resolve(targetAbs);
+  const rel = path.relative(root, resolved);
+  return (
+    rel !== '' &&
+    rel !== '.' &&
+    !rel.startsWith(`..${path.sep}`) &&
+    !rel.startsWith('..') &&
+    !path.isAbsolute(rel)
+  );
+}
+
+/** All resolved vault roots (config + cwd) so purge works when defaults diverge from `process.cwd()`. */
+function msc_vpeCollectVaultRootAbsPaths() {
+  /** @type {Set<string>} */
+  const roots = new Set();
+  try {
+    roots.add(path.resolve(msc_projectVaultRootDir()));
+  } catch (_) {
+    /* */
+  }
+  try {
+    roots.add(path.resolve(path.join(process.cwd(), 'media', 'vault')));
+  } catch (_) {
+    /* */
+  }
+  /** Optional alternate layout e.g. `D:\MSC-Projectz\Vault` — Windows only, if present. */
+  if (process.platform === 'win32') {
+    const alt = path.join('D:', 'MSC-Projectz', 'Vault');
+    try {
+      if (fs.existsSync(alt)) roots.add(path.resolve(alt));
+    } catch (_) {
+      /* */
+    }
+  }
+  return [...roots];
+}
+
+/** @returns {string | null} matching vault root, or null */
+function msc_vpePathInsideAnyVaultRoot(absTarget, vaultRoots) {
+  const abs = path.resolve(absTarget);
+  for (const r of vaultRoots) {
+    if (msc_vpeResolvedPathInsideRoot(r, abs)) return path.resolve(r);
+  }
+  return null;
+}
+
+function msc_vpeRmVaultDirLogged(absDir, projectId) {
+  const abs = path.resolve(absDir);
+  try {
+    if (!fs.existsSync(abs)) return false;
+    const st = fs.statSync(abs);
+    if (!st.isDirectory()) {
+      console.warn('[VPE] delete-project: skip (not a directory)', abs);
+      return false;
+    }
+    console.log('[VPE] delete-project: vaporizing vault dir', abs);
+    fs.rmSync(abs, { recursive: true, force: true });
+    return true;
+  } catch (e) {
+    console.error('[VPE] delete-project: fs.rmSync failed', {
+      projectId,
+      path: abs,
+      message: e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e),
+      stack: e && typeof e === 'object' && 'stack' in e ? String(e.stack) : undefined,
+    });
+    return false;
+  }
+}
+
+const VPE_VAULT_IMAGE_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.gif',
+  '.bmp',
+  '.ico',
+]);
+
+function msc_vpeThumbUrlFileMissing(row) {
+  const tu = row && row.thumbnail_url;
+  if (!tu || typeof tu !== 'string') return true;
+  if (!tu.startsWith('file:')) return false;
+  try {
+    const fp = path.resolve(fileURLToPath(tu));
+    return !fs.existsSync(fp);
+  } catch (_) {
+    return true;
+  }
+}
+
+function msc_vpeSortedVaultImagePathsForResync(absVaultDir) {
+  /** @type {import('fs').Dirent[]} */
+  let entries = [];
+  try {
+    entries = fs.readdirSync(absVaultDir, { withFileTypes: true });
+  } catch (_) {
+    return [];
+  }
+  const names = [];
+  for (const e of entries) {
+    if (!e.isFile()) continue;
+    const nm = e.name;
+    if (msc_isVaultInternalThumbBase(nm)) continue;
+    if (msc_isVaultKeepFile(nm)) continue;
+    if (msc_isVaultNonUserNoiseFile(nm)) continue;
+    const ext = path.extname(nm).toLowerCase();
+    if (!VPE_VAULT_IMAGE_EXTS.has(ext)) continue;
+    names.push(nm);
+  }
+  names.sort((a, b) => a.localeCompare(b));
+  return names.map((nm) => path.resolve(path.join(absVaultDir, nm)));
+}
+
+function msc_vpePickFirstLoadableVaultImage(absVaultDir) {
+  for (const abs of msc_vpeSortedVaultImagePathsForResync(absVaultDir)) {
+    try {
+      const im = nativeImage.createFromPath(abs);
+      if (!im.isEmpty()) return abs;
+    } catch (_) {
+      /* */
+    }
+  }
+  return null;
+}
+
+/** Vader Protocol: deleting the registry row removes matching vault + legacy thumbnail files. */
+const VPE_AUTO_VAULT_PURGE_ON_DELETE = true;
+
 /**
  * IPC domain: project registry, CRUD, app settings, repair log, catalog, dev toggle/build.
  *
@@ -38,6 +188,7 @@ function msc_registerProjectIpc(ipcMain, c) {
     msc_rowUsesInternalVaultThumbnail,
     msc_bumpVaultThumbPulse,
     msc_rendererVaultThumbnailHref,
+    msc_writeVaultInternalThumbnail,
     VPE_SYSTEM_REPAIR_PROJECT_ID,
     VPE_CATALOG_VERSION,
     msc_rowToCatalogPayload,
@@ -47,6 +198,7 @@ function msc_registerProjectIpc(ipcMain, c) {
     msc_normalizeCatalogArchived,
     fs,
     path,
+    app,
     BrowserWindow,
     dialog,
     randomUUID,
@@ -100,7 +252,7 @@ function msc_registerProjectIpc(ipcMain, c) {
       const enriched = msc_ipcEnrichProjectsRow(row);
       return {
         ...enriched,
-        vault_has_files: msc_vaultDirHasUserReferenceFiles(row.name),
+        vault_has_files: msc_vaultDirHasUserReferenceFiles(row.name, row.id),
       };
     }),
   );
@@ -180,6 +332,80 @@ function msc_registerProjectIpc(ipcMain, c) {
     });
     msc_emitProjectsUpdated();
     return { ok: true, port: newPort, start_script: det.start_script };
+  });
+
+  /** Temporary recovery: rebuild `_vpe_thumb.png` + DB `file:` links from images left in each vault folder. */
+  ipcMain.handle('vpe:repair-vault-links', async () => {
+    if (typeof store.listProjectsAlphabetical !== 'function') {
+      return { ok: true, repaired: 0, skipped: 0, errors: [] };
+    }
+    const rows = store.listProjectsAlphabetical();
+    let repaired = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const row of rows) {
+      if (!row?.id || row.name == null || String(row.name).trim() === '') {
+        skipped += 1;
+        continue;
+      }
+      try {
+        const vaultDir = path.resolve(
+          msc_projectVaultProjectDirFromPaths(String(row.name), row.id),
+        );
+        if (!fs.existsSync(vaultDir) || !fs.statSync(vaultDir).isDirectory()) {
+          skipped += 1;
+          continue;
+        }
+        const internalAbs = path.resolve(path.join(vaultDir, VPE_VAULT_INTERNAL_THUMB));
+        const internalExists = fs.existsSync(internalAbs);
+        const linkBroken = msc_vpeThumbUrlFileMissing(row);
+        if (internalExists && !linkBroken) {
+          skipped += 1;
+          continue;
+        }
+        if (!internalExists) {
+          const src = msc_vpePickFirstLoadableVaultImage(vaultDir);
+          if (!src) {
+            skipped += 1;
+            continue;
+          }
+          await msc_writeVaultInternalThumbnail(src, String(row.name), row.id);
+        }
+        if (!fs.existsSync(internalAbs)) {
+          skipped += 1;
+          continue;
+        }
+        const href = pathToFileURL(internalAbs).href;
+        const thumbPersist = msc_normalizeThumbnailUrlForPersistence(row, href);
+        const pt =
+          row.project_type == null || String(row.project_type).trim() === ''
+            ? null
+            : String(row.project_type).trim();
+        store.updateProject({
+          id: row.id,
+          name: row.name,
+          path: row.path,
+          port: row.port,
+          thumbnail_url: thumbPersist ?? href,
+          start_script: row.start_script,
+          build_script: row.build_script,
+          pkg_manager: row.pkg_manager,
+          project_type: pt,
+          is_archived: row.is_archived === true || row.is_archived === 1,
+          notes: row.notes != null ? String(row.notes) : null,
+        });
+        msc_bumpVaultThumbPulse(row.id, Date.now());
+        repaired += 1;
+      } catch (e) {
+        errors.push({
+          id: row.id,
+          message: e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e),
+        });
+      }
+    }
+    msc_emitProjectsUpdated();
+    return { ok: true, repaired, skipped, errors };
   });
 
   ipcMain.handle('vpe:inspect-project', async (_event, projectPath) => {
@@ -393,11 +619,96 @@ function msc_registerProjectIpc(ipcMain, c) {
   });
 
   ipcMain.handle('vpe:delete-project', (event, projectId) => {
-    if (!projectId) throw new Error('VPE: Missing project id');
-    projectRunner.stopProject(projectId);
-    store.deleteProject(projectId);
-    msc_emitProjectsUpdated();
-    return { ok: true };
+    global.__vpeVaultHardDeleteActive = true;
+    try {
+      if (!projectId) throw new Error('VPE: Missing project id');
+      const id = String(projectId);
+      const row = typeof store.getProject === 'function' ? store.getProject(id) : null;
+      projectRunner.stopProject(projectId);
+      store.deleteProject(projectId);
+
+      let filesPurged = false;
+
+      if (row && VPE_AUTO_VAULT_PURGE_ON_DELETE) {
+        try {
+          const vaultRoots = msc_vpeCollectVaultRootAbsPaths();
+          /** Canonical + per-root name/id leaves (handles hardcoded `d:` default vs `cwd` vault). */
+          const vaultCandidates = new Set();
+          try {
+            vaultCandidates.add(
+              path.resolve(msc_projectVaultProjectDirFromPaths(String(row.name), row.id)),
+            );
+          } catch (_) {
+            /* */
+          }
+          for (const vr of vaultRoots) {
+            const rootAbs = path.resolve(vr);
+            vaultCandidates.add(path.resolve(path.join(rootAbs, msc_safeVaultFolderName(String(row.name)))));
+            if (msc_isSafeVaultIdSegment(id)) {
+              vaultCandidates.add(path.resolve(path.join(rootAbs, id)));
+            }
+          }
+
+          let vaultRmAny = false;
+          for (const candidate of vaultCandidates) {
+            const abs = path.resolve(candidate);
+            const matchedRoot = msc_vpePathInsideAnyVaultRoot(abs, vaultRoots);
+            if (!matchedRoot) {
+              console.warn('[VPE] delete-project: skipped path (not under any vault root)', abs, {
+                vaultRoots,
+              });
+              continue;
+            }
+            if (msc_vpeRmVaultDirLogged(abs, id)) {
+              vaultRmAny = true;
+              filesPurged = true;
+            }
+          }
+          if (vaultRmAny) {
+            console.log(`[VPE] Vault Purge Complete for Project: ${id}`);
+          }
+
+          /** Legacy flat thumbnails (pre–Omni-Vault): `media/thumbnails/<uuid>.(jpg|png|…)`. */
+          const legacyThumbExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+          const allowedThumbRoots = new Set();
+          allowedThumbRoots.add(path.resolve(path.join(process.cwd(), 'media', 'thumbnails')));
+          try {
+            if (typeof app?.getPath === 'function') {
+              allowedThumbRoots.add(
+                path.resolve(path.join(app.getPath('userData'), 'media', 'thumbnails')),
+              );
+            }
+          } catch (_) {
+            /* */
+          }
+          for (const thumbsRoot of allowedThumbRoots) {
+            if (!thumbsRoot || !fs.existsSync(thumbsRoot)) continue;
+            const rootResolved = path.resolve(thumbsRoot);
+            for (const ext of legacyThumbExts) {
+              const filePath = path.resolve(path.join(rootResolved, `${id}${ext}`));
+              if (!msc_vpeResolvedPathInsideRoot(rootResolved, filePath)) continue;
+              if (!fs.existsSync(filePath)) continue;
+              try {
+                fs.rmSync(filePath, { force: true });
+                filesPurged = true;
+              } catch (e) {
+                console.error('[VPE] delete-project: legacy thumbnail rmSync failed', {
+                  path: filePath,
+                  message: e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e),
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[VPE] Vault purge on delete failed:', e?.message ?? e);
+        }
+      }
+
+      msc_emitProjectsUpdated();
+      return { ok: true, success: true, filesPurged };
+    } finally {
+      global.__vpeVaultHardDeleteActive = false;
+    }
   });
 
   ipcMain.handle('vpe:catalog-export', async (event, opts) => {

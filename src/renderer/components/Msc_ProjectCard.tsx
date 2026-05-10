@@ -123,11 +123,11 @@ function ProjectMetaAccordion({
   const valueCls = isCompact ? 'text-[12px]' : 'text-[13px]'
 
   return (
-    <div className="border-t border-[#2a2a2a]">
+    <div className="border-t border-[#2a2a2a] bg-[#121212]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-center gap-1 py-1 text-[10px] uppercase tracking-wide text-[#888888] hover:text-white transition-colors vader-focus"
+        className="flex w-full items-center justify-center gap-1 bg-[#121212] py-1 text-[10px] uppercase tracking-wide text-[#888888] transition-colors hover:text-white vader-focus"
         aria-expanded={open}
         title={open ? 'Hide project details' : 'Show project details'}
       >
@@ -139,10 +139,10 @@ function ProjectMetaAccordion({
       <motion.div
         initial={false}
         animate={{ height: open ? 'auto' : 0 }}
-        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-        className="overflow-hidden"
+        transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+        className="overflow-hidden bg-[#121212]"
       >
-        <div className={`space-y-2 ${pad} pt-4 text-[#A0A0A0] bg-[#0f0f0f]`}>
+        <div className={`space-y-2 bg-[#121212] ${pad} pb-3 pt-2 text-[#A0A0A0]`}>
           {isCompact && runningStrip && (
             <div className="rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2 py-1.5">
               <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
@@ -161,7 +161,7 @@ function ProjectMetaAccordion({
                   {runningStrip.healthLabel}
                 </span>
               )}
-              <div className="mt-1.5 pt-1.5 border-t border-[#2d4a38]/50">
+              <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
                 <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
                   Uptime
                 </span>
@@ -190,9 +190,7 @@ function ProjectMetaAccordion({
               <span className={`mb-0.5 block uppercase tracking-wider text-[#555555] ${labelCls}`}>
                 Path
               </span>
-              <span className={`block break-all text-[#c8c8c8] ${valueCls}`}
-                title={projectPath}
-              >
+              <span className={`block break-all text-[#c8c8c8] ${valueCls}`} title={projectPath}>
                 {projectPath.trim() ? projectPath : '—'}
               </span>
             </div>
@@ -217,7 +215,6 @@ function ProjectMetaAccordion({
 }
 
 interface Msc_ProjectCardProps {
-  id: string
   name: string
   port: number
   status: 'running' | 'stopped' | 'error' | 'building'
@@ -297,7 +294,20 @@ export function Msc_ProjectCard({
   isSelected = false,
   devSessionStartedAt = null,
 }: Msc_ProjectCardProps) {
+  const cardShellRef = useRef<HTMLDivElement>(null)
   const [cinemaInspectOpen, setCinemaInspectOpen] = useState(false)
+  const [compactInfoOpen, setCompactInfoOpen] = useState(false)
+  const accordionExpanded = isCompact ? compactInfoOpen : cinemaInspectOpen
+
+  useEffect(() => {
+    if (!accordionExpanded) return
+    const el = cardShellRef.current
+    if (!el) return
+    const tid = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 300)
+    return () => window.clearTimeout(tid)
+  }, [accordionExpanded])
   const dotTitle = msc_shieldTypeTitle(shieldProjectType)
   const dotHex = msc_shieldColorHex(shieldProjectType)
   const isRunning = status === 'running'
@@ -404,8 +414,9 @@ export function Msc_ProjectCard({
     return 'text-[#fbbf08]'
   })()
 
-  const msc_insetActionBtnBase =
-    'shrink-0 flex items-center justify-center rounded-sm border-0 bg-[#121212] transition-colors vader-focus hover:bg-[#2a2a2a]'
+  /** High-contrast icon tiles (Favorite, Settings, Delete). */
+  const msc_actionDarkTile =
+    'shrink-0 flex items-center justify-center rounded-md border border-[#2a2a2a]/50 bg-[#121212] transition-colors vader-focus hover:bg-[#2a2a2a]'
 
   const msc_onCardSurfaceDown = (e: MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, a, [role="button"]')) return
@@ -419,7 +430,7 @@ export function Msc_ProjectCard({
 
   const cardChromeSelected = !isError && isSelected ? 'vpe-card-chrome-selected' : ''
 
-  /** v1.9.5 — LOGS width matches [Favorite, Settings, Trash] only (paperclip lives on thumbnail). */
+  /** v1.9.5 — LOGS width matches [Favorite, Settings, Trash] (paperclip lives on thumbnail). */
   const msc_mgmtTileRem = isCompact ? 1.5 : 1.75
   const msc_mgmtCount = 3
   const msc_logsStripWidth = `${msc_mgmtCount * msc_mgmtTileRem + (msc_mgmtCount - 1) * 0.25}rem`
@@ -432,7 +443,10 @@ export function Msc_ProjectCard({
   if (isCompact) {
     return (
       <div
-        className={`vader-card vpe-theme-font vpe-project-card boxBling overflow-hidden relative w-[250px] max-w-full transition-all duration-200 ease-out ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'} ${cardChromeSelected}`}
+        ref={cardShellRef}
+        className={`vader-card vpe-theme-font vpe-project-card boxBling relative w-[250px] max-w-full transition-all duration-200 ease-out ${
+          compactInfoOpen ? 'overflow-visible' : 'overflow-hidden'
+        } ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'} ${cardChromeSelected}`}
         onContextMenu={onContextMenu}
         onMouseDown={msc_onCardSurfaceDown}
       >
@@ -486,52 +500,52 @@ export function Msc_ProjectCard({
         </div>
 
         <div
-          className={`px-2.5 border-b border-[#2a2a2a] flex items-center justify-between gap-2 min-w-0 ${isIdleStopped ? 'py-1' : 'py-1.5'}`}
+          className={`border-b border-[#2a2a2a] flex min-w-0 items-center justify-between gap-2.5 px-3 ${isIdleStopped ? 'py-1.5' : 'py-2'}`}
         >
-          <div className="flex min-w-0 flex-1 items-center min-h-6">
+          <div className="flex min-w-0 flex-1 items-center min-h-6 pr-0.5">
             <h3
-              className="vpe-card-title text-white text-xs truncate min-w-0 leading-tight"
+              className="vpe-card-title min-w-0 truncate text-xs leading-snug text-white"
               title={name}
             >
               {name}
             </h3>
           </div>
-          <div className="inline-flex shrink-0 items-center gap-1 self-center">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleFavorite?.()
-            }}
-            className={`${msc_insetActionBtnBase} h-6 w-6 ${
-              isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
-            }`}
-            title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
-          >
-            <Star size={12} fill={isFavorite ? '#ffcc00' : 'none'} />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onSettings?.()
-            }}
-            className={`${msc_insetActionBtnBase} h-6 w-6 text-[#A0A0A0] hover:text-[#4fde82]`}
-            title="Project Settings"
-          >
-            <Settings size={12} />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onUnregister?.()
-            }}
-            className={`${msc_insetActionBtnBase} h-6 w-6 text-[#A0A0A0] hover:text-[#e02b20]`}
-            title="Remove from Registry"
-          >
-            <Trash2 size={12} />
-          </button>
+          <div className="inline-flex shrink-0 items-center gap-1.5 self-center">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleFavorite?.()
+              }}
+              className={`${msc_actionDarkTile} h-6 w-6 ${
+                isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
+              }`}
+              title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+            >
+              <Star size={12} fill={isFavorite ? '#ffcc00' : 'none'} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onSettings?.()
+              }}
+              className={`${msc_actionDarkTile} h-6 w-6 text-[#A0A0A0] hover:text-[#4fde82]`}
+              title="Project Settings"
+            >
+              <Settings size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onUnregister?.()
+              }}
+              className={`${msc_actionDarkTile} h-6 w-6 text-[#A0A0A0] hover:text-[#e02b20]`}
+              title="Remove from Registry"
+            >
+              <Trash2 size={12} />
+            </button>
           </div>
         </div>
 
@@ -608,6 +622,7 @@ export function Msc_ProjectCard({
           projectPath={projectPath}
           folderCreatedAt={project_folder_created_at}
           folderModifiedAt={project_folder_modified_at}
+          onOpenChange={setCompactInfoOpen}
           runningStrip={
             isRunning
               ? {
@@ -625,15 +640,20 @@ export function Msc_ProjectCard({
 
   return (
     <div
+      ref={cardShellRef}
       className={`
-        vader-card vpe-theme-font vpe-project-card boxBling overflow-hidden relative transition-all duration-200 ease-out
+        vader-card vpe-theme-font vpe-project-card boxBling relative min-w-0 transition-all duration-200 ease-out
+        ${cinemaInspectOpen ? 'overflow-visible' : 'overflow-hidden'}
         ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'}
         ${cardChromeSelected}
       `}
       onContextMenu={onContextMenu}
       onMouseDown={msc_onCardSurfaceDown}
     >
-      <div className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]" style={{ borderRadius: '4px 4px 0 0' }}>
+        <div
+          className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]"
+          style={{ borderRadius: '4px 4px 0 0' }}
+        >
         {thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -687,113 +707,116 @@ export function Msc_ProjectCard({
       </div>
 
       <div className={isIdleStopped ? 'px-4 pt-3 pb-2' : 'p-4'}>
-        <div
-          className={`flex items-center justify-between gap-2 min-w-0 ${isIdleStopped ? 'mb-1' : 'mb-2'}`}
-        >
-          <div className="flex min-w-0 flex-1 items-center gap-2 min-h-7">
-            <h3 className="vpe-card-title text-white text-base truncate min-w-0 leading-tight" title={name}>
-              {name}
-            </h3>
-            {isError && <AlertTriangle size={14} className="text-[#ff4444] shrink-0" />}
-          </div>
-          <div className="inline-flex shrink-0 items-center gap-1 self-center">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onToggleFavorite?.()
-            }}
-            className={`${msc_insetActionBtnBase} h-7 w-7 ${
-              isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
-            }`}
-            title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+          <div
+            className={`flex min-w-0 items-center justify-between gap-2.5 ${isIdleStopped ? 'mb-1' : 'mb-2'}`}
           >
-            <Star size={12} fill={isFavorite ? '#ffcc00' : 'none'} />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onSettings?.()
-            }}
-            className={`${msc_insetActionBtnBase} h-7 w-7 text-[#A0A0A0] hover:text-[#4fde82]`}
-            title="Project Settings"
-          >
-            <Settings size={12} />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onUnregister?.()
-            }}
-            className={`${msc_insetActionBtnBase} h-7 w-7 text-[#A0A0A0] hover:text-[#e02b20]`}
-            title="Remove from Registry"
-          >
-            <Trash2 size={12} />
-          </button>
-          </div>
-        </div>
-
-        <p
-          className={`text-[10px] uppercase tracking-[0.08em] ${
-            isRunning || isError ? 'mb-2' : isIdleStopped ? 'mb-0' : 'mb-1'
-          } ${isError ? 'text-[#e02b20]' : devInstallInProgress && isRunning ? 'text-[#ffcc00]' : isRunning ? 'text-[#6ee7a8]/90' : 'text-[#888888]'}`}
-        >
-          {getStatusLabel()}
-        </p>
-
-        {isError && errorMessage && (
-          <div className="mt-3 p-2 rounded bg-[#ff4444]/10 border border-[#ff4444]/30">
-            <span className="text-[11px] text-[#ff4444]">{errorMessage}</span>
-          </div>
-        )}
-
-        {isRunning && (
-          <div className="mt-3 rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2.5 py-1.5">
-            <div className="min-w-0">
-              <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                Started on
-              </span>
-              <span
-                className="block truncate text-[11px] leading-tight text-[#7dcea0]/95"
-                title={runUrl}
+            <div className="flex min-h-7 min-w-0 flex-1 items-center gap-2 pr-0.5">
+              <h3
+                className="vpe-card-title min-w-0 truncate text-base leading-snug text-white"
+                title={name}
               >
-                {runUrl}
-              </span>
-              {healthLine && (
-                <span
-                  className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
-                  title="GET / on project port after start"
-                >
-                  {healthLine.label}
-                </span>
-              )}
-              <div className="mt-1.5 pt-1.5 border-t border-[#2d4a38]/50">
-                <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                  Uptime
-                </span>
-                <span className="tabular-nums text-[11px] text-[#7dcea0]/95">{liveUptime}</span>
-              </div>
-              {healthLine?.showErrorCta && onViewErrorConsole && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onViewErrorConsole()
-                  }}
-                  className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
-                >
-                  View error console →
-                </button>
-              )}
+                {name}
+              </h3>
+              {isError && <AlertTriangle size={14} className="text-[#ff4444] shrink-0" />}
+            </div>
+            <div className="inline-flex shrink-0 items-center gap-1.5 self-center">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleFavorite?.()
+                }}
+                className={`${msc_actionDarkTile} h-7 w-7 ${
+                  isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
+                }`}
+                title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+              >
+                <Star size={12} fill={isFavorite ? '#ffcc00' : 'none'} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSettings?.()
+                }}
+                className={`${msc_actionDarkTile} h-7 w-7 text-[#A0A0A0] hover:text-[#4fde82]`}
+                title="Project Settings"
+              >
+                <Settings size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onUnregister?.()
+                }}
+                className={`${msc_actionDarkTile} h-7 w-7 text-[#A0A0A0] hover:text-[#e02b20]`}
+                title="Remove from Registry"
+              >
+                <Trash2 size={12} />
+              </button>
             </div>
           </div>
-        )}
-      </div>
+
+          <p
+            className={`text-[10px] uppercase tracking-[0.08em] ${
+              isRunning || isError ? 'mb-2' : isIdleStopped ? 'mb-0' : 'mb-1'
+            } ${isError ? 'text-[#e02b20]' : devInstallInProgress && isRunning ? 'text-[#ffcc00]' : isRunning ? 'text-[#6ee7a8]/90' : 'text-[#888888]'}`}
+          >
+            {getStatusLabel()}
+          </p>
+
+          {isError && errorMessage && (
+            <div className="mt-3 p-2 rounded bg-[#ff4444]/10 border border-[#ff4444]/30">
+              <span className="text-[11px] text-[#ff4444]">{errorMessage}</span>
+            </div>
+          )}
+
+          {isRunning && (
+            <div className="mt-3 rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2.5 py-1.5">
+              <div className="min-w-0">
+                <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                  Started on
+                </span>
+                <span
+                  className="block truncate text-[11px] leading-tight text-[#7dcea0]/95"
+                  title={runUrl}
+                >
+                  {runUrl}
+                </span>
+                {healthLine && (
+                  <span
+                    className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
+                    title="GET / on project port after start"
+                  >
+                    {healthLine.label}
+                  </span>
+                )}
+                <div className="mt-1.5 pt-1.5 border-t border-[#2d4a38]/50">
+                  <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                    Uptime
+                  </span>
+                  <span className="tabular-nums text-[11px] text-[#7dcea0]/95">{liveUptime}</span>
+                </div>
+                {healthLine?.showErrorCta && onViewErrorConsole && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onViewErrorConsole()
+                    }}
+                    className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
+                  >
+                    View error console →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
       <div
-        className={`flex flex-wrap items-center gap-2 px-4 ${
+        className={`flex min-w-0 flex-row flex-nowrap items-center gap-2 px-4 ${
           isRunning || isError ? 'pb-3 pt-3' : isIdleStopped ? 'pb-3 pt-0' : 'pb-3 pt-1'
         }`}
       >
@@ -813,7 +836,7 @@ export function Msc_ProjectCard({
               : undefined
           }
           className={`
-            min-w-[5rem] flex-1 flex items-center justify-center gap-1.5 h-7 rounded text-xs transition-all vader-focus
+            min-w-[5rem] flex-1 flex min-h-0 items-center justify-center gap-1.5 h-9 rounded text-xs transition-all vader-focus
             ${primaryBtn.active
               ? 'border-0 bg-[#e02b20] text-white hover:bg-[#c41e17] hover:text-white'
               : primaryBtn.disabled
@@ -838,7 +861,7 @@ export function Msc_ProjectCard({
             fill={primaryIsPlayCta || primaryIsStopCta ? 'currentColor' : undefined}
             strokeWidth={primaryIsPlayCta || primaryIsStopCta ? 0 : undefined}
           />
-          <span>{primaryBtn.label}</span>
+          <span className="truncate">{primaryBtn.label}</span>
         </button>
 
         <button
@@ -848,7 +871,7 @@ export function Msc_ProjectCard({
             e.stopPropagation()
             if (isRunning && onOpenInBrowser) onOpenInBrowser()
           }}
-          className={`min-w-[5.5rem] flex-1 flex items-center justify-center gap-1.5 h-7 rounded border text-[11px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
+          className={`min-w-[5.5rem] flex-1 flex min-h-0 items-center justify-center gap-1.5 h-9 rounded border text-[11px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
             isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
           }`}
           title={
@@ -862,11 +885,12 @@ export function Msc_ProjectCard({
         </button>
 
         <button
+          type="button"
           onClick={onLogs}
           style={{ width: msc_logsStripWidth }}
-          className="h-7 shrink-0 flex items-center justify-center gap-1.5 rounded bg-[#2a2a2a] border border-[#333333] text-xs text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
+          className="h-9 shrink-0 flex items-center justify-center gap-1.5 rounded bg-[#2a2a2a] border border-[#333333] text-xs text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
         >
-          <Terminal size={12} />
+          <Terminal size={12} className="shrink-0" />
           <span>LOGS</span>
         </button>
       </div>

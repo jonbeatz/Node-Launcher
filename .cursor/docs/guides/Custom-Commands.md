@@ -4,7 +4,7 @@ This file tracks shorthand commands you want me to execute in this repo.
 
 **Canonical build & command rules** (`vader:*` sequencing, **`concurrently -k`**, **`asar` / `npmRebuild`**, Windows artifacts): [`.cursor/docs/core/VPE-BUILD-PROTOCOL.md`](../core/VPE-BUILD-PROTOCOL.md).
 
-**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Shipped semver:** root **`package.json`** (currently **`1.9.9`**) is authoritative for preload/footer/UI labels; it may advance in **patch** while the git branch name stays on an older line until you cut a new **`VPE-v1.{minor}.x-Dev`**. **Naming:** **`VPE-v1.{minor}.x-Dev`**; new lines increment **`{minor}`** by **1** (example next line after **`VPE-v1.6.x-Dev`**: **`VPE-v1.7.x-Dev`**). Keep **`package.json` `version`** aligned with the branch line’s **minor** when you open a new line (see [START-HERE](START-HERE.md), [Checkpoint — Build v1.9.9](Checkpoint.md), [Checkpoint — Build v1.6.0](Checkpoint.md)).
+**Active branch:** Confirm with `git status` — living status and milestones live in [Checkpoint](Checkpoint.md). **Shipped semver:** root **`package.json`** (currently **`2.1.0`**) is authoritative for preload/footer/UI labels. **`scripts/`** — operational helpers (**`vpe-clean-sync.cjs`**, **`vpe-pm2-kill-optional.cjs`**, **`vpe-add-node-launcher-user-path.ps1`**, **`vpe-verify-ngrok-path.ps1`**, forge stall watchdog, etc.); pair with **`google-api/`** for LiteLLM + ngrok. **Naming:** historical dev branches **`VPE-v1.{minor}.x-Dev`**; semver in **`package.json`** is the ship label (see [Checkpoint — Build v2.1.0](Checkpoint.md)).
 
 **Solved problems (symptoms → fixes):** [Stability](Stability.md).
 

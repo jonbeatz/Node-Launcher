@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const {
   msc_registerVpeVaultPrivilegedScheme,
   msc_registerVpeVaultProtocolHandler,
@@ -20,6 +20,9 @@ const { msc_archiveLegacyProjectsJson } = require('./legacy-projects-archive');
 const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile');
 const { msc_startGhostWatcher } = require('./vpe-orchestrator');
 const { msc_rendererVaultThumbnailHref } = require('./vpe-thumbnail-url');
+const { msc_projectVaultRootDir } = require('./vpe-vault-paths');
+const { msc_installVaultDeletionRmGuard } = require('./vpe-vault-rm-guard');
+msc_installVaultDeletionRmGuard();
 
 /** CDP / remote debugging: dev-only or explicit opt-in (packaged builds stay closed by default). */
 const MSC_VPE_CDP_ALLOWED = isDev === true || String(process.env.VPE_ALLOW_CDP || '') === '1';
@@ -37,6 +40,116 @@ if (MSC_VPE_CDP_ALLOWED) {
     '[VPE Main] Remote debugging disabled (production baseline). Set VPE_ALLOW_CDP=1 to enable CDP for MCP/Playwright.',
   );
 }
+
+/**
+ * v2.0.x — Instance isolation: primary holds `requestSingleInstanceLock()`. If the lock is not
+ * acquired, pivot identity (`app.setName`, Windows `setAppUserModelId`) and an aux profile under
+ * `%AppData%/Vader-Vault-Aux-<ts>/` so SQLite and taskbar grouping do not collide with the first
+ * process. Re-requests the lock after pivot so the auxiliary process can own its own lock key.
+ * Skipped when `VPE_E2E_USER_DATA` is set (Playwright supplies its own profile per worker).
+ */
+if (!process.env.VPE_E2E_USER_DATA) {
+  const msc_vpeInitialSingletonLock = app.requestSingleInstanceLock();
+  if (!msc_vpeInitialSingletonLock) {
+    const instanceId = Date.now().toString();
+    try {
+      app.setName(`VPE-Engine-${instanceId}`);
+      if (process.platform === 'win32' && typeof app.setAppUserModelId === 'function') {
+        app.setAppUserModelId(`VPE.Engine.${instanceId}`);
+      }
+      const auxRoot = path.join(app.getPath('appData'), `Vader-Vault-Aux-${instanceId}`);
+      process.env.VPE_PORTABLE_USER_DATA_ROOT = auxRoot;
+      app.commandLine.appendSwitch('vpe-portable', '1');
+      if (!process.argv.includes('--portable')) {
+        process.argv.push('--portable');
+      }
+      const msc_vpeLockAfterPivot = app.requestSingleInstanceLock();
+      console.warn('[VPE] Auxiliary instance pivot', {
+        instanceId,
+        auxRoot,
+        lockAfterPivot: msc_vpeLockAfterPivot,
+      });
+    } catch (e) {
+      console.error('[VPE] Auxiliary instance pivot failed:', e?.message ?? e);
+    }
+  } else {
+    app.on('second-instance', () => {
+      const w = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+      if (w && !w.isDestroyed()) {
+        if (w.isMinimized()) w.restore();
+        w.show();
+        w.focus();
+      }
+    });
+  }
+}
+
+function msc_ironParseSemverCore(s) {
+  const m = String(s || '')
+    .trim()
+    .replace(/^v/i, '')
+    .match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+/** @returns {boolean} true if a < b */
+function msc_ironSemverLt(a, b) {
+  const pa = msc_ironParseSemverCore(a);
+  const pb = msc_ironParseSemverCore(b);
+  if (!pa || !pb) return false;
+  for (let i = 0; i < 3; i += 1) {
+    if (pa[i] < pb[i]) return true;
+    if (pa[i] > pb[i]) return false;
+  }
+  return false;
+}
+
+/**
+ * Local-first `userData`: when running from a Node-Launcher checkout or with `--portable`,
+ * keep SQLite/cache under `process.cwd()/vpe-local-data` so legacy trees on D: do not share
+ * `%LocalAppData%/VaderProjectEngine` with other installs.
+ */
+function msc_vpeDetectLocalFirstUserData() {
+  /** Iron Curtain — must run before any other logic here (legacy engine / caps install path). */
+  if (!process.env.VPE_E2E_USER_DATA && String(process.env.VPE_SKIP_IRON_CURTAIN || '').trim() !== '1') {
+    const cwdSeg = process.cwd().split(/[/\\]+/).some((seg) => seg === 'NODE-LAUNCHER');
+    const execBase = path.basename(process.execPath || '').toUpperCase();
+    const legacyExe = execBase.includes('NODE-LAUNCHER');
+
+    let appVer = '0.0.0';
+    try {
+      const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+      appVer = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '0.0.0').trim();
+    } catch (_) {
+      /* */
+    }
+    const legacyVersion = msc_ironSemverLt(appVer, '2.1.0');
+
+    if (cwdSeg || legacyExe || legacyVersion) {
+      const msg =
+        'CRITICAL: LEGACY ENGINE DETECTED. To prevent data corruption on your D: Drive Vault, this version has been disabled. Please use the VPE Sovereign Build.';
+      try {
+        dialog.showErrorBox('Vader Project Engine', msg);
+      } catch (_) {
+        /* */
+      }
+      process.exit(0);
+    }
+  }
+
+  if (process.env.VPE_E2E_USER_DATA) return;
+  if (process.env.VPE_PORTABLE_USER_DATA_ROOT) return;
+  const cwd = process.cwd();
+  const portableArgv =
+    process.argv.includes('--portable') || String(process.env.VPE_PORTABLE || '') === '1';
+  const cwdNodeLauncher = /node[-_]?launcher/i.test(cwd);
+  if (portableArgv || cwdNodeLauncher) {
+    process.env.VPE_LOCAL_USERDATA_ROOT = path.resolve(path.join(cwd, 'vpe-local-data'));
+    console.log('[VPE] Local-first userData profile:', process.env.VPE_LOCAL_USERDATA_ROOT);
+  }
+}
+msc_vpeDetectLocalFirstUserData();
 
 /** v1.6.0 — mute noisy DevTools/socket stderr unless `--verbose` is present; ghost watcher post-reconcile. */
 const MSC_VPE_VERBOSE_LOG = process.argv.includes('--verbose');
@@ -163,6 +276,58 @@ function msc_configureWritablePaths() {
     return;
   }
 
+  /** Auxiliary profile (`Vader-Vault-Aux-*`) after lock conflict + identity pivot (see bootstrap). */
+  if (process.env.VPE_PORTABLE_USER_DATA_ROOT) {
+    const userDataDir = path.resolve(String(process.env.VPE_PORTABLE_USER_DATA_ROOT).trim());
+    const cacheDir = path.join(userDataDir, 'cache');
+    const sessionDataDir = path.join(userDataDir, 'session-data');
+    const gpuCacheDir = path.join(cacheDir, 'GPUCache');
+    try {
+      fs.mkdirSync(userDataDir, { recursive: true });
+      fs.mkdirSync(cacheDir, { recursive: true });
+      fs.mkdirSync(sessionDataDir, { recursive: true });
+      fs.mkdirSync(gpuCacheDir, { recursive: true });
+      app.setPath('userData', userDataDir);
+      app.setPath('cache', cacheDir);
+      app.setPath('sessionData', sessionDataDir);
+      app.commandLine.appendSwitch('disk-cache-dir', cacheDir);
+      app.commandLine.appendSwitch('gpu-shader-disk-cache-path', gpuCacheDir);
+      console.log('[VPE] Auxiliary instance userData:', userDataDir);
+    } catch (err) {
+      console.warn(
+        'VPE: Failed to apply VPE_PORTABLE_USER_DATA_ROOT paths, using defaults.',
+        err?.message ?? err,
+      );
+    }
+    return;
+  }
+
+  /** Repo-local profile: `cwd/vpe-local-data` (portable / Node-Launcher checkout). */
+  if (process.env.VPE_LOCAL_USERDATA_ROOT) {
+    const userDataDir = path.resolve(String(process.env.VPE_LOCAL_USERDATA_ROOT).trim());
+    const cacheDir = path.join(userDataDir, 'cache');
+    const sessionDataDir = path.join(userDataDir, 'session-data');
+    const gpuCacheDir = path.join(cacheDir, 'GPUCache');
+    try {
+      fs.mkdirSync(userDataDir, { recursive: true });
+      fs.mkdirSync(cacheDir, { recursive: true });
+      fs.mkdirSync(sessionDataDir, { recursive: true });
+      fs.mkdirSync(gpuCacheDir, { recursive: true });
+      app.setPath('userData', userDataDir);
+      app.setPath('cache', cacheDir);
+      app.setPath('sessionData', sessionDataDir);
+      app.commandLine.appendSwitch('disk-cache-dir', cacheDir);
+      app.commandLine.appendSwitch('gpu-shader-disk-cache-path', gpuCacheDir);
+      console.log('[VPE] Local-first userData applied:', userDataDir);
+    } catch (err) {
+      console.warn(
+        'VPE: Failed to apply VPE_LOCAL_USERDATA_ROOT paths, using defaults.',
+        err?.message ?? err,
+      );
+    }
+    return;
+  }
+
   const localAppData =
     process.env.LOCALAPPDATA ||
     path.join(process.env.USERPROFILE || process.cwd(), 'AppData', 'Local');
@@ -189,6 +354,129 @@ function msc_configureWritablePaths() {
   }
 }
 msc_configureWritablePaths();
+
+/**
+ * One-time copy of `%LocalAppData%/VaderProjectEngine/.../vader.sqlite` into `vpe-local-data`
+ * when local profile is active and the repo folder has no DB yet.
+ */
+function msc_vpeMaybeMigrateSqliteToLocal() {
+  if (!process.env.VPE_LOCAL_USERDATA_ROOT) return;
+  try {
+    const localBase = path.resolve(String(process.env.VPE_LOCAL_USERDATA_ROOT).trim());
+    const localDbDir = path.join(localBase, 'vpe-db');
+    const localDb = path.join(localDbDir, 'vader.sqlite');
+    if (fs.existsSync(localDb)) return;
+
+    const localAppData =
+      process.env.LOCALAPPDATA ||
+      path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
+    const legacyDb = path.join(
+      localAppData,
+      'VaderProjectEngine',
+      'user-data',
+      'vpe-db',
+      'vader.sqlite',
+    );
+    if (fs.existsSync(legacyDb)) {
+      fs.mkdirSync(localDbDir, { recursive: true });
+      fs.copyFileSync(legacyDb, localDb);
+      console.log('[VPE] Initial Migration: Database copied to project vpe-local-data folder.');
+    }
+  } catch (e) {
+    console.error('[VPE] Local DB migration failed:', e?.message ?? e);
+  }
+}
+msc_vpeMaybeMigrateSqliteToLocal();
+
+/**
+ * Vault Shield: `…/media/vault/vpe-version.lock` (see `msc_projectVaultRootDir`) records the newest
+ * engine that touched the vault. Older executables refuse to run against a newer lock.
+ *
+ * Must run **before** `msc_registerVpeIpc` (which materializes vault dirs / migration scrub on attach)
+ * so no sync touches the vault on a mismatched engine build.
+ */
+function msc_vpeParseSemverCore(s) {
+  const m = String(s || '')
+    .trim()
+    .replace(/^v/i, '')
+    .match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+function msc_vpeSemverCompare(a, b) {
+  const pa = msc_vpeParseSemverCore(a);
+  const pb = msc_vpeParseSemverCore(b);
+  if (!pa || !pb) return 0;
+  for (let i = 0; i < 3; i += 1) {
+    if (pa[i] > pb[i]) return 1;
+    if (pa[i] < pb[i]) return -1;
+  }
+  return 0;
+}
+
+function msc_vpeReadEngineVersionFromPackage() {
+  try {
+    const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+    const j = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    return String(j.version || '0.0.0').trim();
+  } catch (_) {
+    return '0.0.0';
+  }
+}
+
+function msc_vpeEnforceVaultVersionLock() {
+  if (process.env.VPE_E2E_USER_DATA) return;
+  if (String(process.env.VPE_SKIP_VAULT_VERSION_LOCK || '').trim() === '1') return;
+
+  const appVer = msc_vpeReadEngineVersionFromPackage();
+  let vaultRoot;
+  try {
+    vaultRoot = path.resolve(msc_projectVaultRootDir());
+  } catch (e) {
+    console.warn('[VPE] Vault version lock skipped (no vault root):', e?.message ?? e);
+    return;
+  }
+
+  const lockPath = path.join(vaultRoot, 'vpe-version.lock');
+  try {
+    fs.mkdirSync(vaultRoot, { recursive: true });
+  } catch (e) {
+    console.warn('[VPE] Vault version lock: mkdir failed:', e?.message ?? e);
+    return;
+  }
+
+  let lockVer = '';
+  try {
+    if (fs.existsSync(lockPath)) {
+      lockVer = String(fs.readFileSync(lockPath, 'utf8')).split(/\r?\n/)[0].trim();
+    }
+  } catch (e) {
+    console.warn('[VPE] Vault version lock read failed:', e?.message ?? e);
+  }
+
+  if (lockVer && msc_vpeSemverCompare(lockVer, appVer) === 1) {
+    const msg =
+      'Incompatible Engine Version. Access Denied to Vault to prevent data corruption.\n\n' +
+      `This installation is v${appVer}. The vault was last upgraded by v${lockVer}.`;
+    console.error('[VPE]', msg);
+    try {
+      dialog.showErrorBox('Vader Project Engine', msg);
+    } catch (_) {
+      /* */
+    }
+    app.exit(1);
+    return;
+  }
+
+  try {
+    fs.writeFileSync(lockPath, `${appVer}\n`, 'utf8');
+    console.log('[VPE] Vault version lock updated:', lockPath, '→', appVer);
+  } catch (e) {
+    console.warn('[VPE] Vault version lock write failed:', e?.message ?? e);
+  }
+}
+msc_vpeEnforceVaultVersionLock();
 
 /** v1.7.6 — before `ready`; pairs with `msc_registerVpeVaultProtocolHandler` on startup. */
 msc_registerVpeVaultPrivilegedScheme();
@@ -232,6 +520,7 @@ function msc_attachEngineAfterWindow(mainWin) {
       projectRunner.setMainWindow(mainWin);
     } else {
       projectRunner = new MSC_ProjectRunner(mainWin, db);
+      // IPC registers vault sync (`msc_syncVaultPhysicalFolders`); `msc_vpeEnforceVaultVersionLock` already ran at boot.
       msc_registerVpeIpc(projectRunner, db, msc_vpeRuntime);
     }
     console.log('VPE: Persistence + ProjectRunner IPC online.');

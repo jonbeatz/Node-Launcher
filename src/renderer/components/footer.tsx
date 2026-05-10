@@ -6,9 +6,9 @@ import { getVpeApi } from '@/lib/vpe-bridge'
 type NetLedState = 'unknown' | 'forge' | 'dev' | 'conflict'
 
 function msc_engineVersionLabel(): string {
-  if (typeof window === 'undefined') return '2.0.0'
+  if (typeof window === 'undefined') return '2.1.0'
   const w = window as Window & { vpeInfo?: { version?: string } }
-  return w.vpeInfo?.version ?? '2.0.0'
+  return w.vpeInfo?.version ?? '2.1.0'
 }
 
 export function Footer() {
@@ -94,7 +94,7 @@ export function Footer() {
           disabled={purging || led === 'unknown'}
           onClick={() => void handlePurge()}
           className="h-6 px-2 rounded border border-[#444444] font-sans text-[10px] uppercase tracking-wide text-[#A0A0A0] hover:text-white hover:border-[#4fde82]/60 disabled:opacity-40 vader-focus"
-          title="taskkill /F /PID on listeners for 3000, 3001, 9222 (no /T) — skips launcher PID and parent PID"
+          title="Dev: no port kills (Next + stack stay up); refreshes health. Packaged: taskkill listeners on 3000/3001/9222 (+ Chrome VPE*). VPE_FORCE_PROD_PORT_PURGE=1 forces dev kills"
         >
           {purging ? 'Purging…' : 'Purge env'}
         </button>

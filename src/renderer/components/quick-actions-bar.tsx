@@ -19,7 +19,7 @@ export function QuickActionsBar({
   explorerActionTitle = 'Open selected project folder in Explorer',
 }: QuickActionsBarProps) {
   return (
-    <div className="flex items-center gap-1 px-6 pb-2">
+    <div className="flex items-center gap-1 pb-2 pl-6 pr-14">
       <button
         onClick={onStartAll}
         className="w-7 h-7 rounded flex items-center justify-center text-[#A0A0A0] hover:text-[#4fde82] hover:bg-[#252525] transition-all vader-focus"

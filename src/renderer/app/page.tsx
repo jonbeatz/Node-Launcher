@@ -1058,10 +1058,13 @@ function DashboardContent() {
             onClose={() => setSystemHealthOpen(false)} 
           />
 
-          {/* Content Area */}
-          <div className="flex-1 flex min-h-0 overflow-hidden">
+          {/* Content Area — grid fills width; LogDrawer is an absolute overlay (see data-vpe-log-drawer-layer) */}
+          <div
+            className="relative flex-1 flex min-h-0 overflow-hidden"
+            data-vpe-log-drawer-layer
+          >
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="min-w-0 flex-1 flex flex-col min-h-0 overflow-hidden">
               {activeNav === 'maintenance' ? (
                 <MaintenanceSection
                   maintenanceTab={maintenanceTab}
@@ -1139,24 +1142,26 @@ function DashboardContent() {
               )}
             </div>
 
-            {/* Log Drawer */}
-            <LogDrawer 
-              projects={logDrawerTabs}
-              activeProject={activeLogProject}
-              onProjectSelect={setActiveLogProject}
-              onClose={() => setLogDrawerExpanded(false)}
-              expanded={logDrawerExpanded}
-              onExpandedChange={setLogDrawerExpanded}
-              onCloseTab={(projectId) => {
-                if (projectId === '__vpe_all__') return
-                if (logProjects.length > 1) {
-                  const remaining = logProjects.filter(p => p.id !== projectId)
-                  if (remaining.length > 0) {
-                    setActiveLogProject(remaining[0].id)
+            {/* System logs: absolute overlay — does not shrink the project grid */}
+            <div className="pointer-events-none absolute inset-0 z-[35]">
+              <LogDrawer
+                projects={logDrawerTabs}
+                activeProject={activeLogProject}
+                onProjectSelect={setActiveLogProject}
+                onClose={() => setLogDrawerExpanded(false)}
+                expanded={logDrawerExpanded}
+                onExpandedChange={setLogDrawerExpanded}
+                onCloseTab={(projectId) => {
+                  if (projectId === '__vpe_all__') return
+                  if (logProjects.length > 1) {
+                    const remaining = logProjects.filter((p) => p.id !== projectId)
+                    if (remaining.length > 0) {
+                      setActiveLogProject(remaining[0].id)
+                    }
                   }
-                }
-              }}
-            />
+                }}
+              />
+            </div>
           </div>
 
           {/* Footer - 32px */}
@@ -1183,6 +1188,23 @@ function DashboardContent() {
               }
             }
           }}
+          onOpenVaultFolderInExplorer={async () => {
+            const pid = contextMenu?.projectId
+            if (!pid) return
+            const api = getVpeApi()
+            if (!api?.vaultOpenFolder) {
+              addToast('Vault folder', 'warning', 'Open the VPE desktop app to browse the project vault.')
+              return
+            }
+            try {
+              const res = await api.vaultOpenFolder(pid)
+              if (res && res.ok === false && typeof res.error === 'string' && res.error.trim()) {
+                addToast('Vault folder', 'error', res.error)
+              }
+            } catch (err: unknown) {
+              addToast('Vault folder', 'error', msc_formatUnknownIPCError(err))
+            }
+          }}
           onOpenVSCode={() => addToast('Opening VS Code...', 'info')}
           onOpenTerminal={async () => {
             const project = projects.find(p => p.id === contextMenu.projectId)
@@ -1196,7 +1218,24 @@ function DashboardContent() {
               }
             }
           }}
-          onRecaptureThumbnail={() => addToast('Recapturing thumbnail...', 'info')}
+          onRecaptureThumbnail={async () => {
+            const pid = contextMenu?.projectId
+            if (!pid) return
+            const api = getVpeApi()
+            if (!api?.pickThumbnail) {
+              addToast('Thumbnail', 'warning', 'Run inside the VPE desktop shell to pick an image.')
+              return
+            }
+            try {
+              const href = await api.pickThumbnail(pid, null)
+              if (href) {
+                addToast('Thumbnail updated', 'success', 'Vault card image saved and registry refreshed.')
+                await refreshProjects()
+              }
+            } catch (err: unknown) {
+              addToast('Thumbnail update failed', 'error', msc_formatUnknownIPCError(err))
+            }
+          }}
           onRunBuild={() => {
             const id = contextMenu?.projectId
             if (id) void handleRunBuild(id)

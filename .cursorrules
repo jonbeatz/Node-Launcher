@@ -3,11 +3,11 @@ description:
 alwaysApply: true
 ---
 
-# Vader Project Engine (VPE) — Cursor Rules (Vader Protocol v2.0.0 refactor track)
+# Vader Project Engine (VPE) — Cursor Rules (Vader Protocol v2.1.0 track)
 
 ## 1. Project Context & Identity
 - **Project Name:** Vader Project Engine (VPE)
-- **Current Version:** follow root **`package.json` `version`** (always re-read the file if disputed). **v2.0.0 — Vader Station Core:** modular IPC (`src/main/ipc/*`), dashboard islands (`ProjectGrid`, `StationSidebar`), migration guard (`test/verify-migrations.js`), path-redacting logger + Desktop **Support Bundle** (`vpe:generate-support-bundle`). **Docs:** v2.0.0 **Phase A** = single-source paths under **`.cursor/docs/core/`** and **`.cursor/docs/guides/`** (no ghost duplicates at **`.cursor/docs/`** root).
+- **Current Version:** follow root **`package.json` `version`** (always re-read the file if disputed). **v2.1.0 — Vault sovereignty:** **`vpe-vault-rm-guard.js`** write-protects **`fs.rmSync`** under vault roots unless **`vpe:delete-project`** (or vault rename maintenance) sets **`global.__vpeVaultHardDeleteActive`**. **Iron Curtain** in **`msc_vpeDetectLocalFirstUserData()`** blocks legacy engines (**`package.json` < 2.1.0** and/or **`NODE-LAUNCHER`** path/exe signals); escape **`VPE_SKIP_IRON_CURTAIN=1`** / **`VPE_E2E_USER_DATA`**. **v2.0.0 — Vader Station Core:** modular IPC (`src/main/ipc/*`), dashboard islands (`ProjectGrid`, `StationSidebar`), migration guard (`test/verify-migrations.js`), path-redacting logger + Desktop **Support Bundle** (`vpe:generate-support-bundle`). **Docs:** **Phase A** = single-source paths under **`.cursor/docs/core/`** and **`.cursor/docs/guides/`** (no ghost duplicates at **`.cursor/docs/`** root).
 - **Target Hardware:** AMD Ryzen 9700x / Gigabyte B650 (Optimized for high-performance I/O)
 - **OS Focus:** Windows 11 25H2 (Native optimizations for Defender/Antivirus paths)
 - **Branding:** My Studio Channel (MSC) / Vader Protocol
@@ -22,7 +22,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 
 **Documentation layout (v2.0.0+ — zero drift):** **`.cursor/docs/core/`** = constitution, build protocol, boot (**`AGENT-BOOT.md`**), capabilities, design spec. **`.cursor/docs/guides/`** = START-HERE, Custom-Commands, Stability, PRD, Checkpoint. Do **not** duplicate those filenames at **`.cursor/docs/`** root; root holds only adjunct refs (**`API-SetUp-Master.md`**, **`THUMBNAIL-IPC-INVESTIGATION.md`**, **`Rebuid-Commands.md`**). **`AGENT-BOOT-CHECKLIST.md`** and **`Stability-Fix-Backlog.md`** are retired — use **`core/AGENT-BOOT.md`** and **`guides/Stability.md`**.
 
-**Session bootstrap (cold start):** `.cursor/docs/core/AGENT-BOOT.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above. **Start Project** (or new session / agent setup): follow **`.cursor/prompts/Start-Project.md`** — then §4 **First actions**, **`.\google-api\vpe-start-api.ps1`**, confirm **`[VPE STANDBY]`** + **Uvicorn** on **4000** (**API is Live**), summarize **`VADER_STATION_LOG.md`**. See **`.cursor/docs/guides/START-HERE.md`**.
+**Session bootstrap (cold start):** `.cursor/docs/core/AGENT-BOOT.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above. **Start Project** (or new session / agent setup): follow **`.cursor/prompts/Start-Project.md`** — **canonical order** for full Vertex/LiteLLM context: **this file (§2–3)** → **`AGENT-BOOT.md`** §1 + §4 → **`API-SetUp-Master.md`** → **`.\google-api\vpe-start-api.ps1`** + **`ngrok http 4000`** → **`[VPE STANDBY]`** / **Uvicorn 4000** (**API is Live**) → **`VADER_STATION_LOG.md`**. See **`.cursor/docs/guides/START-HERE.md`**.
 
 **Critical:** Before performing any build, deployment, or environment setup, read and adhere to the protocols in **`.cursor/docs/core/VPE-BUILD-PROTOCOL.md`.**
 
@@ -45,7 +45,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Puppeteer Lifecycle:** Reuse single headless browser instance; capture thumbnails only after HTTP 200 health check; WebP format; cache across restarts
 - **Log Drawer:** Per-project log segregation via PM2 process ID; stream into dedicated xterm.js instance; support ANSI colors, Ctrl+F search, copy, clear view
 
-### 3.1 v2.0.0 Modular Architecture (Vader Station Core)
+### 3.1 v2.0.0+ Modular Architecture (Vader Station Core)
 - **Renderer:** **`ProjectGrid`** (`src/renderer/components/dashboard/ProjectGrid.tsx`) — filters, view modes, grid/list body. **`StationSidebar`** wraps **`AppSidebar`** (`src/renderer/components/layout/StationSidebar.tsx`).
 - **Main IPC:** Domain registrars **`src/main/ipc/project-handlers.js`**, **`vault-handlers.js`**, **`system-handlers.js`**; shared context + boot scrub in **`src/main/vpe-ipc.js`**.
 - **Quality / schema:** **`npm run test:migrations`** (in-memory SQLite via store migrations); reference **`test/fixtures/sqlite-v13-schema.sql`**. Playwright heartbeat: **`e2e/electron/vader-station-heartbeat.spec.ts`**.

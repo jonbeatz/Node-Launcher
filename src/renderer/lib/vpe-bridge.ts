@@ -259,11 +259,20 @@ export interface VpeApi {
     value: boolean,
   ) => Promise<{ ok?: boolean; settings?: VpeAppSettings; changeSummary?: string }>
   addProject: (payload: AddProjectPayload) => Promise<{ ok?: boolean; id?: string }>
-  deleteProject: (projectId: string) => Promise<{ ok?: boolean }>
+  deleteProject: (
+    projectId: string,
+  ) => Promise<{ ok?: boolean; success?: boolean; filesPurged?: boolean }>
   /** Reassign port + refresh detected scripts/package manager after preflight failure. */
   autoFixProjectPort: (
     projectId: string,
   ) => Promise<{ ok?: boolean; port: number; start_script?: string }>
+  /** Recovery: regenerate vault `_vpe_thumb.png` + fix broken `file:` thumbnail rows from images in each vault. */
+  repairVaultLinks?: () => Promise<{
+    ok: boolean
+    repaired: number
+    skipped: number
+    errors: { id: string; message: string }[]
+  }>
   openDirectory: () => Promise<string | null>
   vaultAddFile?: (
     projectId: string,
@@ -331,6 +340,8 @@ export interface VpeApi {
   scorchedEarth?: () => Promise<{
     ok: boolean
     skipped?: string
+    /** `soft_dev` — dev: no taskkill; `full` — packaged Windows scorched earth */
+    mode?: string
     log?: string[]
     error?: string
   }>
@@ -343,6 +354,10 @@ export interface VpeApi {
       deletedOrphanThumbFiles: number
       legacyThumbnailDirsRemoved: number
       orphanVaultDirsRemoved: number
+      /** Dirs under vault root with no matching DB project (not deleted). */
+      orphanVaultDirsDetected?: number
+      /** Legacy thumbnail dirs that could be removed manually (not auto-deleted). */
+      legacyThumbnailDirsEligible?: number
       legacyScratchRemoved: boolean
       bytesFreed: number
       mbFreed: number

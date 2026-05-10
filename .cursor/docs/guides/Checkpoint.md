@@ -1,5 +1,12 @@
 # VPE Checkpoint (2026-05-09)
 
+## Build v2.1.0 — Vault sovereignty, Iron Curtain, `fs.rmSync` guard, session handoff
+
+- **Version:** **`2.1.0`** — **`package.json`**, preload **`vpeInfo.version`**, footer fallbacks → **Sovereign baseline**.
+- **Main:** **`msc_vpeDetectLocalFirstUserData()`** — Iron Curtain (legacy **`package.json` < 2.1.0** and/or **`NODE-LAUNCHER`** signals; **`VPE_SKIP_IRON_CURTAIN`**, **`VPE_E2E_USER_DATA`** bypass). **`src/main/vpe-vault-rm-guard.js`** — **`VPE_VAULT_DELETION_LOCKED`**, **`fs.rmSync`** blocked under vault roots unless **`global.__vpeVaultHardDeleteActive`** during **`vpe:delete-project`** / vault rename cleanup. **`vpe-version.lock`** gate + boot scrub behavior per **`VADER_STATION_LOG.md`** **v2.1.0** entry.
+- **Renderer:** **`Msc_ProjectCard`** accordion **`scrollIntoView`** deferred **300ms**; context menu vault + thumbnail repair paths.
+- **Next session:** **`VADER_STATION_LOG.md`** — **Session handoff — 2026-05-09** (reorder arrows, legacy smoke, optional repair UI).
+
 ## Build v1.9.9 — Infrastructure consolidation (docs hierarchy + `google-api` centralization)
 
 - **Version:** **`1.9.9`** — **`package.json`**, preload, footer, **`layout.tsx`** → **Station Prime (v1.9.9)**.

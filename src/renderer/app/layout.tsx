@@ -10,7 +10,7 @@ const vpeCriticalBlockingCss =
 export const metadata: Metadata = {
   title: 'Vader Project Engine',
   description:
-    'Node.js Process Management Dashboard — MSC Media Engine Station Prime v2.0.0',
+    'Node.js Process Management Dashboard — MSC Media Engine Station Prime v2.1.0',
   generator: 'v0.app',
 }
 

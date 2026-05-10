@@ -28,6 +28,16 @@ function msc_isVaultInternalThumbBase(fileName) {
   );
 }
 
+/** OS / Explorer sidecars — never count as user “attachments” (paperclip). */
+function msc_isVaultNonUserNoiseFile(fileName) {
+  const lower = String(fileName || '').toLowerCase();
+  return (
+    lower === 'desktop.ini' ||
+    lower === 'thumbs.db' ||
+    lower === '.ds_store'
+  );
+}
+
 /** Sanitized single path segment for vault folder name (registry `name`). */
 function msc_safeVaultFolderName(name) {
   const raw = String(name || 'project')
@@ -70,6 +80,24 @@ function msc_dirHasAnyFile(absDir) {
   }
 }
 
+function msc_isExistingVaultDir(absPath) {
+  try {
+    return fs.existsSync(absPath) && fs.statSync(absPath).isDirectory();
+  } catch (_) {
+    return false;
+  }
+}
+
+/** Reject path-like `projectId` values so `path.join(root, id)` cannot escape the vault root. */
+function msc_isSafeVaultIdSegment(projectId) {
+  const id = projectId != null ? String(projectId).trim() : '';
+  if (!id) return false;
+  if (id.includes('..')) return false;
+  if (id.includes('/') || id.includes('\\')) return false;
+  if (/^[a-zA-Z]:/.test(id)) return false;
+  return path.basename(id) === id;
+}
+
 function msc_tryMigrateVaultFromLegacy(projectName) {
   const root = msc_projectVaultRootDir();
   const dest = path.join(root, msc_safeVaultFolderName(projectName));
@@ -90,10 +118,27 @@ function msc_tryMigrateVaultFromLegacy(projectName) {
   }
 }
 
-/** Absolute per-project vault directory (creates parent root only when migrating). */
-function msc_projectVaultProjectDir(projectName) {
+/**
+ * Absolute per-project vault directory (parent root created only during legacy migrate).
+ * v2.0.0+: Prefer folder named after sanitized display name; if that directory does not exist,
+ * fall back to a directory named exactly `projectId` (stable key when display name drifts).
+ * @param {string} projectName Registry display `name`
+ * @param {string | null | undefined} [projectId] Registry UUID (optional)
+ */
+function msc_projectVaultProjectDir(projectName, projectId) {
   msc_tryMigrateVaultFromLegacy(projectName);
-  return path.join(msc_projectVaultRootDir(), msc_safeVaultFolderName(projectName));
+  const root = msc_projectVaultRootDir();
+  const primary = path.join(root, msc_safeVaultFolderName(projectName));
+  if (msc_isExistingVaultDir(primary)) {
+    return primary;
+  }
+  if (msc_isSafeVaultIdSegment(projectId)) {
+    const byId = path.join(root, String(projectId).trim());
+    if (msc_isExistingVaultDir(byId)) {
+      return byId;
+    }
+  }
+  return primary;
 }
 
 /**
@@ -116,10 +161,13 @@ function msc_vaultRenameProjectFolder(oldDisplayName, newDisplayName) {
       return;
     }
     try {
+      global.__vpeVaultHardDeleteActive = true;
       fs.rmSync(newDir, { recursive: true, force: true });
     } catch (e) {
       console.warn('[VPE]', 'vault rename could not clear empty target', e?.message ?? e);
       return;
+    } finally {
+      global.__vpeVaultHardDeleteActive = false;
     }
   }
   fs.renameSync(oldDir, newDir);
@@ -130,8 +178,10 @@ module.exports = {
   VPE_VAULT_KEEP_FILE,
   msc_isVaultKeepFile,
   msc_isVaultInternalThumbBase,
+  msc_isVaultNonUserNoiseFile,
   msc_safeVaultFolderName,
   msc_projectVaultRootDir,
+  msc_isSafeVaultIdSegment,
   msc_projectVaultProjectDir,
   msc_vaultRenameProjectFolder,
 };

@@ -1,6 +1,14 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react'
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  KeyboardEvent,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { X, GripVertical, ChevronLeft, ChevronRight, ExternalLink, ArrowDownToLine } from 'lucide-react'
 import { getVpeApi, msc_formatUnknownIPCError } from '@/lib/vpe-bridge'
 import {
@@ -143,12 +151,17 @@ export function LogDrawer({
   onCloseTab
 }: LogDrawerProps) {
   const [selectedProject, setSelectedProject] = useState(activeProject)
-  const [width, setWidth] = useState(420)
+  const [width, setWidth] = useState(400)
   const [isDetached, setIsDetached] = useState(false)
   const [termPrefsRev, setTermPrefsRev] = useState(0)
   const [floatingPosition, setFloatingPosition] = useState({ x: 100, y: 100 })
   const [floatingSize, setFloatingSize] = useState({ width: 500, height: 400 })
   const [logs, setLogs] = useState<LogEntry[]>(() => mscBootstrapLogs())
+  /** Docked (non-floating) overlay: keep mounted briefly after collapse for slide-out. */
+  const [dockedLayerVisible, setDockedLayerVisible] = useState(
+    () => Boolean(expandedProp && !isDetached),
+  )
+  const [dockedSlideOpen, setDockedSlideOpen] = useState(false)
 
   useEffect(() => {
     const fn = () => setTermPrefsRev((r) => r + 1)
@@ -316,8 +329,11 @@ export function LogDrawer({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing.current) return
-      const newWidth = window.innerWidth - e.clientX
-      setWidth(Math.max(380, Math.min(520, newWidth)))
+      const layer = document.querySelector('[data-vpe-log-drawer-layer]')
+      const rect = layer?.getBoundingClientRect()
+      const right = rect != null ? rect.right : window.innerWidth
+      const newWidth = Math.max(320, Math.min(560, right - e.clientX))
+      setWidth(newWidth)
     }
 
     const handleMouseUp = () => {
@@ -334,6 +350,24 @@ export function LogDrawer({
     }
   }, [])
 
+  useLayoutEffect(() => {
+    if (isDetached) {
+      setDockedLayerVisible(false)
+      setDockedSlideOpen(false)
+      return
+    }
+    if (expandedProp) {
+      setDockedLayerVisible(true)
+      const id = requestAnimationFrame(() =>
+        requestAnimationFrame(() => setDockedSlideOpen(true)),
+      )
+      return () => cancelAnimationFrame(id)
+    }
+    setDockedSlideOpen(false)
+    const t = window.setTimeout(() => setDockedLayerVisible(false), 300)
+    return () => window.clearTimeout(t)
+  }, [expandedProp, isDetached])
+
   const startResize = () => {
     isResizing.current = true
     document.body.style.cursor = 'col-resize'
@@ -343,6 +377,8 @@ export function LogDrawer({
   // Floating window drag handlers
   const startDrag = (e: React.MouseEvent) => {
     if (!floatingRef.current) return
+    if (e.button !== 0) return
+    e.preventDefault()
     isDragging.current = true
     const rect = floatingRef.current.getBoundingClientRect()
     dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
@@ -493,13 +529,13 @@ export function LogDrawer({
     }
   }
 
-  if (!expandedProp && !isDetached) {
+  if (!expandedProp && !isDetached && !dockedLayerVisible) {
     return (
-      <div className="vpe-log-drawer-root vpe-theme-font h-full flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 w-8">
+      <div className="vpe-log-drawer-root vpe-theme-font pointer-events-auto absolute right-0 top-0 bottom-0 z-[58] flex w-8 flex-col border-l border-[#333333] bg-[#1c1c1c]">
         <button
           type="button"
           onClick={() => onExpandedChange?.(true)}
-          className="flex-1 flex items-center justify-center text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all"
+          className="flex flex-1 items-center justify-center text-[#A0A0A0] transition-all hover:bg-[#252525] hover:text-white"
           title="Expand System Log"
         >
           <ChevronLeft size={16} />
@@ -508,12 +544,13 @@ export function LogDrawer({
     )
   }
 
-  // Detached floating window mode
+  // Detached floating window — portal to `document.body` so it is not under the
+  // main-area `pointer-events-none` overlay wrapper (drag / resize / clicks would not fire).
   if (isDetached) {
-    return (
+    const detachedNode = (
       <div
         ref={floatingRef}
-        className="vpe-log-drawer-root vpe-theme-font fixed z-[100] flex flex-col bg-[#1c1c1c] border border-[#333333] rounded shadow-2xl"
+        className="vpe-log-drawer-root vpe-theme-font pointer-events-auto fixed z-[110] flex flex-col rounded border border-[#333333] bg-[#1c1c1c] shadow-2xl"
         style={{
           left: floatingPosition.x,
           top: floatingPosition.y,
@@ -522,26 +559,33 @@ export function LogDrawer({
         }}
       >
         {/* Floating Header - Draggable */}
-        <div 
-          className="h-10 bg-[#161616] border-b border-[#333333] flex items-center justify-between px-3 cursor-move select-none rounded-t"
+        <div
+          className="vpe-log-drawer-drag-handle flex h-10 shrink-0 cursor-move select-none items-center justify-between rounded-t border-b border-[#333333] bg-[#161616] px-3"
           onMouseDown={startDrag}
         >
-          <h2 className="font-semibold text-white text-sm tracking-tight">SYSTEM_LOGS</h2>
+          <h2 className="text-sm font-semibold tracking-tight text-white">SYSTEM_LOGS</h2>
           <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
-            <button 
-              onClick={() => setIsDetached(false)}
-              className="p-1.5 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all"
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsDetached(false)
+                onExpandedChange?.(true)
+              }}
+              className="rounded p-1.5 text-[#A0A0A0] transition-all hover:bg-[#252525] hover:text-white"
               title="Dock to sidebar"
             >
               <ArrowDownToLine size={14} />
             </button>
-            <button 
-              onClick={() => {
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
                 setIsDetached(false)
                 onExpandedChange?.(false)
                 onClose?.()
               }}
-              className="p-1.5 rounded text-[#A0A0A0] hover:text-white hover:bg-[#252525] transition-all"
+              className="rounded p-1.5 text-[#A0A0A0] transition-all hover:bg-[#252525] hover:text-white"
             >
               <X size={14} />
             </button>
@@ -598,11 +642,12 @@ export function LogDrawer({
           <span className="text-[10px] text-[#555555]">DETACHED</span>
         </div>
 
-        {/* Resize handle for floating window */}
-        <div 
-          className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+        {/* Resize handle — bottom-right; stopPropagation so header drag does not steal */}
+        <div
+          className="absolute bottom-0 right-0 z-20 flex h-5 w-5 cursor-se-resize items-end justify-end p-0.5"
           onMouseDown={(e) => {
             e.preventDefault()
+            e.stopPropagation()
             const startX = e.clientX
             const startY = e.clientY
             const startWidth = floatingSize.width
@@ -611,7 +656,7 @@ export function LogDrawer({
             const handleResize = (moveE: MouseEvent) => {
               setFloatingSize({
                 width: Math.max(400, startWidth + (moveE.clientX - startX)),
-                height: Math.max(300, startHeight + (moveE.clientY - startY))
+                height: Math.max(300, startHeight + (moveE.clientY - startY)),
               })
             }
 
@@ -624,22 +669,40 @@ export function LogDrawer({
             document.addEventListener('mouseup', handleResizeEnd)
           }}
         >
-          <GripVertical size={12} className="text-[#555555] rotate-45" />
+          <GripVertical size={12} className="rotate-45 text-[#555555]" />
         </div>
       </div>
     )
+
+    if (typeof document !== 'undefined') {
+      return createPortal(detachedNode, document.body)
+    }
+    return detachedNode
   }
 
-  return (
-    <div 
-      className="vpe-log-drawer-root vpe-theme-font relative h-full min-h-0 flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 transition-all duration-200"
-      style={{ width, borderRadius: '4px 0 0 4px' }}
-    >
+  if (!isDetached && (expandedProp || dockedLayerVisible)) {
+    return (
+      <>
+        <button
+          type="button"
+          aria-label="Close system logs"
+          className="pointer-events-auto absolute inset-0 z-[55] bg-[#121212]/80 backdrop-blur-sm transition-opacity duration-300"
+          onClick={() => {
+            onExpandedChange?.(false)
+            onClose?.()
+          }}
+        />
+        <div
+          className={`vpe-log-drawer-root vpe-theme-font pointer-events-auto absolute top-0 right-0 bottom-0 z-[60] flex min-h-0 flex-col border-l border-[#333333] bg-[#1c1c1c] shadow-2xl transition-transform duration-300 ease-out ${
+            dockedSlideOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
+          style={{ width, borderRadius: '4px 0 0 4px' }}
+        >
       {/* Resize Handle — above terminal hit target; terminal content inset with left-1 */}
       <div
         ref={resizeRef}
         onMouseDown={startResize}
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#4fde82]/20 transition-colors z-10"
+        className="absolute left-0 top-0 bottom-0 z-10 w-1 cursor-col-resize transition-colors hover:bg-[#4fde82]/20"
       />
 
       {/* Tab Bar - SQUARED with 4px top radius only, dark grey active state */}
@@ -779,6 +842,10 @@ export function LogDrawer({
           </div>
         </>
       )}
-    </div>
-  )
+        </div>
+      </>
+    )
+  }
+
+  return null
 }

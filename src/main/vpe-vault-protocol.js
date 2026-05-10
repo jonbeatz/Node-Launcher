@@ -54,7 +54,7 @@ function msc_registerVpeVaultProtocolHandler(getStore) {
       // Path only — `?pulse=…` and other query params are ignored for disk lookup (cache-bust).
       const pn = u.pathname.replace(/\\/g, '/').toLowerCase();
       if (pn !== `/${VPE_VAULT_INTERNAL_THUMB}`.toLowerCase()) return fail();
-      const vaultDir = path.resolve(msc_projectVaultProjectDir(row.name));
+      const vaultDir = path.resolve(msc_projectVaultProjectDir(row.name, row.id));
       const abs = path.resolve(path.join(vaultDir, VPE_VAULT_INTERNAL_THUMB));
       const rel = path.relative(vaultDir, abs);
       if (rel.startsWith('..') || path.isAbsolute(rel)) return fail();

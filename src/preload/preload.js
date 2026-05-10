@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     msc_invoke('vpe:update-setting-launch-startup', value),
   addProject: (payload) => msc_invoke('vpe:add-project', payload),
   autoFixProjectPort: (projectId) => msc_invoke('vpe:auto-fix-port', projectId),
+  repairVaultLinks: () => msc_invoke('vpe:repair-vault-links'),
   deleteProject: (projectId) => msc_invoke('vpe:delete-project', projectId),
   openDirectory: () => msc_invoke('vpe:open-directory'),
   inspectProject: (projectPath) => msc_invoke('vpe:inspect-project', projectPath),
@@ -139,7 +140,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '2.0.0',
+  version: '2.1.0',
   hardware: '9700x Tuned',
 });
 

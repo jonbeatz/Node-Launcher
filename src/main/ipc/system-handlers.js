@@ -1,6 +1,48 @@
 'use strict';
 
+const { msc_logInfo, msc_logError } = require('../lib/logger');
 const { msc_generateSupportBundle } = require('../lib/support-bundle');
+
+/**
+ * Best-effort removal of leftover VPE dirs/zips under OS temp (snapshots / restore scratch).
+ * @param {typeof import('fs')} fs
+ * @param {typeof import('path')} path
+ * @param {typeof import('os')} os
+ * @returns {string[]}
+ */
+function msc_softPurgeVpeTempScratch(fs, path, os) {
+  /** @type {string[]} */
+  const log = [];
+  let tmp;
+  try {
+    tmp = os.tmpdir();
+    const entries = fs.readdirSync(tmp, { withFileTypes: true });
+    for (const ent of entries) {
+      const full = path.join(tmp, ent.name);
+      if (ent.isDirectory()) {
+        if (!/^vpe-(snapshot|restore)-/i.test(ent.name)) continue;
+        try {
+          fs.rmSync(full, { recursive: true, force: true });
+          log.push(`temp_removed_dir:${ent.name}`);
+        } catch (e) {
+          log.push(`temp_dir_skip:${ent.name}:${e && e.message ? String(e.message) : String(e)}`);
+        }
+        continue;
+      }
+      if (/^vpe-snapshot-.*\.zip$/i.test(ent.name)) {
+        try {
+          fs.unlinkSync(full);
+          log.push(`temp_removed_zip:${ent.name}`);
+        } catch (e) {
+          log.push(`temp_zip_skip:${ent.name}`);
+        }
+      }
+    }
+  } catch (e) {
+    log.push(`temp_scan_error:${e && e.message ? String(e.message) : String(e)}`);
+  }
+  return log;
+}
 
 /**
  * IPC domain: diagnostics, PM2 stop-all, terminal, snapshots, launcher ports, media purge.
@@ -48,9 +90,55 @@ function msc_registerSystemIpc(ipcMain, c) {
   });
 
   ipcMain.handle('vpe:scorched-earth', async () => {
+    const isActuallyDev =
+      !app.isPackaged || process.env.NODE_ENV === 'development';
+
+    msc_logInfo(`[VPE DEBUG] app.isPackaged: ${app.isPackaged}`);
+    msc_logInfo(`[VPE DEBUG] process.env.NODE_ENV: ${process.env.NODE_ENV}`);
+    msc_logInfo(`[VPE DEBUG] Final Decision - isActuallyDev: ${isActuallyDev}`);
+
     if (process.platform !== 'win32') {
       return { ok: true, skipped: 'non_win32' };
     }
+
+    if (isActuallyDev) {
+      // Isolation: `set VPE_SCORCHED_EARTH_DEV_NOOP=1` — instant return, no cleanup (verify window stays open).
+      if (process.env.VPE_SCORCHED_EARTH_DEV_NOOP === '1') {
+        msc_logInfo('[VPE] DEV NOOP: instant return only (VPE_SCORCHED_EARTH_DEV_NOOP=1).');
+        return { ok: true, mode: 'soft_dev', log: ['noop:isolation_instant_return'] };
+      }
+
+      msc_logInfo(
+        '[VPE] Soft Purge Initiated. Sending UI response FIRST to prevent hang.',
+      );
+
+      const result = { ok: true, mode: 'soft_dev' };
+
+      setImmediate(() => {
+        void (async () => {
+          try {
+            msc_logInfo('[VPE] Running background cleanup...');
+            if (typeof msc_vpeStopAllEngines === 'function') {
+              await msc_vpeStopAllEngines();
+            }
+            if (typeof msc_softPurgeVpeTempScratch === 'function') {
+              msc_softPurgeVpeTempScratch(fs, path, os);
+            }
+            msc_emitProjectsUpdated();
+            msc_logInfo('[VPE] Soft Purge Background Cleanup Complete.');
+          } catch (err) {
+            const msg =
+              err && typeof err === 'object' && 'message' in err
+                ? String(err.message)
+                : String(err);
+            msc_logError('[VPE] Soft Purge background error: ' + msg);
+          }
+        })();
+      });
+
+      return result;
+    }
+
     try {
       const r = await msc_scorchedEarthWin32Steps();
       msc_emitProjectsUpdated();
@@ -339,13 +427,14 @@ function msc_registerSystemIpc(ipcMain, c) {
     }
   });
 
+  /** Aligns DB thumbnail paths + prunes stray `_vpe_thumb*` files in known vault dirs only — no orphan folder deletion. */
   ipcMain.handle('vpe:purge-unused-media', async () => {
     try {
       const migration = msc_greatPurgeThumbnailMigration(store);
       const scrub = msc_purgeUnusedMediaScrub(store);
       const vaultSync = msc_syncVaultPhysicalFolders(store);
       msc_emitProjectsUpdated();
-      console.log('[VPE HARD SCRUB COMPLETE]', { migration, scrub });
+      console.log('[VPE MEDIA ALIGN]', { migration, scrub });
       console.log('[VPE VAULT SYNC COMPLETE]', vaultSync);
       console.log('[VPE STANDBY]');
       return { ok: true, migration, scrub, vaultSync };

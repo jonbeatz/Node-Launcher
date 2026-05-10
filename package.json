@@ -1,7 +1,7 @@
 {
   "name": "vader-project-engine",
-  "version": "2.0.0",
-  "description": "Vader Project Engine — Station Prime (v2.0.0)",
+  "version": "2.1.0",
+  "description": "Vader Project Engine — Station Prime (v2.1.0)",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {
@@ -28,6 +28,7 @@
     "build:renderer": "next build src/renderer",
     "lint": "next lint src/renderer",
     "test:migrations": "cross-env ELECTRON_RUN_AS_NODE=1 electron test/verify-migrations.js",
+    "vault:reconcile-msc": "cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/vault-reconcile-msc-media-pro.cjs",
     "test:e2e": "playwright test",
     "test:e2e:electron": "npm run build:renderer && playwright test --config=playwright.electron.config.ts",
     "repair:ast": "node scripts/vpe-repair-stub.cjs",

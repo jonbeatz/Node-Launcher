@@ -17,6 +17,7 @@ const {
   VPE_VAULT_KEEP_FILE,
   msc_isVaultInternalThumbBase,
   msc_isVaultKeepFile,
+  msc_isVaultNonUserNoiseFile,
   msc_safeVaultFolderName,
   msc_projectVaultRootDir,
   msc_projectVaultProjectDir,
@@ -31,7 +32,14 @@ const {
 } = require('./vpe-thumbnail-url');
 const { pathToFileURL, fileURLToPath } = require('node:url');
 const { msc_patchPackageJsonStripScriptPorts } = require('./package-json-script-patch');
-const isDev = require('electron-is-dev');
+const { msc_logInfo } = require('./lib/logger');
+
+/** Align with `system-handlers` / `vpe:scorched-earth`. Override: `VPE_FORCE_DEV_PORT_PURGE_SAFE=1` / `VPE_FORCE_PROD_PORT_PURGE=1`. */
+function msc_isActuallyDevEnvironment() {
+  if (process.env.VPE_FORCE_PROD_PORT_PURGE === '1') return false;
+  if (process.env.VPE_FORCE_DEV_PORT_PURGE_SAFE === '1') return true;
+  return !app.isPackaged || process.env.NODE_ENV === 'development';
+}
 
 let msc_vpeIpcRegistered = false;
 /** Node-Launcher UI port; managed projects must avoid this port. */
@@ -604,14 +612,26 @@ function msc_purgeProtectedPids() {
  * @param {number} port
  * @param {boolean} aggressive
  * @param {Array<{ pid: string, port: number, img: string }> | null} killed
+ * @param {boolean} [killNodeListenersOnly] Dev footer purge: only `node.exe` — never kill `electron.exe` on 3000/3001 (avoids app exit).
  */
-function msc_purgeTryKillListeningPid(protectedPids, pid, port, aggressive, killed) {
+function msc_purgeTryKillListeningPid(
+  protectedPids,
+  pid,
+  port,
+  aggressive,
+  killed,
+  killNodeListenersOnly,
+) {
   const ps = String(pid);
   if (protectedPids.has(ps)) return;
   if (process.platform !== 'win32') return;
   const { execSync } = require('child_process');
   const img = msc_tasklistImageName(ps);
-  if (!aggressive && img !== 'node.exe' && img !== 'electron.exe') return;
+  if (killNodeListenersOnly) {
+    if (img !== 'node.exe') return;
+  } else if (!aggressive && img !== 'node.exe' && img !== 'electron.exe') {
+    return;
+  }
   try {
     execSync(`taskkill /F /PID ${ps}`, { windowsHide: true, stdio: 'ignore' });
     if (killed) killed.push({ pid: ps, port, img: img || (aggressive ? 'aggressive-9222' : '') });
@@ -729,7 +749,7 @@ function msc_killNodeProcessesOwnedByRepoRoot(protectedPids) {
 /** Same as inner, but never hangs the UI: on timeout assume port free (forge-friendly). */
 async function msc_launcherPortRowHealth(port) {
   // v1.2.0: zero-wait dev override — NET always green in dev; real cleanup happens on quit-sweep / purge.
-  if (isDev && [3000, 3001, 9222].includes(port)) {
+  if (msc_isActuallyDevEnvironment() && [3000, 3001, 9222].includes(port)) {
     return { inUse: false, ok: true, forced: true };
   }
   if (port === 9222) {
@@ -758,16 +778,24 @@ async function msc_launcherPortRowHealth(port) {
 }
 
 /**
- * Purge orphan TCP listeners on 3000 / 3001 / 9222. Never targets the main app (`process.pid`)
+ * Purge orphan TCP listeners on 3000 / 3001 / (9222 production only). Never targets the main app (`process.pid`)
  * or `process.ppid`. Uses `taskkill /F /PID` only (no `/T`) so the Electron tree is not torn down.
+ * Dev / unpackaged: **no listener taskkill** on 3000/3001 — those are almost always this repo's Next + managed
+ * dev stack; killing `node.exe` there stops `npm run dev:renderer` and can end the whole `concurrently` session.
+ * Also **never** touches **9222** in dev (Electron CDP). Set `VPE_FORCE_PROD_PORT_PURGE=1` to restore kills.
  */
 async function msc_purgeLauncherPorts() {
   const { execSync } = require('child_process');
   const { setTimeout: delay } = require('timers/promises');
   const protectedPids = msc_purgeProtectedPids();
   const killed = [];
+  const devUnpackaged = msc_isActuallyDevEnvironment();
 
-  if (process.platform === 'win32') {
+  msc_logInfo(
+    `[VPE purge-launcher-ports] devSafe=${devUnpackaged} isPackaged=${app.isPackaged} NODE_ENV=${process.env.NODE_ENV ?? ''}`,
+  );
+
+  if (process.platform === 'win32' && !devUnpackaged) {
     try {
       execSync('taskkill /F /IM chrome.exe /FI "WINDOWTITLE eq VPE*"', {
         windowsHide: true,
@@ -778,17 +806,23 @@ async function msc_purgeLauncherPorts() {
     }
   }
 
-  const ports = [3000, 3001, 9222];
-  for (const port of ports) {
-    for (const pid of msc_netstatListeningPidsOnPort(port)) {
-      msc_purgeTryKillListeningPid(protectedPids, pid, port, false, killed);
+  if (!devUnpackaged) {
+    const ports = [3000, 3001, 9222];
+    for (const port of ports) {
+      for (const pid of msc_netstatListeningPidsOnPort(port)) {
+        msc_purgeTryKillListeningPid(protectedPids, pid, port, false, killed, false);
+      }
     }
-  }
 
-  if (process.platform === 'win32') {
-    for (const pid of msc_netstatListeningPidsOnPort(9222)) {
-      msc_purgeTryKillListeningPid(protectedPids, pid, 9222, true, killed);
+    if (process.platform === 'win32') {
+      for (const pid of msc_netstatListeningPidsOnPort(9222)) {
+        msc_purgeTryKillListeningPid(protectedPids, pid, 9222, true, killed);
+      }
     }
+  } else {
+    msc_logInfo(
+      '[VPE purge-launcher-ports] dev-safe: skip 3000/3001/9222 taskkill (use VPE_FORCE_PROD_PORT_PURGE=1 to force)',
+    );
   }
 
   await delay(500);
@@ -1027,14 +1061,15 @@ function msc_vault_destPathNoCollision(destDir, filename) {
  * Secure copy of an arbitrary file into the project vault directory.
  * @param {string} projectDisplayName Registry `name` (folder key)
  * @param {string} srcPath Absolute source file path
+ * @param {string | null | undefined} [projectId] Registry id for vault path fallback
  * @returns {string} Absolute destination path
  */
-function msc_vault_copyFile(projectDisplayName, srcPath) {
+function msc_vault_copyFile(projectDisplayName, srcPath, projectId) {
   const abs = path.resolve(srcPath);
   if (!fs.existsSync(abs)) throw new Error('VPE: Source file does not exist.');
   const st = fs.statSync(abs);
   if (!st.isFile()) throw new Error('VPE: Vault accepts files only.');
-  const destDir = msc_projectVaultProjectDir(projectDisplayName);
+  const destDir = msc_projectVaultProjectDir(projectDisplayName, projectId);
   fs.mkdirSync(destDir, { recursive: true });
   let fname = path.basename(abs);
   if (msc_isVaultInternalThumbBase(fname)) {
@@ -1046,16 +1081,23 @@ function msc_vault_copyFile(projectDisplayName, srcPath) {
   return dest;
 }
 
-/** Whether this project's vault has at least one user reference file (excludes internal thumbs, `.vpe_keep`, `_vpe_thumb*`). */
-function msc_vaultDirHasUserReferenceFiles(projectDisplayName) {
+/**
+ * Whether this project's vault has at least one user reference file
+ * (excludes internal thumbs, `.vpe_keep`, `_vpe_thumb*`, OS noise). Thumbnail-only or
+ * `.vpe_keep`-only folders do **not** enable the paperclip.
+ * @param {string} projectDisplayName Registry `name`
+ * @param {string | null | undefined} [projectId] Registry id — must match `vpe:getProjects` / vault IPC resolution
+ */
+function msc_vaultDirHasUserReferenceFiles(projectDisplayName, projectId) {
   try {
-    const dir = msc_projectVaultProjectDir(projectDisplayName);
+    const dir = msc_projectVaultProjectDir(projectDisplayName, projectId);
     if (!fs.existsSync(dir)) return false;
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     return entries.some((e) => {
       if (!e.isFile()) return false;
       const nm = e.name;
       if (msc_isVaultKeepFile(nm)) return false;
+      if (msc_isVaultNonUserNoiseFile(nm)) return false;
       const lower = String(nm).toLowerCase();
       if (lower.startsWith('_vpe_thumb')) return false;
       return true;
@@ -1143,6 +1185,12 @@ async function msc_safeWriteThumbnail(vaultDir, pngBuffer) {
         }
       }
       console.log('[VPE THUMBNAIL LOCK RELEASED]');
+      try {
+        const t = new Date();
+        fs.utimesSync(outPath, t, t);
+      } catch (_) {
+        /* mtime bump is best-effort — helps renderer / disk cache see a fresh thumb */
+      }
       return outPath;
     } catch (err) {
       lastErr = err;
@@ -1169,8 +1217,8 @@ async function msc_safeWriteThumbnail(vaultDir, pngBuffer) {
  * v1.7.3 — delegates disk write to `msc_safeWriteThumbnail` (TEMP + fsync + atomic rename).
  * @returns {Promise<string>} Absolute path to `_vpe_thumb.png`
  */
-async function msc_writeVaultInternalThumbnail(srcImagePath, projectDisplayName) {
-  const vaultDir = msc_projectVaultProjectDir(projectDisplayName);
+async function msc_writeVaultInternalThumbnail(srcImagePath, projectDisplayName, projectId) {
+  const vaultDir = msc_projectVaultProjectDir(projectDisplayName, projectId);
   fs.mkdirSync(vaultDir, { recursive: true });
 
   ['_vpe_thumb.jpg', '_vpe_thumb.jpeg'].forEach((leaf) => {
@@ -1269,6 +1317,10 @@ function msc_utf16LeBase64ForPs(script) {
   return Buffer.from(script, 'utf16le').toString('base64');
 }
 
+/**
+ * Full scorched earth (Windows production): `taskkill` Node tree + orphan Electron sweep.
+ * Dev “soft purge” lives in `system-handlers.js` (`vpe:scorched-earth` when `electron-is-dev`).
+ */
 async function msc_scorchedEarthWin32Steps() {
   const { exec } = require('child_process');
   const execIgnore = (cmd) =>
@@ -1335,7 +1387,7 @@ Get-CimInstance Win32_Process -Filter "Name='electron.exe'" | ForEach-Object {
   log.push(`orphan_electron_attempted: ${orphanElectronPids.length}`);
   log.push(`orphan_electron_taskkills: ${killedElectron}`);
 
-  return { ok: true, log };
+  return { ok: true, mode: 'full', log };
 }
 
 /** @param {unknown} err */
@@ -1441,7 +1493,7 @@ function msc_coerceThumbnailVaultFilePresence(row) {
   }
   try {
     const fp = path.resolve(fileURLToPath(tu));
-    const vdir = path.resolve(msc_projectVaultProjectDir(row.name));
+    const vdir = path.resolve(msc_projectVaultProjectDir(row.name, row.id));
     const rel = path.relative(vdir, fp);
     if (rel.startsWith('..') || path.isAbsolute(rel)) {
       return tu;
@@ -1470,7 +1522,10 @@ function msc_greatPurgeThumbnailMigration(store) {
     let next = row.thumbnail_url ?? null;
 
     if (typeof next === 'string' && msc_isLegacyMediaThumbnailsUrl(next)) {
-      const vaultPng = path.join(msc_projectVaultProjectDir(row.name), VPE_VAULT_INTERNAL_THUMB);
+      const vaultPng = path.join(
+        msc_projectVaultProjectDir(row.name, row.id),
+        VPE_VAULT_INTERNAL_THUMB,
+      );
       next = fs.existsSync(vaultPng) ? pathToFileURL(vaultPng).href : null;
       migratedLegacy += 1;
     }
@@ -1565,8 +1620,9 @@ function msc_sumPathBytesSync(targetPath) {
 }
 
 /**
- * v1.6.7 — Orphan `_vpe_thumb*`, hard-remove repo `media/thumbnails` when no row points at it,
- * remove userData scratch the same way, delete vault folders with no registry match (sanitized `name`).
+ * v1.6.7 — Orphan `_vpe_thumb*` files inside **registered** vault dirs may be unlinked when not the
+ * approved thumbnail. Legacy `media/thumbnails` dirs and vault folders missing from the DB are
+ * never auto-deleted (orphans are left on disk for manual reconcile / UI flags).
  */
 function msc_purgeUnusedMediaScrub(store) {
   /** @type {unknown[]} */
@@ -1596,7 +1652,7 @@ function msc_purgeUnusedMediaScrub(store) {
 
   for (const row of rows) {
     if (!row?.name) continue;
-    const dir = msc_projectVaultProjectDir(row.name);
+    const dir = msc_projectVaultProjectDir(row.name, row.id);
     if (!fs.existsSync(dir)) continue;
 
     const leaf = msc_safeVaultFolderName(row.name);
@@ -1637,8 +1693,12 @@ function msc_purgeUnusedMediaScrub(store) {
     }
   }
 
-  /** v1.6.7 — Hard scrub: delete each legacy dir only if no registry row targets that path. */
+  /**
+   * v1.6.7 — legacy `media/thumbnails` dirs and orphan vault folders are **not** auto-deleted:
+   * only explicit project Delete may remove vault trees. Count eligible dirs for diagnostics.
+   */
   let legacyThumbnailDirsRemoved = 0;
+  let legacyThumbnailDirsEligible = 0;
   const legacyRepoThumbnails = msc_normalizeResolvedPath(
     path.join(process.cwd(), 'media', 'thumbnails'),
   );
@@ -1655,16 +1715,10 @@ function msc_purgeUnusedMediaScrub(store) {
   )) {
     if (!legacyPath || !fs.existsSync(legacyPath)) continue;
     if (msc_registryPointsAtFilesystemDir(store, legacyPath)) continue;
-    try {
-      bytesFreed += msc_sumPathBytesSync(legacyPath);
-      fs.rmSync(legacyPath, { recursive: true, force: true });
-      legacyThumbnailDirsRemoved += 1;
-    } catch (_) {
-      /* */
-    }
+    legacyThumbnailDirsEligible += 1;
   }
 
-  /** Vault folders on disk without a registry project (sanitized display `name`). */
+  /** Vault folders on disk without a registry project (sanitized display `name`) — detect only. */
   /** @type {Set<string>} */
   const legitLeaves = new Set(
     rows
@@ -1673,6 +1727,7 @@ function msc_purgeUnusedMediaScrub(store) {
   );
 
   let orphanVaultDirsRemoved = 0;
+  let orphanVaultDirsDetected = 0;
   const vaultRootResolved = path.resolve(msc_projectVaultRootDir());
 
   try {
@@ -1698,13 +1753,20 @@ function msc_purgeUnusedMediaScrub(store) {
     const relTop = path.relative(vaultRootResolved, target);
     if (relTop.startsWith('..') || path.isAbsolute(relTop)) continue;
 
-    try {
-      bytesFreed += msc_sumPathBytesSync(target);
-      fs.rmSync(target, { recursive: true, force: true });
-      orphanVaultDirsRemoved += 1;
-    } catch (_) {
-      /* */
-    }
+    orphanVaultDirsDetected += 1;
+  }
+
+  if (orphanVaultDirsDetected > 0) {
+    console.log(
+      '[VPE] Orphan vault directories on disk (not auto-deleted; reconcile manually if needed):',
+      orphanVaultDirsDetected,
+    );
+  }
+  if (legacyThumbnailDirsEligible > 0) {
+    console.log(
+      '[VPE] Legacy media/thumbnails dirs present with no DB pointer (not auto-deleted):',
+      legacyThumbnailDirsEligible,
+    );
   }
 
   const mbFreed = Math.round((bytesFreed / (1024 * 1024)) * 100) / 100;
@@ -1713,7 +1775,9 @@ function msc_purgeUnusedMediaScrub(store) {
     deletedOrphanThumbFiles,
     legacyThumbnailDirsRemoved,
     orphanVaultDirsRemoved,
-    legacyScratchRemoved: legacyThumbnailDirsRemoved > 0,
+    orphanVaultDirsDetected,
+    legacyThumbnailDirsEligible,
+    legacyScratchRemoved: false,
     bytesFreed,
     mbFreed,
   };
@@ -1756,7 +1820,7 @@ function msc_syncVaultPhysicalFolders(store) {
   for (const row of rows) {
     if (!row?.id || row.name == null || String(row.name).trim() === '') continue;
 
-    const dir = msc_projectVaultProjectDir(String(row.name));
+    const dir = msc_projectVaultProjectDir(String(row.name), row.id);
     let existedBefore = false;
     try {
       existedBefore = fs.existsSync(dir) && fs.statSync(dir).isDirectory();
@@ -1965,6 +2029,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     msc_projectVaultProjectDir,
     msc_isVaultInternalThumbBase,
     msc_isVaultKeepFile,
+    msc_isVaultNonUserNoiseFile,
     msc_promptVaultPath,
     msc_promptVaultMasterItems,
     msc_mergePromptVaultMasters,
@@ -1992,7 +2057,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     try {
       const migration = msc_greatPurgeThumbnailMigration(store);
       const scrub = msc_purgeUnusedMediaScrub(store);
-      console.log('[VPE HARD SCRUB COMPLETE]', { migration, scrub });
+      console.log('[VPE BOOT MEDIA ALIGN]', { migration, scrub });
     } catch (e) {
       console.warn('[VPE BOOT] Hard Scrub v1.6.7 failed', e?.message ?? e);
     }
