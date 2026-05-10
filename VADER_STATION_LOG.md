@@ -6,6 +6,8 @@
 
 ## Session handoff — 2026-05-09 (pause)
 
+**Git:** Work continues on **`VPE-v2.1.x-Dev`** (pushed; same tip as **`VPE-v2.0.x-Dev`** through **`017524d`** — v2.1.0 vault/Iron Curtain/docs).
+
 **Stopped for today.** Next session (**priority backlog**):
 
 1. **Dashboard:** Add **arrow controls** to **reorder** projects in the registry (persist order; align with list/grid).
