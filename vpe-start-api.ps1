@@ -1,6 +1,12 @@
 #!/usr/bin/env pwsh
-# v1.6.1 — Self-contained LiteLLM + Vertex (port 4000) + ngrok (new window)
+# v1.7.7 — LiteLLM + Vertex (port 4000); Cursor integrated terminal (no external windows)
 # Run from repo root: .\vpe-start-api.ps1
+# ngrok: use global `ngrok` on User PATH (Node-Launcher root added per v1.7.7 — scripts\vpe-add-node-launcher-user-path.ps1)
+# Optional (no-op, for ritual clarity): .\vpe-start-api.ps1 -Integrated
+
+param(
+    [switch]$Integrated
+)
 
 $ScriptRootSafe = $PSScriptRoot
 $KeyPath = Join-Path $ScriptRootSafe "google-api\gcp_key.json"
@@ -12,7 +18,7 @@ function Write-VpeLine {
 }
 
 Write-VpeLine "═══════════════════════════════════════════════════════" "Cyan"
-Write-VpeLine " VPE API — LiteLLM ⇄ Vertex AI (MSC)" "Cyan"
+Write-VpeLine " VPE API — LiteLLM ⇄ Vertex AI (MSC) · v1.7.7 integrated" "Cyan"
 Write-VpeLine "═══════════════════════════════════════════════════════" "Cyan"
 
 if (-not (Test-Path -LiteralPath $KeyPath)) {
@@ -33,26 +39,16 @@ Write-VpeLine "GOOGLE_APPLICATION_CREDENTIALS → $KeyPath" "Green"
 Write-VpeLine "LiteLLM config → .\google-api\litellm_config.yaml" "Green"
 Write-VpeLine "Listen port → 4000 (locked)" "Green"
 
-$repoEsc = $ScriptRootSafe.Replace("'", "''")
-$ngrokBlock = @"
-Set-Location -LiteralPath '$repoEsc'
-Write-Host '────────────────────────────────────────' -ForegroundColor DarkRed
-Write-Host ' VPE · ngrok → http://localhost:4000' -ForegroundColor Cyan
-Write-Host '────────────────────────────────────────' -ForegroundColor DarkRed
-`$exe = Join-Path '$repoEsc' 'ngrok.exe'
-if (Test-Path -LiteralPath `$exe) { & `$exe http 4000 } else { ngrok http 4000 }
-"@
-try {
-    Start-Process -FilePath "powershell.exe" -WorkingDirectory $ScriptRootSafe `
-        -ArgumentList @("-NoLogo", "-NoExit", "-Command", $ngrokBlock) -ErrorAction Stop | Out-Null
-    Write-VpeLine "ngrok launched in a new PowerShell window (http 4000)." "Cyan"
-}
-catch {
-    Write-VpeLine "[VPE ERROR] Could not start ngrok window: $_" "Red"
-    Write-VpeLine "  Run manually: ngrok http 4000" "Yellow"
+Write-VpeLine "" "White"
+Write-VpeLine "── Next: open another Cursor integrated terminal pane and run (global PATH) ──" "DarkYellow"
+Write-VpeLine "ngrok http 4000" "Cyan"
+Write-VpeLine "" "White"
+
+if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
+    Write-VpeLine "[VPE WARN] ngrok not on PATH — run scripts\vpe-add-node-launcher-user-path.ps1 once, then reopen the terminal." "Yellow"
 }
 
-Write-VpeLine "[VPE STANDBY] Self-contained paths OK · ngrok window · LiteLLM :4000" "Green"
+Write-VpeLine "[VPE STANDBY] Paths OK · ngrok (global) → separate pane · LiteLLM :4000 (this pane)" "Green"
 
 Write-VpeLine "Starting LiteLLM (this window)…" "Cyan"
 Set-Location -LiteralPath $ScriptRootSafe

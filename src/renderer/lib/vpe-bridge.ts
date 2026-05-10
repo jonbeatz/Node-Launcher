@@ -33,9 +33,16 @@ export interface VpeProjectRow {
   is_archived?: number | boolean | null
   /** SQLite v8+ — Project Settings notes */
   notes?: string | null
-  /** Renderer enrich: reference vault has ≥1 file */
+  /** Renderer enrich: reference vault has ≥1 user file (not internal thumb / keep). */
   vault_has_files?: boolean
+  /** SQLite v13+ — when false/0, hide documentation (paperclip) even if vault has files. */
+  has_documentation?: number | boolean | null
   node_modules_missing?: boolean
+  /** ISO timestamps from `fs.statSync` on project `path` (main enrich). */
+  project_folder_created_at?: string | null
+  project_folder_modified_at?: string | null
+  /** ISO time when dev session last started (SQLite v11+); drives live uptime in renderer. */
+  dev_session_started_at?: string | null
 }
 
 export interface VpeUnifiedLogRow {
@@ -206,9 +213,19 @@ export interface VpeAppSettings {
   launch_at_login: boolean
   minimize_to_tray: boolean
   auto_start_projects: boolean
-  /** `card` → dashboard grid layout in renderer. */
-  default_view: 'card' | 'list'
+  /** `cinema` | `compact` | `list` (legacy `card` normalized in main to `cinema`). */
+  default_view: 'cinema' | 'compact' | 'list'
   theme_accent?: string
+  /** v1.7.9 — drives `--vpe-font-family` in the renderer */
+  font_style?:
+    | 'vpe_classic'
+    | 'mulish_studio'
+    | 'google_sans_modern'
+    | 'noto_sans'
+    | 'poppins'
+  /** v1.8.5 — inclusive managed-port window hint (persisted). */
+  port_range_start?: number
+  port_range_end?: number
 }
 
 export interface VpeApi {
@@ -262,14 +279,21 @@ export interface VpeApi {
   clearAllProjects?: () => Promise<{ ok?: boolean }>
   runBuild: (projectId: string) => Promise<{ ok?: boolean }>
   nukeProject: (projectId: string) => Promise<{ ok?: boolean; id?: string }>
-  saveSettings: (payload: SaveSettingsPayload) => Promise<{ ok?: boolean }>
+  saveSettings: (payload: SaveSettingsPayload) => Promise<{
+    ok?: boolean
+    detection?: unknown
+    /** v1.7.8 — pulsed `vpe-vault://…?pulse=` (or external URL) for instant preview refresh */
+    thumbnail_url_for_renderer?: string | null
+    /** v1.8.4 — human-readable diff for contextual save toasts */
+    changeSummary?: string
+  }>
   getAppSettings?: () => Promise<VpeAppSettings>
   updateAppSettings?: (
     payload: Partial<VpeAppSettings>,
-  ) => Promise<{ ok?: boolean; settings?: VpeAppSettings }>
+  ) => Promise<{ ok?: boolean; settings?: VpeAppSettings; changeSummary?: string }>
   updateSettingLaunchStartup?: (
     value: boolean,
-  ) => Promise<{ ok?: boolean; settings?: VpeAppSettings }>
+  ) => Promise<{ ok?: boolean; settings?: VpeAppSettings; changeSummary?: string }>
   addProject: (payload: AddProjectPayload) => Promise<{ ok?: boolean; id?: string }>
   deleteProject: (projectId: string) => Promise<{ ok?: boolean }>
   /** Reassign port + refresh detected scripts/package manager after preflight failure. */
@@ -307,7 +331,10 @@ export interface VpeApi {
     projectId: string,
     absoluteSourcePath: string,
   ) => Promise<{ ok: boolean; dest?: string; name?: string }>
-  pickThumbnail: (projectId: string) => Promise<string | null>
+  pickThumbnail: (
+    projectId: string,
+    draftDisplayName?: string | null,
+  ) => Promise<string | null>
   openProjectUrl: (url: string) => Promise<{ ok?: boolean }>
   /** Listen for live stdout/stderr / engine lines (main → renderer). */
   subscribeLogUpdate: (
@@ -343,6 +370,25 @@ export interface VpeApi {
     log?: string[]
     error?: string
   }>
+  /** v1.6.7 — migrate legacy thumbnail paths + hard scrub vault / legacy `media/thumbnails`. */
+  purgeUnusedMedia?: () => Promise<{
+    ok: boolean
+    error?: string
+    migration?: { migratedLegacy: number; nulledMissingVault: number; rowsTouched: number }
+    scrub?: {
+      deletedOrphanThumbFiles: number
+      legacyThumbnailDirsRemoved: number
+      orphanVaultDirsRemoved: number
+      legacyScratchRemoved: boolean
+      bytesFreed: number
+      mbFreed: number
+    }
+    vaultSync?: {
+      foldersCreated: string[]
+      keepFilesWritten: string[]
+      projectsSynced: number
+    }
+  }>
   runForgeDiagnostics?: () => Promise<{
     ok: boolean
     checks: { id: string; ok: boolean; detail?: string }[]
@@ -366,10 +412,35 @@ export function getVpeApi(): VpeApi | null {
   return window.vpeAPI ?? null
 }
 
+/** Registry / vault enumeration can stall on huge D:-drive vaults — cap wait via renderer-side race (main handler remains unchanged). */
+export const VPE_GET_PROJECTS_TIMEOUT_MS = 60_000
+
+/** Race IPC promise against a deadline; clears timer when settle wins. */
+export async function msc_withIpcTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let tid: ReturnType<typeof setTimeout> | undefined
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      tid = setTimeout(() => {
+        reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`))
+      }, ms)
+    })
+    return await Promise.race([promise, timeout])
+  } finally {
+    if (tid !== undefined) clearTimeout(tid)
+  }
+}
+
 /** v1.2.1 — safe message for terminals / toasts when IPC rejects with a DOM Event or other non-Error. */
 export function msc_formatUnknownIPCError(reason: unknown): string {
   if (reason == null) return 'Unknown failure'
-  if (typeof reason === 'string') return reason
+  if (typeof reason === 'string') {
+    if (reason === '[object Event]') return 'IPC/Event-style failure ([object Event])'
+    return reason
+  }
   if (typeof reason !== 'object') return String(reason)
   if (reason instanceof Error) return reason.message || reason.name || '[Error]'
   const o = reason as Record<string, unknown> & { constructor?: { name?: string } }
@@ -403,6 +474,7 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   name: string
   port: number
   uptime: string
+  dev_session_started_at: string | null
   status: 'running' | 'stopped' | 'error' | 'building'
   cpu: number
   ram: string
@@ -422,6 +494,10 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   is_archived?: boolean
   notes?: string | null
   vault_has_files?: boolean
+  /** Registry flag: paperclip requires this on (default true) plus vault reference files. */
+  has_documentation?: boolean
+  project_folder_created_at?: string | null
+  project_folder_modified_at?: string | null
 } {
   const pm =
     row.pkg_manager === 'yarn' || row.pkg_manager === 'pnpm'
@@ -429,11 +505,14 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
       : 'npm'
   const st: 'running' | 'stopped' =
     row.status === 'running' ? 'running' : 'stopped'
+  const dss = row.dev_session_started_at
   return {
     id: row.id,
     name: row.name,
     port: Number.isFinite(Number(row.port)) && Number(row.port) > 0 ? Number(row.port) : 3001,
     uptime: '--',
+    dev_session_started_at:
+      dss != null && String(dss).trim() !== '' ? String(dss).trim() : null,
     status: st,
     cpu: 0,
     ram: '—',
@@ -465,5 +544,12 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
         ? null
         : String(row.notes),
     vault_has_files: row.vault_has_files === true,
+    has_documentation: !(
+      row.has_documentation === false ||
+      row.has_documentation === 0 ||
+      row.has_documentation === '0'
+    ),
+    project_folder_created_at: row.project_folder_created_at ?? null,
+    project_folder_modified_at: row.project_folder_modified_at ?? null,
   }
 }

@@ -287,9 +287,9 @@ export function PromptVault() {
                 value={item.id}
                 className="rounded border border-[#333333] bg-[#161616] overflow-hidden last:border-b"
               >
-                <div className="flex items-stretch gap-0">
-                  <AccordionTrigger className="flex-1 px-4 py-3 hover:bg-[#2a2a2a] hover:no-underline text-left [&>svg]:text-[#888888] font-sans">
-                    <div className="flex flex-col gap-0.5 min-w-0 pr-2">
+                <div className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-stretch min-h-[3rem]">
+                  <AccordionTrigger className="min-w-0 px-4 py-3 hover:bg-[#2a2a2a] hover:no-underline text-left [&>svg]:text-[#888888] font-sans">
+                    <div className="flex flex-col gap-1 min-w-0 pr-2 text-left">
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className="shrink-0 font-mono text-[10px] font-semibold tracking-wide text-[#888888] border border-[#333333] rounded px-1.5 py-0.5 bg-[#121212]"
@@ -303,18 +303,28 @@ export function PromptVault() {
                         >
                           {msc_vaultTypeBadge(msc_resolvedVaultType(item))}
                         </span>
-                        <span className="text-sm font-medium text-white truncate">{item.title}</span>
+                        <span className="text-sm font-medium text-white truncate min-w-0">
+                          {item.title}
+                        </span>
                       </div>
-                      <span className="text-[11px] text-[#c8c8c8]">{item.versionLabel}</span>
+                      <span className="text-[11px] text-[#a8a8a8] line-clamp-2 pl-0.5">
+                        {item.versionLabel}
+                        {(item.description ?? '').trim()
+                          ? ` — ${(item.description ?? '').trim()}`
+                          : ''}
+                      </span>
                     </div>
                   </AccordionTrigger>
-                  <div className="flex items-center gap-1 pr-2 shrink-0 border-l border-[#2a2a2a]">
+                  <div className="flex items-center justify-end gap-0.5 pl-1 pr-3 shrink-0 border-l border-[#2a2a2a] bg-[#161616]">
                     <button
                       type="button"
-                      title="Prime AI Assistant"
-                      aria-label="Prime AI Assistant"
-                      onClick={() => void handleCopy(item)}
-                      className="h-9 w-9 flex items-center justify-center rounded bg-[#2a2a2a] text-[#eaeaea] hover:bg-[#333333] vader-focus"
+                      title="Copy to clipboard"
+                      aria-label="Copy to clipboard"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void handleCopy(item)
+                      }}
+                      className="h-9 w-9 flex items-center justify-center rounded text-[#c8c8c8] hover:bg-[#2a2a2a] hover:text-white vader-focus"
                     >
                       <Copy size={16} />
                     </button>
@@ -322,10 +332,25 @@ export function PromptVault() {
                       type="button"
                       title="Edit vault template"
                       aria-label="Edit vault template"
-                      onClick={() => openEdit(item)}
-                      className="h-9 w-9 flex items-center justify-center rounded bg-[#2a2a2a] text-[#eaeaea] hover:bg-[#333333] vader-focus"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEdit(item)
+                      }}
+                      className="h-9 w-9 flex items-center justify-center rounded text-[#c8c8c8] hover:bg-[#2a2a2a] hover:text-white vader-focus"
                     >
                       <Pencil size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      title="Delete template"
+                      aria-label="Delete template"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(item.id)
+                      }}
+                      className="h-9 w-9 flex items-center justify-center rounded text-[#9ca3af] hover:text-[#f87171] hover:bg-[#3f1a1a]/50 vader-focus"
+                    >
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
@@ -342,21 +367,9 @@ export function PromptVault() {
                   <pre className="font-mono text-[11px] text-[#d4d4d4] whitespace-pre-wrap max-h-48 overflow-y-auto custom-scrollbar rounded bg-[#0a0a0a] border border-[#333333] p-3">
                     {item.bodyMd}
                   </pre>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <span className="font-sans text-[10px] text-[#555555]">
-                      Updated {new Date(item.updatedAt).toLocaleString()}
-                    </span>
-                    <button
-                      type="button"
-                      title="Remove from vault"
-                      aria-label="Remove from vault"
-                      onClick={() => handleDelete(item.id)}
-                      className="h-8 px-3 rounded border border-[#333333] text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a] font-sans text-[11px] vader-focus inline-flex items-center gap-1"
-                    >
-                      <Trash2 size={14} />
-                      Delete
-                    </button>
-                  </div>
+                  <p className="mt-3 font-sans text-[10px] text-[#555555]">
+                    Updated {new Date(item.updatedAt).toLocaleString()}
+                  </p>
                 </AccordionContent>
               </AccordionItem>
             ))}

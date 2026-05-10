@@ -1,13 +1,12 @@
 'use client'
 
-import Image from 'next/image'
+import { useState, useEffect, useRef, type MouseEvent } from 'react'
+import { motion } from 'framer-motion'
 import {
   Play,
   Square,
-  Wrench,
-  Trash2,
   Terminal,
-  X,
+  Trash2,
   Settings,
   AlertTriangle,
   Hammer,
@@ -15,18 +14,212 @@ import {
   Star,
   Loader2,
   Paperclip,
+  ChevronDown,
+  Copy,
 } from 'lucide-react'
 
 import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
 import { msc_shieldColorHex, msc_shieldTypeTitle } from '@/lib/shield-colors'
+import { useToast } from '@/components/vader-toast'
+import { VpeHealthEqualizerIcon } from '@/components/vpe-health-equalizer-icon'
 
 export type { VpeShieldProjectType }
+
+function msc_formatUptimeSeconds(total: number): string {
+  if (!Number.isFinite(total) || total < 0) return '—'
+  const d = Math.floor(total / 86400)
+  const h = Math.floor((total % 86400) / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = Math.floor(total % 60)
+  if (d > 0) return `${d}d ${h}h ${m}m ${s}s`
+  if (h > 0) return `${h}h ${m}m ${s}s`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+/** Live session duration from persisted start (main) or client anchor when missing. */
+function useVpeLiveSessionUptime(
+  isRunning: boolean,
+  devSessionStartedAt: string | null | undefined,
+): string {
+  const [now, setNow] = useState(() => Date.now())
+  const [fallbackStart, setFallbackStart] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!isRunning) return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [isRunning])
+
+  useEffect(() => {
+    if (!isRunning) {
+      setFallbackStart(null)
+      return
+    }
+    if (!devSessionStartedAt) {
+      setFallbackStart((prev) => (prev === null ? Date.now() : prev))
+    } else {
+      setFallbackStart(null)
+    }
+  }, [isRunning, devSessionStartedAt])
+
+  if (!isRunning) return '—'
+  const t0 = devSessionStartedAt
+    ? new Date(devSessionStartedAt).getTime()
+    : fallbackStart
+  if (t0 == null || Number.isNaN(t0)) return '—'
+  const sec = Math.max(0, Math.floor((now - t0) / 1000))
+  return msc_formatUptimeSeconds(sec)
+}
+
+function msc_formatFolderTimestamp(iso: string | null | undefined): string {
+  if (iso == null || String(iso).trim() === '') return '—'
+  const d = new Date(String(iso))
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString()
+}
+
+function ProjectMetaAccordion({
+  isCompact,
+  projectPath,
+  folderCreatedAt,
+  folderModifiedAt,
+  onOpenChange,
+  runningStrip,
+}: {
+  isCompact: boolean
+  projectPath: string
+  folderCreatedAt?: string | null
+  folderModifiedAt?: string | null
+  onOpenChange?: (open: boolean) => void
+  /** Compact-only: show “Started on” inside the dropdown when running (v1.8.1). */
+  runningStrip?: {
+    runUrl: string
+    healthLabel: string | null
+    healthCls: string | null
+    uptimeLabel: string
+  } | null
+}) {
+  const { addToast } = useToast()
+  const [open, setOpen] = useState(false)
+  const skipParentSync = useRef(true)
+
+  useEffect(() => {
+    if (skipParentSync.current) {
+      skipParentSync.current = false
+      return
+    }
+    onOpenChange?.(open)
+  }, [open, onOpenChange])
+
+  const copyPath = () => {
+    if (!projectPath.trim()) return
+    void navigator.clipboard.writeText(projectPath).then(() => {
+      addToast('Copied!', 'success', 'Project path copied to clipboard.', undefined, 1000)
+    })
+  }
+
+  const pad = isCompact ? 'px-2.5 pb-2' : 'px-4 pb-3'
+  const labelCls = isCompact ? 'text-[11px]' : 'text-[12px]'
+  const valueCls = isCompact ? 'text-[12px]' : 'text-[13px]'
+
+  return (
+    <div className="border-t border-[#2a2a2a]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-center gap-1 py-1 text-[10px] uppercase tracking-wide text-[#888888] hover:text-white transition-colors vader-focus"
+        aria-expanded={open}
+        title={open ? 'Hide project details' : 'Show project details'}
+      >
+        <ChevronDown
+          size={isCompact ? 14 : 15}
+          className={`shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <motion.div
+        initial={false}
+        animate={{ height: open ? 'auto' : 0 }}
+        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+        className="overflow-hidden"
+      >
+        <div className={`space-y-2 ${pad} pt-4 text-[#A0A0A0] bg-[#0f0f0f]`}>
+          {isCompact && runningStrip && (
+            <div className="rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2 py-1.5">
+              <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                Started on
+              </span>
+              <span
+                className="block truncate text-[12px] leading-tight text-[#7dcea0]/95"
+                title={runningStrip.runUrl}
+              >
+                {runningStrip.runUrl}
+              </span>
+              {runningStrip.healthLabel && (
+                <span
+                  className={`mt-0.5 block text-[11px] leading-snug ${runningStrip.healthCls ?? 'text-[#4fde82]'}`}
+                >
+                  {runningStrip.healthLabel}
+                </span>
+              )}
+              <div className="mt-1.5 pt-1.5 border-t border-[#2d4a38]/50">
+                <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                  Uptime
+                </span>
+                <span className="tabular-nums text-[12px] text-[#7dcea0]/95">{runningStrip.uptimeLabel}</span>
+              </div>
+            </div>
+          )}
+          <div>
+            <span className={`mb-0.5 block uppercase tracking-wider text-[#555555] ${labelCls}`}>
+              Project Started
+            </span>
+            <span className={`text-[#e8e8e8] tabular-nums ${valueCls}`}>
+              {msc_formatFolderTimestamp(folderCreatedAt)}
+            </span>
+          </div>
+          <div>
+            <span className={`mb-0.5 block uppercase tracking-wider text-[#555555] ${labelCls}`}>
+              Last Modified
+            </span>
+            <span className={`text-[#e8e8e8] tabular-nums ${valueCls}`}>
+              {msc_formatFolderTimestamp(folderModifiedAt)}
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <span className={`mb-0.5 block uppercase tracking-wider text-[#555555] ${labelCls}`}>
+                Path
+              </span>
+              <span className={`block break-all text-[#c8c8c8] ${valueCls}`}
+                title={projectPath}
+              >
+                {projectPath.trim() ? projectPath : '—'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                copyPath()
+              }}
+              disabled={!projectPath.trim()}
+              className={`mt-4 flex shrink-0 items-center gap-1 rounded border border-[#444444] px-2 py-1 uppercase tracking-wide text-[#A0A0A0] transition-colors hover:border-[#22c55e] hover:bg-[#22c55e] hover:text-white disabled:opacity-40 vader-focus ${isCompact ? 'text-[11px]' : 'text-[12px]'}`}
+              title="Copy path"
+            >
+              <Copy size={11} />
+              COPY
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
 
 interface Msc_ProjectCardProps {
   id: string
   name: string
   port: number
-  uptime: string
   status: 'running' | 'stopped' | 'error' | 'building'
   errorMessage?: string
   thumbnailUrl?: string
@@ -39,8 +232,6 @@ interface Msc_ProjectCardProps {
   onStop?: () => void
   onBuild?: () => void
   onLogs?: () => void
-  onRepair?: () => void
-  onNuke?: () => void
   onSettings?: () => void
   onUnregister?: () => void
   onContextMenu?: (e: React.MouseEvent) => void
@@ -56,14 +247,25 @@ interface Msc_ProjectCardProps {
   devInstallInProgress?: boolean
   /** v1.2.4 — resolved shield (manual override or auto classifier). */
   shieldProjectType?: VpeShieldProjectType
-  /** Notes or vault attachments (12px paperclip by status dot). */
-  hasDocumentationReferences?: boolean
+  /** Vault has user reference files; v1.9.5+ paperclip on thumbnail overlay only. */
+  vaultHasReferenceFiles?: boolean
+  /** v1.6.8 — dense grid: ~250px card (v1.7.9+), 4:3 thumb, truncated title. */
+  isCompact?: boolean
+  /** v1.6.9 — project folder on disk (accordion + copy). */
+  projectPath?: string
+  project_folder_created_at?: string | null
+  project_folder_modified_at?: string | null
+  /** v1.8.0 — marks this project as the global Explorer / folder-action target. */
+  onCardInteraction?: () => void
+  /** v1.8.1 — focused card: subtle stroke until another card is picked. */
+  isSelected?: boolean
+  /** ISO dev session start from persistence (v1.8.2); drives live uptime. */
+  devSessionStartedAt?: string | null
 }
 
 export function Msc_ProjectCard({
   name,
   port,
-  uptime,
   status,
   errorMessage,
   thumbnailUrl,
@@ -76,8 +278,6 @@ export function Msc_ProjectCard({
   onStop,
   onBuild,
   onLogs,
-  onRepair,
-  onNuke,
   onSettings,
   onUnregister,
   onContextMenu,
@@ -88,8 +288,16 @@ export function Msc_ProjectCard({
   onViewErrorConsole,
   devInstallInProgress,
   shieldProjectType,
-  hasDocumentationReferences = false,
+  vaultHasReferenceFiles = false,
+  isCompact = false,
+  projectPath = '',
+  project_folder_created_at,
+  project_folder_modified_at,
+  onCardInteraction,
+  isSelected = false,
+  devSessionStartedAt = null,
 }: Msc_ProjectCardProps) {
+  const [cinemaInspectOpen, setCinemaInspectOpen] = useState(false)
   const dotTitle = msc_shieldTypeTitle(shieldProjectType)
   const dotHex = msc_shieldColorHex(shieldProjectType)
   const isRunning = status === 'running'
@@ -117,14 +325,6 @@ export function Msc_ProjectCard({
   }
 
   const primaryBtn = getPrimaryButton()
-
-  const getLedColor = () => {
-    if (devInstallInProgress && isRunning) return 'bg-[#ffcc00] animate-pulse-led'
-    if (isRunning) return 'bg-[#4fde82] shadow-[0_0_6px_#4fde82]'
-    if (isError) return 'bg-[#e02b20] animate-pulse-led shadow-[0_0_6px_#e02b20]'
-    if (isBuilding) return 'bg-[#ffcc00] animate-pulse-led'
-    return 'bg-[#555555]'
-  }
 
   const getStatusLabel = () => {
     if (devInstallInProgress && isRunning) return 'INSTALLING'
@@ -177,34 +377,282 @@ export function Msc_ProjectCard({
   }
 
   const healthLine = getHealthLine()
+  const liveUptime = useVpeLiveSessionUptime(isRunning, devSessionStartedAt)
+
+  /** Warm-up: running but not yet checked — drives equalizer amber (not paperclip). */
+  const isBootingHttp =
+    isRunning &&
+    health_reachable !== false &&
+    !health_checked_at &&
+    (health_http_code === undefined || health_http_code === null)
+
+  const showVaultPaperclip = Boolean(vaultHasReferenceFiles)
+  const isIdleStopped = !isRunning && !isError && !isBuilding
+
+  /** v1.9.2 — equalizer colors only while running (glyph omitted when stopped). */
+  const healthEqualizerClass = (() => {
+    if (!isRunning) return 'text-[#9ca3af]'
+    if (isBuilding || (devInstallInProgress && isRunning)) return 'text-[#fbbf08]'
+    if (
+      typeof health_http_code === 'number' &&
+      health_http_code >= 200 &&
+      health_http_code < 300
+    ) {
+      return 'text-[#22c55e]'
+    }
+    if (isBootingHttp) return 'text-[#fbbf08]'
+    return 'text-[#fbbf08]'
+  })()
+
+  const msc_insetActionBtnBase =
+    'shrink-0 flex items-center justify-center rounded-sm border-0 bg-[#121212] transition-colors vader-focus hover:bg-[#2a2a2a]'
+
+  const msc_onCardSurfaceDown = (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, a, [role="button"]')) return
+    onCardInteraction?.()
+  }
+
+  const openBtnActiveClass =
+    'border-[#121816] bg-[#080b09] text-white hover:bg-[#0f1411] hover:border-[#2a322c]'
+  const openBtnIdleClass =
+    'border-[#3f3f3f] bg-transparent text-[#555555] opacity-50'
+
+  const cardChromeSelected = !isError && isSelected ? 'vpe-card-chrome-selected' : ''
+
+  /** v1.9.5 — LOGS width matches [Favorite, Settings, Trash] only (paperclip lives on thumbnail). */
+  const msc_mgmtTileRem = isCompact ? 1.5 : 1.75
+  const msc_mgmtCount = 3
+  const msc_logsStripWidth = `${msc_mgmtCount * msc_mgmtTileRem + (msc_mgmtCount - 1) * 0.25}rem`
+
+  const primaryIsPlayCta =
+    primaryBtn.label === 'START' || primaryBtn.label === 'INSTALL & START'
+  const primaryIsStopCta =
+    'active' in primaryBtn && primaryBtn.active === true && primaryBtn.label === 'STOP'
+
+  if (isCompact) {
+    return (
+      <div
+        className={`vader-card vpe-theme-font vpe-project-card boxBling overflow-hidden relative w-[250px] max-w-full transition-all duration-200 ease-out ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'} ${cardChromeSelected}`}
+        onContextMenu={onContextMenu}
+        onMouseDown={msc_onCardSurfaceDown}
+      >
+        <div className="relative aspect-[4/3] bg-[#121212] overflow-hidden border-b border-[#333333]">
+          {thumbnailUrl ? (
+            // v1.7.6 — native img for `vpe-vault:` (privileged custom scheme); avoids Next/Image URL restrictions.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbnailUrl}
+              alt={name}
+              className="absolute inset-0 h-full w-full object-cover opacity-90"
+            />
+          ) : (
+            <div className="w-full h-full vader-grid-pattern flex items-center justify-center">
+              <span className="text-[10px] text-[#333333] uppercase tracking-wider">THUMB</span>
+            </div>
+          )}
+
+          <div
+            className="absolute left-2 top-2 z-20 flex flex-col items-center gap-1 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+            aria-hidden
+          >
+            <span
+              className="block rounded-full border-0 shrink-0 ring-1 ring-black/40"
+              title={dotTitle}
+              style={{ width: 8, height: 8, backgroundColor: dotHex }}
+            />
+            {isRunning ? (
+              <span
+                className={`inline-flex size-[14px] shrink-0 items-center justify-center ${healthEqualizerClass}`}
+              >
+                <VpeHealthEqualizerIcon size={14} title={getStatusLabel()} className="shrink-0" />
+              </span>
+            ) : (
+              <span className="inline-flex size-[14px] shrink-0" aria-hidden />
+            )}
+          </div>
+          {showVaultPaperclip ? (
+            <div
+              className="absolute right-2 top-2 z-20 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+              title="Vault reference files"
+            >
+              <span
+                className="inline-flex size-6 items-center justify-center rounded-md bg-[#00000066] text-[#eaeaea]"
+                aria-hidden
+              >
+                <Paperclip size={11} strokeWidth={2} />
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          className={`px-2.5 border-b border-[#2a2a2a] flex items-center justify-between gap-2 min-w-0 ${isIdleStopped ? 'py-1' : 'py-1.5'}`}
+        >
+          <div className="flex min-w-0 flex-1 items-center min-h-6">
+            <h3
+              className="vpe-card-title text-white text-xs truncate min-w-0 leading-tight"
+              title={name}
+            >
+              {name}
+            </h3>
+          </div>
+          <div className="inline-flex shrink-0 items-center gap-1 self-center">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleFavorite?.()
+            }}
+            className={`${msc_insetActionBtnBase} h-6 w-6 ${
+              isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
+            }`}
+            title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+          >
+            <Star size={12} fill={isFavorite ? '#ffcc00' : 'none'} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onSettings?.()
+            }}
+            className={`${msc_insetActionBtnBase} h-6 w-6 text-[#A0A0A0] hover:text-[#4fde82]`}
+            title="Project Settings"
+          >
+            <Settings size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onUnregister?.()
+            }}
+            className={`${msc_insetActionBtnBase} h-6 w-6 text-[#A0A0A0] hover:text-[#e02b20]`}
+            title="Remove from Registry"
+          >
+            <Trash2 size={12} />
+          </button>
+          </div>
+        </div>
+
+        <div
+          className={`px-2.5 flex flex-wrap items-center gap-1 ${isIdleStopped ? 'py-1.5' : 'py-2'}`}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              if ('action' in primaryBtn && typeof primaryBtn.action === 'function') {
+                primaryBtn.action()
+              }
+            }}
+            disabled={Boolean('disabled' in primaryBtn && primaryBtn.disabled === true)}
+            className={`
+              flex-1 min-w-[72px] flex items-center justify-center gap-1 h-7 rounded text-[10px] transition-all vader-focus
+              ${primaryBtn.active
+                ? 'border-0 bg-[#e02b20] text-white hover:bg-[#c41e17] hover:text-white'
+                : primaryBtn.disabled
+                  ? 'bg-transparent border border-[#333333] text-[#555555] cursor-not-allowed'
+                  : primaryBtn.label === 'Installing…'
+                    ? 'bg-transparent border border-[#ffcc00] text-[#ffcc00]'
+                    : primaryIsPlayCta
+                      ? 'border-0 bg-[#181818] text-white hover:bg-[#22c55e] hover:text-white'
+                      : 'bg-transparent border border-[#555555] text-white hover:border-[#22c55e] hover:bg-[#22c55e] hover:text-white'
+              }
+            `}
+          >
+            <primaryBtn.icon
+              size={11}
+              className={
+                'installingActive' in primaryBtn && primaryBtn.installingActive
+                  ? 'animate-spin shrink-0'
+                  : primaryIsPlayCta || primaryIsStopCta
+                    ? 'shrink-0 text-white'
+                    : undefined
+              }
+              fill={primaryIsPlayCta || primaryIsStopCta ? 'currentColor' : undefined}
+              strokeWidth={primaryIsPlayCta || primaryIsStopCta ? 0 : undefined}
+            />
+            <span className="truncate">{primaryBtn.label}</span>
+          </button>
+          <button
+            type="button"
+            disabled={!isRunning || !onOpenInBrowser}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (isRunning && onOpenInBrowser) onOpenInBrowser()
+            }}
+            className={`flex min-w-[4.25rem] flex-1 items-center justify-center gap-1 h-7 rounded border text-[10px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
+              isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
+            }`}
+            title={
+              isRunning
+                ? `Open ${runUrl} in browser`
+                : 'Start the project to open in browser'
+            }
+          >
+            <ExternalLink size={11} className="shrink-0" />
+            Open
+          </button>
+          <button
+            type="button"
+            onClick={onLogs}
+            style={{ width: msc_logsStripWidth }}
+            className="h-7 shrink-0 rounded bg-[#2a2a2a] border border-[#333333] flex items-center justify-center text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
+            title="Logs"
+          >
+            <Terminal size={12} />
+          </button>
+        </div>
+        <ProjectMetaAccordion
+          isCompact
+          projectPath={projectPath}
+          folderCreatedAt={project_folder_created_at}
+          folderModifiedAt={project_folder_modified_at}
+          runningStrip={
+            isRunning
+              ? {
+                  runUrl,
+                  healthLabel: healthLine?.label ?? null,
+                  healthCls: healthLine?.cls ?? null,
+                  uptimeLabel: liveUptime,
+                }
+              : null
+          }
+        />
+      </div>
+    )
+  }
 
   return (
     <div
-      className={`vader-card vpe-project-card boxBling overflow-hidden relative ${isError ? 'border-[#e02b20]' : ''}`}
+      className={`
+        vader-card vpe-theme-font vpe-project-card boxBling overflow-hidden relative transition-all duration-200 ease-out
+        ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'}
+        ${cardChromeSelected}
+      `}
       onContextMenu={onContextMenu}
+      onMouseDown={msc_onCardSurfaceDown}
     >
       <div className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]" style={{ borderRadius: '4px 4px 0 0' }}>
         {thumbnailUrl ? (
-          <Image
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             src={thumbnailUrl}
             alt={name}
-            fill
-            unoptimized
-            sizes="(max-width: 768px) 100vw, 380px"
-            className="object-cover opacity-80"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${cinemaInspectOpen ? 'opacity-70' : 'opacity-80'}`}
           />
         ) : (
           <div className="w-full h-full vader-grid-pattern flex items-center justify-center">
-            <span className="font-sans text-xs text-[#333333] uppercase tracking-wider">THUMBNAIL</span>
+            <span className="text-xs text-[#333333] uppercase tracking-wider">THUMBNAIL</span>
           </div>
         )}
 
         <div
-          className="absolute left-2 top-2 z-20 flex items-center gap-1 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+          className="absolute left-2 top-2 z-20 flex flex-col items-center gap-1 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
           aria-hidden
         >
           <span
-            className="block rounded-full border-0 shrink-0"
+            className="block rounded-full border-0 shrink-0 ring-1 ring-black/50"
             title={dotTitle}
             style={{
               width: 10,
@@ -212,106 +660,121 @@ export function Msc_ProjectCard({
               backgroundColor: dotHex,
             }}
           />
-          {hasDocumentationReferences && (
+          {isRunning ? (
             <span
-              className="inline-flex shrink-0"
-              title="Notes or vault reference files"
+              className={`inline-flex size-4 shrink-0 items-center justify-center ${healthEqualizerClass}`}
             >
-              <Paperclip size={12} className="text-[#d0d0d0]" strokeWidth={2} />
+              <VpeHealthEqualizerIcon size={16} title={getStatusLabel()} className="shrink-0" />
             </span>
+          ) : (
+            <span className="inline-flex size-4 shrink-0" aria-hidden />
           )}
         </div>
-
-        <div className="absolute top-2 right-2 flex items-start justify-end gap-2 z-10 pointer-events-none">
-          <div className="flex items-center gap-1 pointer-events-auto">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleFavorite?.()
-              }}
-              className={`w-7 h-7 rounded bg-[#0a0a0a]/70 backdrop-blur-sm flex items-center justify-center transition-colors ${
-                isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
-              }`}
-              title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+        {showVaultPaperclip ? (
+          <div
+            className="absolute right-2 top-2 z-20 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+            title="Vault reference files"
+          >
+            <span
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[#00000066] text-[#eaeaea]"
+              aria-hidden
             >
-              <Star size={14} fill={isFavorite ? '#ffcc00' : 'none'} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onSettings?.()
-              }}
-              className="w-7 h-7 rounded bg-[#0a0a0a]/70 backdrop-blur-sm flex items-center justify-center text-[#A0A0A0] hover:text-[#4fde82] transition-colors"
-              title="Project Settings"
-            >
-              <Settings size={14} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onUnregister?.()
-              }}
-              className="w-7 h-7 rounded bg-[#0a0a0a]/70 backdrop-blur-sm flex items-center justify-center text-[#A0A0A0] hover:text-[#e02b20] transition-colors"
-              title="Remove from Registry"
-            >
-              <X size={14} />
-            </button>
+              <Paperclip size={12} strokeWidth={2} />
+            </span>
           </div>
-        </div>
+        ) : null}
+
       </div>
 
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-2">
-          <h3 className="font-sans font-bold text-white text-base">{name}</h3>
-          {isError && <AlertTriangle size={14} className="text-[#ff4444]" />}
-        </div>
-
-        <div className="flex items-center gap-2 mb-3">
-          <div className={`w-2 h-2 rounded-full ${getLedColor()}`} />
-          <span
-            className={`font-sans text-[11px] uppercase tracking-[0.05em] ${isError ? 'text-[#e02b20]' : devInstallInProgress && isRunning ? 'text-[#ffcc00]' : isRunning ? 'text-[#4fde82]' : 'text-[#A0A0A0]'}`}
+      <div className={isIdleStopped ? 'px-4 pt-3 pb-2' : 'p-4'}>
+        <div
+          className={`flex items-center justify-between gap-2 min-w-0 ${isIdleStopped ? 'mb-1' : 'mb-2'}`}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-2 min-h-7">
+            <h3 className="vpe-card-title text-white text-base truncate min-w-0 leading-tight" title={name}>
+              {name}
+            </h3>
+            {isError && <AlertTriangle size={14} className="text-[#ff4444] shrink-0" />}
+          </div>
+          <div className="inline-flex shrink-0 items-center gap-1 self-center">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleFavorite?.()
+            }}
+            className={`${msc_insetActionBtnBase} h-7 w-7 ${
+              isFavorite ? 'text-[#ffcc00]' : 'text-[#A0A0A0] hover:text-[#ffcc00]'
+            }`}
+            title={isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
           >
-            {getStatusLabel()}
-          </span>
+            <Star size={12} fill={isFavorite ? '#ffcc00' : 'none'} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onSettings?.()
+            }}
+            className={`${msc_insetActionBtnBase} h-7 w-7 text-[#A0A0A0] hover:text-[#4fde82]`}
+            title="Project Settings"
+          >
+            <Settings size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onUnregister?.()
+            }}
+            className={`${msc_insetActionBtnBase} h-7 w-7 text-[#A0A0A0] hover:text-[#e02b20]`}
+            title="Remove from Registry"
+          >
+            <Trash2 size={12} />
+          </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] uppercase">
-          <div>
-            <span className="text-[#555555]">PORT</span>
-            <span className="ml-2 text-[#A0A0A0] text-[13px] normal-case">{port}</span>
-          </div>
-          <div>
-            <span className="text-[#555555]">UPTIME</span>
-            <span className="ml-2 text-[#A0A0A0] text-[13px] normal-case">{uptime}</span>
-          </div>
-        </div>
+        <p
+          className={`text-[10px] uppercase tracking-[0.08em] ${
+            isRunning || isError ? 'mb-2' : isIdleStopped ? 'mb-0' : 'mb-1'
+          } ${isError ? 'text-[#e02b20]' : devInstallInProgress && isRunning ? 'text-[#ffcc00]' : isRunning ? 'text-[#6ee7a8]/90' : 'text-[#888888]'}`}
+        >
+          {getStatusLabel()}
+        </p>
 
         {isError && errorMessage && (
           <div className="mt-3 p-2 rounded bg-[#ff4444]/10 border border-[#ff4444]/30">
-            <span className="font-sans text-[11px] text-[#ff4444]">{errorMessage}</span>
+            <span className="text-[11px] text-[#ff4444]">{errorMessage}</span>
           </div>
         )}
 
         {isRunning && (
-          <div className="mt-3 flex flex-col gap-2 rounded border border-[#2a4a3a] bg-[#0d1a14] px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <span className="mb-0.5 block font-sans text-[9px] uppercase tracking-wider text-[#555555]">
+          <div className="mt-3 rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2.5 py-1.5">
+            <div className="min-w-0">
+              <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
                 Started on
               </span>
               <span
-                className="block truncate font-mono text-[12px] text-[#4fde82]"
+                className="block truncate text-[11px] leading-tight text-[#7dcea0]/95"
                 title={runUrl}
               >
                 {runUrl}
               </span>
               {healthLine && (
                 <span
-                  className={`mt-1 block font-mono text-[11px] ${healthLine.cls}`}
+                  className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
                   title="GET / on project port after start"
                 >
                   {healthLine.label}
                 </span>
               )}
+              <div className="mt-1.5 pt-1.5 border-t border-[#2d4a38]/50">
+                <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                  Uptime
+                </span>
+                <span className="tabular-nums text-[11px] text-[#7dcea0]/95">{liveUptime}</span>
+              </div>
               {healthLine?.showErrorCta && onViewErrorConsole && (
                 <button
                   type="button"
@@ -319,30 +782,21 @@ export function Msc_ProjectCard({
                     e.stopPropagation()
                     onViewErrorConsole()
                   }}
-                  className="mt-2 font-sans text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
+                  className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
                 >
                   View error console →
                 </button>
               )}
             </div>
-            {onOpenInBrowser && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenInBrowser()
-                }}
-                className="flex shrink-0 items-center justify-center gap-1.5 self-start rounded border border-[#4fde82] bg-transparent px-3 py-1.5 font-sans text-[11px] font-medium uppercase tracking-wide text-[#4fde82] transition-colors hover:bg-[#4fde82] hover:text-black vader-focus sm:self-center"
-              >
-                <ExternalLink size={14} />
-                Open
-              </button>
-            )}
           </div>
         )}
       </div>
 
-      <div className="p-3 flex items-center gap-2">
+      <div
+        className={`flex flex-wrap items-center gap-2 px-4 ${
+          isRunning || isError ? 'pb-3 pt-3' : isIdleStopped ? 'pb-3 pt-0' : 'pb-3 pt-1'
+        }`}
+      >
         <button
           type="button"
           onClick={() => {
@@ -359,14 +813,16 @@ export function Msc_ProjectCard({
               : undefined
           }
           className={`
-            flex-1 flex items-center justify-center gap-1.5 h-7 rounded font-sans text-xs transition-all vader-focus
+            min-w-[5rem] flex-1 flex items-center justify-center gap-1.5 h-7 rounded text-xs transition-all vader-focus
             ${primaryBtn.active
-              ? 'bg-[#4fde82] text-black'
+              ? 'border-0 bg-[#e02b20] text-white hover:bg-[#c41e17] hover:text-white'
               : primaryBtn.disabled
                 ? 'bg-transparent border border-[#333333] text-[#555555] cursor-not-allowed'
                 : primaryBtn.label === 'Installing…'
                   ? 'bg-transparent border border-[#ffcc00] text-[#ffcc00] hover:border-[#e02b20] hover:text-[#e02b20]'
-                : 'bg-transparent border border-[#555555] text-white hover:border-[#4fde82] hover:text-[#4fde82]'
+                : primaryIsPlayCta
+                  ? 'border-0 bg-[#181818] text-white hover:bg-[#22c55e] hover:text-white'
+                  : 'bg-transparent border border-[#555555] text-white hover:border-[#22c55e] hover:bg-[#22c55e] hover:text-white'
             }
           `}
         >
@@ -375,36 +831,52 @@ export function Msc_ProjectCard({
             className={
               'installingActive' in primaryBtn && primaryBtn.installingActive
                 ? 'animate-spin shrink-0'
-                : undefined
+                : primaryIsPlayCta || primaryIsStopCta
+                  ? 'shrink-0 text-white'
+                  : undefined
             }
+            fill={primaryIsPlayCta || primaryIsStopCta ? 'currentColor' : undefined}
+            strokeWidth={primaryIsPlayCta || primaryIsStopCta ? 0 : undefined}
           />
           <span>{primaryBtn.label}</span>
         </button>
 
         <button
+          type="button"
+          disabled={!isRunning || !onOpenInBrowser}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (isRunning && onOpenInBrowser) onOpenInBrowser()
+          }}
+          className={`min-w-[5.5rem] flex-1 flex items-center justify-center gap-1.5 h-7 rounded border text-[11px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
+            isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
+          }`}
+          title={
+            isRunning
+              ? `Open ${runUrl} in browser`
+              : 'Start the project to open in browser'
+          }
+        >
+          <ExternalLink size={13} className="shrink-0" />
+          Open
+        </button>
+
+        <button
           onClick={onLogs}
-          className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded bg-[#2a2a2a] border border-[#333333] font-sans text-xs text-[#A0A0A0] hover:border-[#4fde82] hover:text-white transition-all vader-focus"
+          style={{ width: msc_logsStripWidth }}
+          className="h-7 shrink-0 flex items-center justify-center gap-1.5 rounded bg-[#2a2a2a] border border-[#333333] text-xs text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
         >
           <Terminal size={12} />
           <span>LOGS</span>
         </button>
-
-        <button
-          onClick={onRepair}
-          className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded bg-[#2a2a2a] border border-[#333333] font-sans text-xs text-[#A0A0A0] hover:border-[#4fde82] hover:text-white transition-all vader-focus"
-        >
-          <Wrench size={12} />
-          <span>REPAIR</span>
-        </button>
-
-        <button
-          onClick={onNuke}
-          className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded bg-[#2a2a2a] border border-[#555555] font-sans text-xs text-[#A0A0A0] hover:border-[#e02b20] hover:text-[#e02b20] transition-all vader-focus"
-        >
-          <Trash2 size={12} />
-          <span>NUKE</span>
-        </button>
       </div>
+      <ProjectMetaAccordion
+        isCompact={false}
+        projectPath={projectPath}
+        folderCreatedAt={project_folder_created_at}
+        folderModifiedAt={project_folder_modified_at}
+        onOpenChange={setCinemaInspectOpen}
+      />
     </div>
   )
 }

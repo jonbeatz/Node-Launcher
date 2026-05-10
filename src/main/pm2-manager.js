@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const { msc_rendererVaultThumbnailHref } = require('./vpe-thumbnail-url');
 const fs = require('fs');
 const { msc_getPm2 } = require('./pm2-client');
 const pm2 = msc_getPm2();
@@ -294,7 +295,7 @@ class MSC_PM2Manager {
       detectedPackageManager: row.pkg_manager,
       preferredPort: row.port,
       status: row.status,
-      lastThumbnail: row.thumbnail_url,
+      lastThumbnail: msc_rendererVaultThumbnailHref(row, null) ?? row.thumbnail_url ?? null,
     }));
   }
 

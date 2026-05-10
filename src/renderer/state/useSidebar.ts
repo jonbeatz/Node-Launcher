@@ -3,20 +3,17 @@
 import { useState } from 'react'
 
 /**
- * v1.3.5 — **Engineering**, **Vault** (incl. VPE Sandbox link), **Favorites** accordions default collapsed.
- * Dashboard nav is flat (no accordion) in **`app-sidebar.tsx`**.
+ * v1.3.5+ — **Projects** (tactical + favorites filter), **Vault** accordions default collapsed.
+ * v1.9.0 — Favorites filter lives inside **Projects** (no separate Favorites pillar).
  */
 export function useSidebarAccordionState() {
-  const [engineeringOpen, setEngineeringOpen] = useState(false)
+  const [projectsOpen, setProjectsOpen] = useState(false)
   const [vaultOpen, setVaultOpen] = useState(false)
-  const [favoritesOpen, setFavoritesOpen] = useState(false)
 
   return {
-    engineeringOpen,
-    setEngineeringOpen,
+    projectsOpen,
+    setProjectsOpen,
     vaultOpen,
     setVaultOpen,
-    favoritesOpen,
-    setFavoritesOpen,
   }
 }

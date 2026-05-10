@@ -13,10 +13,23 @@ const {
 } = require('./project-detection');
 const { msc_validateProjectPath } = require('./path-guard');
 const {
+  VPE_VAULT_INTERNAL_THUMB,
+  VPE_VAULT_KEEP_FILE,
+  msc_isVaultInternalThumbBase,
+  msc_isVaultKeepFile,
   msc_safeVaultFolderName,
+  msc_projectVaultRootDir,
   msc_projectVaultProjectDir,
   msc_vaultRenameProjectFolder,
 } = require('./vpe-vault-paths');
+const {
+  msc_internalVaultThumbAbsForRow,
+  msc_rowUsesInternalVaultThumbnail,
+  msc_bumpVaultThumbPulse,
+  msc_rendererVaultThumbnailHref,
+  msc_normalizeThumbnailUrlForPersistence,
+} = require('./vpe-thumbnail-url');
+const { pathToFileURL, fileURLToPath } = require('node:url');
 const { msc_patchPackageJsonStripScriptPorts } = require('./package-json-script-patch');
 const isDev = require('electron-is-dev');
 
@@ -34,6 +47,144 @@ function msc_applyLoginStartupFromStore(store) {
   } catch (e) {
     console.warn('[VPE ERROR]', 'setLoginItemSettings', e?.message ?? e);
   }
+}
+
+/** v1.8.4 — human-readable font_style labels for contextual toasts. */
+function msc_fontStyleLabel(key) {
+  const k = String(key == null ? '' : key).trim();
+  const m = {
+    vpe_classic: 'VPE Classic',
+    mulish_studio: 'Mulish Studio',
+    google_sans_modern: 'Google Sans (Modern)',
+    noto_sans: 'Noto Sans',
+    poppins: 'Poppins',
+  };
+  return m[k] || k || 'default';
+}
+
+/**
+ * v1.8.5 — summarize app settings patch for renderer toasts (keys present in `patch` only).
+ * @param {Record<string, unknown>} before
+ * @param {Record<string, unknown>} after
+ * @param {Record<string, unknown>} patch
+ */
+function msc_summarizeAppSettingsChanges(before, after, patch) {
+  if (!before || !after || !patch || typeof patch !== 'object') return 'Preferences saved';
+  const keys = Object.keys(patch);
+  if (!keys.length) return 'Preferences saved';
+  const parts = [];
+  const PREFIX = 'Settings Saved: ';
+  if (
+    keys.includes('launch_at_login') &&
+    Boolean(before.launch_at_login === true || before.launch_at_login === 1) !==
+      Boolean(after.launch_at_login === true || after.launch_at_login === 1)
+  ) {
+    parts.push(
+      after.launch_at_login === true || after.launch_at_login === 1
+        ? 'Launch at login enabled.'
+        : 'Launch at login disabled.',
+    );
+  }
+  if (
+    keys.includes('minimize_to_tray') &&
+    Boolean(before.minimize_to_tray === true || before.minimize_to_tray === 1) !==
+      Boolean(after.minimize_to_tray === true || after.minimize_to_tray === 1)
+  ) {
+    parts.push(
+      after.minimize_to_tray === true || after.minimize_to_tray === 1
+        ? 'Minimize to tray enabled.'
+        : 'Minimize to tray disabled.',
+    );
+  }
+  if (
+    keys.includes('auto_start_projects') &&
+    Boolean(before.auto_start_projects === true || before.auto_start_projects === 1) !==
+      Boolean(after.auto_start_projects === true || after.auto_start_projects === 1)
+  ) {
+    parts.push(
+      after.auto_start_projects === true || after.auto_start_projects === 1
+        ? 'Auto-start on launch enabled.'
+        : 'Auto-start on launch disabled.',
+    );
+  }
+  if (
+    keys.includes('default_view') &&
+    String(before.default_view || '') !== String(after.default_view || '')
+  ) {
+    parts.push(`Default view set to ${String(after.default_view || '').toUpperCase()}.`);
+  }
+  if (keys.includes('font_style') && String(before.font_style || '') !== String(after.font_style || '')) {
+    parts.push(`Font Theme updated to ${msc_fontStyleLabel(after.font_style)}.`);
+  }
+  if (
+    (keys.includes('port_range_start') || keys.includes('port_range_end')) &&
+    (Number(before.port_range_start) !== Number(after.port_range_start) ||
+      Number(before.port_range_end) !== Number(after.port_range_end))
+  ) {
+    parts.push(
+      `Port Range set to ${Number(after.port_range_start)}-${Number(after.port_range_end)}.`,
+    );
+  }
+  if (!parts.length) return 'No field changes (values already matched)';
+  return PREFIX + parts.join(' ');
+}
+
+/**
+ * v1.8.5 — diff SQLite project row before/after save for contextual toasts (`vpe:save-settings`).
+ * @param {Record<string, unknown>|null|undefined} before
+ * @param {Record<string, unknown>|null|undefined} after
+ */
+function msc_summarizeProjectSettingsRowDiff(before, after) {
+  if (!after) return 'Registry synchronized';
+  if (!before) return 'Project configuration stored';
+  const PREFIX = 'Settings Saved: ';
+  const parts = [];
+  const scriptChanged =
+    String(before.start_script || '') !== String(after.start_script || '') ||
+    String(before.build_script || '') !== String(after.build_script || '');
+  if (String(before.name || '') !== String(after.name || '')) {
+    parts.push(`Display name → "${after.name}"`);
+  }
+  if (String(before.path || '') !== String(after.path || '')) {
+    parts.push('Project folder path updated');
+  }
+  if (Number(before.port) !== Number(after.port)) {
+    parts.push(`Port ${after.port} assigned`);
+  }
+  if (scriptChanged) {
+    parts.push('Build Actions updated.');
+  }
+  const bt = before.thumbnail_url == null ? '' : String(before.thumbnail_url);
+  const at = after.thumbnail_url == null ? '' : String(after.thumbnail_url);
+  if (bt !== at) {
+    parts.push('Thumbnail reference updated');
+  }
+  const bpt =
+    before.project_type == null || String(before.project_type).trim() === ''
+      ? 'auto'
+      : String(before.project_type);
+  const apt =
+    after.project_type == null || String(after.project_type).trim() === ''
+      ? 'auto'
+      : String(after.project_type);
+  if (bpt !== apt) {
+    parts.push(`Project type → ${apt}`);
+  }
+  const ba = !!(before.is_archived === true || before.is_archived === 1);
+  const aa = !!(after.is_archived === true || after.is_archived === 1);
+  if (ba !== aa) {
+    parts.push(aa ? 'Marked archived in registry' : 'Removed from archive flag');
+  }
+  const bn = before.notes == null ? '' : String(before.notes);
+  const an = after.notes == null ? '' : String(after.notes);
+  if (bn !== an) {
+    parts.push('Project journal updated');
+  }
+  if (String(before.pkg_manager || '') !== String(after.pkg_manager || '')) {
+    parts.push(`Package manager → ${after.pkg_manager}`);
+  }
+  if (!parts.length) return 'Registry synchronized (detection refreshed)';
+  return PREFIX + parts.join(' ');
 }
 
 /**
@@ -858,18 +1009,6 @@ function msc_buildSanitizedSystemStatsPayload(p) {
   };
 }
 
-/** Writable thumbnail scratch dir (not inside read-only app.asar). */
-function msc_userDataMediaThumbnailsDir() {
-  try {
-    if (typeof app?.getPath === 'function') {
-      return path.join(app.getPath('userData'), 'media', 'thumbnails');
-    }
-  } catch (_) {
-    /* non-Electron */
-  }
-  return path.join(process.cwd(), 'media', 'thumbnails');
-}
-
 /** @param {string} destDir @param {string} filename */
 function msc_vault_destPathNoCollision(destDir, filename) {
   const base = path.basename(filename) || 'file';
@@ -897,20 +1036,227 @@ function msc_vault_copyFile(projectDisplayName, srcPath) {
   if (!st.isFile()) throw new Error('VPE: Vault accepts files only.');
   const destDir = msc_projectVaultProjectDir(projectDisplayName);
   fs.mkdirSync(destDir, { recursive: true });
-  const dest = msc_vault_destPathNoCollision(destDir, path.basename(abs));
+  let fname = path.basename(abs);
+  if (msc_isVaultInternalThumbBase(fname)) {
+    const ext = path.extname(fname) || '';
+    fname = `user_ref_${Date.now()}${ext}`;
+  }
+  const dest = msc_vault_destPathNoCollision(destDir, fname);
   fs.copyFileSync(abs, dest);
   return dest;
 }
 
-/** Whether this project's vault folder has at least one file (documentation indicator). */
-function msc_vaultDirHasFiles(projectDisplayName) {
+/** Whether this project's vault has at least one user reference file (excludes internal thumbs, `.vpe_keep`, `_vpe_thumb*`). */
+function msc_vaultDirHasUserReferenceFiles(projectDisplayName) {
   try {
     const dir = msc_projectVaultProjectDir(projectDisplayName);
     if (!fs.existsSync(dir)) return false;
     const entries = fs.readdirSync(dir, { withFileTypes: true });
-    return entries.some((e) => e.isFile());
+    return entries.some((e) => {
+      if (!e.isFile()) return false;
+      const nm = e.name;
+      if (msc_isVaultKeepFile(nm)) return false;
+      const lower = String(nm).toLowerCase();
+      if (lower.startsWith('_vpe_thumb')) return false;
+      return true;
+    });
   } catch (_) {
     return false;
+  }
+}
+
+/** v1.7.1 — previous thumb sidelined before atomic swap. */
+const VPE_VAULT_INTERNAL_THUMB_OLD = '_vpe_thumb_OLD.png';
+/** v1.7.3 — full PNG written here first, then fsync + rename into `_vpe_thumb.png`. */
+const VPE_VAULT_INTERNAL_THUMB_TEMP = '_vpe_thumb_TEMP.png';
+
+function msc_isThumbnailEBUSY(err) {
+  if (!err || typeof err !== 'object') return false;
+  const code = 'code' in err ? String(err.code) : '';
+  if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') return true;
+  const msg = 'message' in err && typeof err.message === 'string' ? err.message : String(err);
+  return /\bEBUSY\b/i.test(msg) || /\bresource busy\b/i.test(msg) || /\blocked\b/i.test(msg);
+}
+
+function msc_sleepMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * v1.7.3 — Atomic swap: write `_vpe_thumb_TEMP.png` + fsync, rename current → OLD, rename TEMP → final,
+ * then remove OLD. `_vpe_thumb.png` is never a partial write. EBUSY retries (50ms × 3) on rename chain.
+ * @param {string} vaultDir
+ * @param {Buffer} pngBuffer
+ * @returns {Promise<string>} Absolute path to `_vpe_thumb.png`
+ */
+async function msc_safeWriteThumbnail(vaultDir, pngBuffer) {
+  fs.mkdirSync(vaultDir, { recursive: true });
+  const outPath = path.join(vaultDir, VPE_VAULT_INTERNAL_THUMB);
+  const oldPath = path.join(vaultDir, VPE_VAULT_INTERNAL_THUMB_OLD);
+  const tempPath = path.join(vaultDir, VPE_VAULT_INTERNAL_THUMB_TEMP);
+
+  try {
+    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+  } catch (_) {
+    /* */
+  }
+
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await msc_sleepMs(50);
+    try {
+      const fd = fs.openSync(tempPath, 'w');
+      try {
+        fs.writeSync(fd, pngBuffer, 0, pngBuffer.length, 0);
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
+
+      if (fs.existsSync(outPath)) {
+        if (fs.existsSync(oldPath)) {
+          try {
+            fs.unlinkSync(oldPath);
+          } catch (e) {
+            if (msc_isThumbnailEBUSY(e) && attempt < 2) {
+              lastErr = e;
+              try {
+                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+              } catch (_) {
+                /* */
+              }
+              continue;
+            }
+            throw e;
+          }
+        }
+        fs.renameSync(outPath, oldPath);
+      }
+
+      fs.renameSync(tempPath, outPath);
+
+      if (fs.existsSync(oldPath)) {
+        try {
+          fs.unlinkSync(oldPath);
+        } catch (_) {
+          /* best-effort */
+        }
+      }
+      console.log('[VPE THUMBNAIL LOCK RELEASED]');
+      return outPath;
+    } catch (err) {
+      lastErr = err;
+      try {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      } catch (_) {
+        /* */
+      }
+      if (attempt < 2 && msc_isThumbnailEBUSY(err)) {
+        continue;
+      }
+      throw err;
+    }
+  }
+  const m =
+    lastErr && typeof lastErr === 'object' && 'message' in lastErr
+      ? String(lastErr.message)
+      : String(lastErr);
+  throw new Error(`VPE: Thumbnail write failed after retries (${m})`);
+}
+
+/**
+ * v1.6.6 — Card thumbnail stored only under `media/vault/<sanitizedName>/VPE_VAULT_INTERNAL_THUMB` (PNG).
+ * v1.7.3 — delegates disk write to `msc_safeWriteThumbnail` (TEMP + fsync + atomic rename).
+ * @returns {Promise<string>} Absolute path to `_vpe_thumb.png`
+ */
+async function msc_writeVaultInternalThumbnail(srcImagePath, projectDisplayName) {
+  const vaultDir = msc_projectVaultProjectDir(projectDisplayName);
+  fs.mkdirSync(vaultDir, { recursive: true });
+
+  ['_vpe_thumb.jpg', '_vpe_thumb.jpeg'].forEach((leaf) => {
+    try {
+      const p = path.join(vaultDir, leaf);
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    } catch (_) {
+      /* */
+    }
+  });
+
+  const img = nativeImage.createFromPath(srcImagePath);
+  if (img.isEmpty()) {
+    throw new Error('VPE: Could not load image for thumbnail.');
+  }
+
+  let resized = img;
+  const { width, height } = img.getSize();
+  const largestEdge = Math.max(width || 0, height || 0);
+  if (largestEdge > MAX_THUMB_EDGE) {
+    resized = img.resize({
+      width: width >= height ? MAX_THUMB_EDGE : undefined,
+      height: height > width ? MAX_THUMB_EDGE : undefined,
+      quality: 'good',
+    });
+  }
+
+  let buf = resized.toPNG();
+  let guard = 0;
+  /** @type {import('electron').NativeImage} */
+  let shrink = resized;
+  while (buf.length > MAX_THUMB_BYTES && guard < 14) {
+    guard += 1;
+    const sz = shrink.getSize();
+    const nw = Math.max(180, Math.floor((sz.width || 1) * 0.82));
+    const nh = Math.max(180, Math.floor((sz.height || 1) * 0.82));
+    shrink = shrink.resize({
+      width: nw,
+      height: nh,
+      quality: 'good',
+    });
+    buf = shrink.toPNG();
+  }
+  const statApprox = buf.length;
+  if (statApprox > 12 * 1024 * 1024) {
+    throw new Error('VPE: Thumbnail file is too large (max 12 MB).');
+  }
+  return msc_safeWriteThumbnail(vaultDir, buf);
+}
+
+/** After vault folder rename, fix `file://` thumbnail URLs that pointed at `_vpe_thumb.*` in the moved folder. */
+function msc_remapVaultThumbAfterProjectRename(thumbUrl, oldDisplayName, newDisplayName) {
+  if (thumbUrl == null || thumbUrl === '') return thumbUrl ?? null;
+  const s = String(thumbUrl);
+  const oldLeaf = msc_safeVaultFolderName(oldDisplayName);
+  const newLeaf = msc_safeVaultFolderName(newDisplayName);
+  if (oldLeaf === newLeaf) return thumbUrl ?? null;
+  if (!s.startsWith('file:')) return thumbUrl ?? null;
+
+  try {
+    const root = path.resolve(msc_projectVaultRootDir());
+    const oldVault = path.resolve(path.join(root, oldLeaf));
+    const newVault = path.resolve(path.join(root, newLeaf));
+    const abs = path.resolve(fileURLToPath(s));
+    const rel = path.relative(oldVault, abs);
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) {
+      return thumbUrl ?? null;
+    }
+    if (!msc_isVaultInternalThumbBase(path.basename(abs))) {
+      return thumbUrl ?? null;
+    }
+    const nextAbs = path.resolve(path.join(newVault, path.basename(abs)));
+    const relInto = path.relative(newVault, nextAbs);
+    if (relInto.startsWith('..') || path.isAbsolute(relInto)) {
+      return thumbUrl ?? null;
+    }
+    if (fs.existsSync(nextAbs)) {
+      return pathToFileURL(nextAbs).href;
+    }
+    const fallback = path.resolve(path.join(newVault, VPE_VAULT_INTERNAL_THUMB));
+    if (fs.existsSync(fallback)) {
+      return pathToFileURL(fallback).href;
+    }
+    return pathToFileURL(nextAbs).href;
+  } catch (_) {
+    return thumbUrl ?? null;
   }
 }
 
@@ -1027,49 +1373,420 @@ function msc_fallbackSystemStats(err) {
   }
 }
 
-function msc_optimizeThumbnailIfNeeded(src, fallbackDest) {
-  const ext = path.extname(src).toLowerCase();
-  // Preserve animated GIF behavior by skipping re-encode.
-  if (ext === '.gif') {
-    fs.copyFileSync(src, fallbackDest);
-    return fallbackDest;
+/** Legacy scratch thumbnails under repo or userData (pre–Omni-Vault). */
+function msc_isLegacyMediaThumbnailsUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const lower = url.toLowerCase();
+  if (
+    lower.includes('/media/thumbnails/') ||
+    lower.includes('\\media\\thumbnails\\')
+  ) {
+    return true;
+  }
+  try {
+    const dec = decodeURIComponent(url).toLowerCase();
+    return (
+      dec.includes('/media/thumbnails/') || dec.includes('\\media\\thumbnails\\')
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+/** @param {unknown} row */
+function msc_projectRowToUpdatePayload(row, thumbnail_url) {
+  const pt =
+    row.project_type == null || String(row.project_type).trim() === ''
+      ? null
+      : String(row.project_type).trim();
+
+  const portNum =
+    row.port != null && Number.isFinite(Number(row.port)) ? Number(row.port) : row.port;
+
+  return {
+    id: row.id,
+    name: row.name,
+    path: row.path,
+    port: portNum,
+    thumbnail_url: thumbnail_url ?? null,
+    start_script: row.start_script,
+    build_script: row.build_script,
+    pkg_manager: row.pkg_manager,
+    project_type: pt,
+    is_archived: row.is_archived === true || row.is_archived === 1,
+    notes: row.notes != null ? String(row.notes) : null,
+  };
+}
+
+function msc_storeListProjectsAlphabetical(store) {
+  if (typeof store.listProjectsAlphabetical === 'function') {
+    return store.listProjectsAlphabetical();
+  }
+  return typeof store.getProjects === 'function' ? store.getProjects() : [];
+}
+
+/** Drop thumbnail_url when it points inside this project vault but file is gone. */
+function msc_coerceThumbnailVaultFilePresence(row) {
+  const tu = row.thumbnail_url;
+  if (!tu || typeof tu !== 'string') {
+    return tu ?? null;
+  }
+  if (tu.startsWith('vpe-vault:')) {
+    const abs = msc_internalVaultThumbAbsForRow(row);
+    if (!abs || !fs.existsSync(abs)) return null;
+    return pathToFileURL(abs).href;
+  }
+  if (!tu.startsWith('file:')) {
+    return tu ?? null;
+  }
+  try {
+    const fp = path.resolve(fileURLToPath(tu));
+    const vdir = path.resolve(msc_projectVaultProjectDir(row.name));
+    const rel = path.relative(vdir, fp);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      return tu;
+    }
+    if (!fs.existsSync(fp)) return null;
+    return tu;
+  } catch (_) {
+    return tu;
+  }
+}
+
+/**
+ * v1.6.6 Great Purge — registry alignment (legacy media/thumbnails → vault file URL or NULL).
+ * @returns {{ migratedLegacy: number; nulledMissingVault: number; rowsTouched: number }}
+ */
+function msc_greatPurgeThumbnailMigration(store) {
+  /** @type {unknown[]} */
+  const rows = msc_storeListProjectsAlphabetical(store);
+  let migratedLegacy = 0;
+  let nulledMissingVault = 0;
+  let rowsTouched = 0;
+
+  for (const row of rows) {
+    if (!row?.id) continue;
+
+    let next = row.thumbnail_url ?? null;
+
+    if (typeof next === 'string' && msc_isLegacyMediaThumbnailsUrl(next)) {
+      const vaultPng = path.join(msc_projectVaultProjectDir(row.name), VPE_VAULT_INTERNAL_THUMB);
+      next = fs.existsSync(vaultPng) ? pathToFileURL(vaultPng).href : null;
+      migratedLegacy += 1;
+    }
+
+    next = msc_coerceThumbnailVaultFilePresence({ ...row, thumbnail_url: next });
+
+    const prevNorm = row.thumbnail_url ?? null;
+    const nextNorm = next ?? null;
+    if (prevNorm !== nextNorm) {
+      store.updateProject(msc_projectRowToUpdatePayload(row, nextNorm));
+      rowsTouched += 1;
+      if (nextNorm === null && prevNorm != null) nulledMissingVault += 1;
+    }
   }
 
-  const img = nativeImage.createFromPath(src);
-  if (img.isEmpty()) {
-    fs.copyFileSync(src, fallbackDest);
-    return fallbackDest;
+  return { migratedLegacy, nulledMissingVault, rowsTouched };
+}
+
+function msc_normalizeResolvedPath(p) {
+  try {
+    return path.normalize(path.resolve(p));
+  } catch (_) {
+    return '';
+  }
+}
+
+/** True if `entryAbs` is a file/dir path strictly inside `containerDirAbs` (not the dir path alone). */
+function msc_fsPathIsStrictlyInsideDir(entryAbs, containerDirAbs) {
+  const dir = msc_normalizeResolvedPath(containerDirAbs);
+  const ent = msc_normalizeResolvedPath(entryAbs);
+  if (!dir || !ent) return false;
+  const rel = path.relative(dir, ent);
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/** `thumbnail_url` resolves to a path under this exact legacy directory (local disk). */
+function msc_rowThumbnailPointsUnderDir(thumbnailUrl, legacyDirAbs) {
+  if (!thumbnailUrl || typeof thumbnailUrl !== 'string' || !legacyDirAbs) return false;
+  const base = msc_normalizeResolvedPath(legacyDirAbs);
+  if (!base) return false;
+
+  if (thumbnailUrl.startsWith('file:')) {
+    try {
+      const fp = msc_normalizeResolvedPath(fileURLToPath(thumbnailUrl));
+      return msc_fsPathIsStrictlyInsideDir(fp, base) || fp === base;
+    } catch (_) {
+      return false;
+    }
   }
 
-  const { width, height } = img.getSize();
-  const largestEdge = Math.max(width || 0, height || 0);
-  const srcSize = fs.statSync(src).size;
-  const shouldResize = largestEdge > MAX_THUMB_EDGE;
-  const shouldCompress = srcSize > MAX_THUMB_BYTES;
+  if (/^[a-zA-Z][a-zA-Z0-9+\-.]*:/.test(thumbnailUrl.trim())) return false;
 
-  if (!shouldResize && !shouldCompress) {
-    fs.copyFileSync(src, fallbackDest);
-    return fallbackDest;
+  try {
+    const cand = thumbnailUrl.trim();
+    if (!path.isAbsolute(cand)) return false;
+    const fp = msc_normalizeResolvedPath(cand);
+    return msc_fsPathIsStrictlyInsideDir(fp, base) || fp === base;
+  } catch (_) {
+    return false;
+  }
+}
+
+function msc_registryPointsAtFilesystemDir(store, dirAbs) {
+  return msc_storeListProjectsAlphabetical(store).some((row) =>
+    msc_rowThumbnailPointsUnderDir(row?.thumbnail_url, dirAbs),
+  );
+}
+
+/** Recursive byte size (used before rm/unlink). */
+function msc_sumPathBytesSync(targetPath) {
+  try {
+    if (!fs.existsSync(targetPath)) return 0;
+    const st = fs.statSync(targetPath);
+    if (st.isFile()) return st.size;
+    if (!st.isDirectory()) return 0;
+    let total = 0;
+    for (const ent of fs.readdirSync(targetPath, { withFileTypes: true })) {
+      const p = path.join(targetPath, ent.name);
+      if (ent.isDirectory()) total += msc_sumPathBytesSync(p);
+      else if (ent.isFile()) {
+        try {
+          total += fs.statSync(p).size;
+        } catch (_) {
+          /* */
+        }
+      }
+    }
+    return total;
+  } catch (_) {
+    return 0;
+  }
+}
+
+/**
+ * v1.6.7 — Orphan `_vpe_thumb*`, hard-remove repo `media/thumbnails` when no row points at it,
+ * remove userData scratch the same way, delete vault folders with no registry match (sanitized `name`).
+ */
+function msc_purgeUnusedMediaScrub(store) {
+  /** @type {unknown[]} */
+  const rows = msc_storeListProjectsAlphabetical(store);
+
+  /** @type {Record<string,string>} sanitized leaf → normalized approved thumb path or '' */
+  const approvedThumbPathByLeaf = Object.create(null);
+  for (const row of rows) {
+    const leaf = msc_safeVaultFolderName(row.name);
+    let approved = '';
+    const tu = row.thumbnail_url;
+    if (tu && typeof tu === 'string' && msc_rowUsesInternalVaultThumbnail(row)) {
+      const abs = msc_internalVaultThumbAbsForRow(row);
+      approved = abs && fs.existsSync(abs) ? abs : '';
+    } else if (tu && typeof tu === 'string' && tu.startsWith('file:')) {
+      try {
+        approved = path.resolve(fileURLToPath(tu));
+      } catch (_) {
+        approved = '';
+      }
+    }
+    approvedThumbPathByLeaf[leaf] = approved;
   }
 
-  const resized = shouldResize
-    ? img.resize({
-        width: width >= height ? MAX_THUMB_EDGE : undefined,
-        height: height > width ? MAX_THUMB_EDGE : undefined,
-        quality: 'good',
-      })
-    : img;
+  let deletedOrphanThumbFiles = 0;
+  let bytesFreed = 0;
 
-  // JPEG yields significantly smaller payloads for preview thumbnails.
-  const outPath = fallbackDest.replace(/\.[^.]+$/, '.jpg');
-  let quality = shouldCompress ? 78 : 84;
-  let out = resized.toJPEG(quality);
-  while (out.length > MAX_THUMB_BYTES && quality > 50) {
-    quality -= 6;
-    out = resized.toJPEG(quality);
+  for (const row of rows) {
+    if (!row?.name) continue;
+    const dir = msc_projectVaultProjectDir(row.name);
+    if (!fs.existsSync(dir)) continue;
+
+    const leaf = msc_safeVaultFolderName(row.name);
+    const approvedNorm = approvedThumbPathByLeaf[leaf]
+      ? path.normalize(approvedThumbPathByLeaf[leaf])
+      : '';
+
+    /** @type {import('fs').Dirent[]} */
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch (_) {
+      /* */
+    }
+
+    for (const e of entries) {
+      if (!e.isFile()) continue;
+      const nm = e.name;
+      if (!nm.toLowerCase().startsWith('_vpe_thumb')) continue;
+
+      const fullPath = path.join(dir, nm);
+      let resolved;
+      try {
+        resolved = path.normalize(path.resolve(fullPath));
+      } catch (_) {
+        continue;
+      }
+
+      if (approvedNorm && resolved === approvedNorm) continue;
+
+      try {
+        bytesFreed += msc_sumPathBytesSync(fullPath);
+        fs.unlinkSync(fullPath);
+        deletedOrphanThumbFiles += 1;
+      } catch (_) {
+        /* */
+      }
+    }
   }
-  fs.writeFileSync(outPath, out);
-  return outPath;
+
+  /** v1.6.7 — Hard scrub: delete each legacy dir only if no registry row targets that path. */
+  let legacyThumbnailDirsRemoved = 0;
+  const legacyRepoThumbnails = msc_normalizeResolvedPath(
+    path.join(process.cwd(), 'media', 'thumbnails'),
+  );
+  const legacyUserDataThumbnails = (() => {
+    try {
+      return msc_normalizeResolvedPath(path.join(app.getPath('userData'), 'media', 'thumbnails'));
+    } catch (_) {
+      return '';
+    }
+  })();
+
+  for (const legacyPath of new Set(
+    [legacyRepoThumbnails, legacyUserDataThumbnails].filter(Boolean),
+  )) {
+    if (!legacyPath || !fs.existsSync(legacyPath)) continue;
+    if (msc_registryPointsAtFilesystemDir(store, legacyPath)) continue;
+    try {
+      bytesFreed += msc_sumPathBytesSync(legacyPath);
+      fs.rmSync(legacyPath, { recursive: true, force: true });
+      legacyThumbnailDirsRemoved += 1;
+    } catch (_) {
+      /* */
+    }
+  }
+
+  /** Vault folders on disk without a registry project (sanitized display `name`). */
+  /** @type {Set<string>} */
+  const legitLeaves = new Set(
+    rows
+      .filter((r) => r?.name != null && String(r.name).trim() !== '')
+      .map((r) => msc_safeVaultFolderName(String(r.name))),
+  );
+
+  let orphanVaultDirsRemoved = 0;
+  const vaultRootResolved = path.resolve(msc_projectVaultRootDir());
+
+  try {
+    fs.mkdirSync(vaultRootResolved, { recursive: true });
+  } catch (_) {
+    /* */
+  }
+
+  /** @type {import('fs').Dirent[]} */
+  let rootEntries = [];
+  try {
+    rootEntries = fs.readdirSync(vaultRootResolved, { withFileTypes: true });
+  } catch (_) {
+    /* */
+  }
+
+  for (const d of rootEntries) {
+    if (!d.isDirectory()) continue;
+    const leaf = d.name;
+    if (legitLeaves.has(leaf)) continue;
+
+    const target = path.resolve(path.join(vaultRootResolved, leaf));
+    const relTop = path.relative(vaultRootResolved, target);
+    if (relTop.startsWith('..') || path.isAbsolute(relTop)) continue;
+
+    try {
+      bytesFreed += msc_sumPathBytesSync(target);
+      fs.rmSync(target, { recursive: true, force: true });
+      orphanVaultDirsRemoved += 1;
+    } catch (_) {
+      /* */
+    }
+  }
+
+  const mbFreed = Math.round((bytesFreed / (1024 * 1024)) * 100) / 100;
+
+  return {
+    deletedOrphanThumbFiles,
+    legacyThumbnailDirsRemoved,
+    orphanVaultDirsRemoved,
+    legacyScratchRemoved: legacyThumbnailDirsRemoved > 0,
+    bytesFreed,
+    mbFreed,
+  };
+}
+
+function msc_vaultDirTopLevelHasAnyFile(absDir) {
+  try {
+    return fs.readdirSync(absDir, { withFileTypes: true }).some((e) => e.isFile());
+  } catch (_) {
+    return true;
+  }
+}
+
+function msc_trySetWindowsHiddenFile(absPath) {
+  if (process.platform !== 'win32') return;
+  try {
+    const { execFileSync } = require('child_process');
+    execFileSync('attrib', ['+h', absPath], { windowsHide: true, stdio: 'ignore' });
+  } catch (_) {
+    /* */
+  }
+}
+
+/**
+ * Ensure every registry project has a physical folder under the vault root (`msc_projectVaultProjectDir`).
+ * Adds `.vpe_keep` (+h on Windows) when the folder has no files yet.
+ * @returns {{ foldersCreated: string[]; keepFilesWritten: string[]; projectsSynced: number }}
+ */
+function msc_syncVaultPhysicalFolders(store) {
+  /** @type {unknown[]} */
+  const rows = msc_storeListProjectsAlphabetical(store);
+  /** @type {string[]} */
+  const foldersCreated = [];
+  /** @type {string[]} */
+  const keepFilesWritten = [];
+  let projectsSynced = 0;
+
+  fs.mkdirSync(msc_projectVaultRootDir(), { recursive: true });
+
+  for (const row of rows) {
+    if (!row?.id || row.name == null || String(row.name).trim() === '') continue;
+
+    const dir = msc_projectVaultProjectDir(String(row.name));
+    let existedBefore = false;
+    try {
+      existedBefore = fs.existsSync(dir) && fs.statSync(dir).isDirectory();
+    } catch (_) {
+      existedBefore = false;
+    }
+
+    fs.mkdirSync(dir, { recursive: true });
+    if (!existedBefore) foldersCreated.push(dir);
+    projectsSynced += 1;
+
+    if (!msc_vaultDirTopLevelHasAnyFile(dir)) {
+      const keep = path.join(dir, VPE_VAULT_KEEP_FILE);
+      if (!fs.existsSync(keep)) {
+        fs.writeFileSync(
+          keep,
+          'VPE vault placeholder - keeps empty project folders materialized. Do not delete.\n',
+          'utf8',
+        );
+        msc_trySetWindowsHiddenFile(keep);
+        keepFilesWritten.push(keep);
+      }
+    }
+  }
+
+  if (foldersCreated.length > 0) {
+    console.log('[VPE VAULT SYNC] Folders created:', foldersCreated);
+  }
+
+  return { foldersCreated, keepFilesWritten, projectsSynced };
 }
 
 /**
@@ -1131,6 +1848,9 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       // eslint-disable-next-line no-await-in-loop
       const used = await msc_isPortInUse(probe);
       if (!used) return probe;
+      // v1.8.0 — Windows fast I/O: space TCP probes to reduce port-lock races (Ryzen / 25H2).
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, 2000));
     }
     return floor + 200;
   };
@@ -1167,9 +1887,12 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     if (typeof store.updateAppSettings !== 'function') {
       throw new Error('VPE: updateAppSettings not available on store.');
     }
+    const before =
+      typeof store.getSettings === 'function' ? store.getSettings() : {};
     const next = store.updateAppSettings(payload);
     msc_applyLoginStartupFromStore(store);
-    return { ok: true, settings: next };
+    const changeSummary = msc_summarizeAppSettingsChanges(before, next, payload);
+    return { ok: true, settings: next, changeSummary };
   });
 
   ipcMain.handle('vpe:update-setting-launch-startup', (_evt, value) => {
@@ -1181,9 +1904,14 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     if (typeof store.updateAppSettings !== 'function') {
       throw new Error('VPE: updateAppSettings not available on store.');
     }
+    const before =
+      typeof store.getSettings === 'function' ? store.getSettings() : {};
     const next = store.updateAppSettings({ launch_at_login: v });
     msc_applyLoginStartupFromStore(store);
-    return { ok: true, settings: next };
+    const changeSummary = msc_summarizeAppSettingsChanges(before, next, {
+      launch_at_login: v,
+    });
+    return { ok: true, settings: next, changeSummary };
   });
 
   const msc_emitProjectsUpdated = () => {
@@ -1232,7 +1960,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       const enriched = msc_ipcEnrichProjectsRow(row);
       return {
         ...enriched,
-        vault_has_files: msc_vaultDirHasFiles(row.name),
+        vault_has_files: msc_vaultDirHasUserReferenceFiles(row.name),
       };
     }),
   );
@@ -1510,6 +2238,9 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     }
 
     const existingRow = typeof store.getProject === 'function' ? store.getProject(id) : null;
+    const hasThumbPayload = Object.prototype.hasOwnProperty.call(payload, 'thumbnail_url');
+    let savedThumbnail = hasThumbPayload ? thumbnail_url : existingRow?.thumbnail_url ?? null;
+
     if (existingRow && String(existingRow.name) !== String(name)) {
       try {
         msc_vaultRenameProjectFolder(existingRow.name, name);
@@ -1520,6 +2251,18 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
           e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e),
         );
       }
+      savedThumbnail = msc_remapVaultThumbAfterProjectRename(
+        savedThumbnail,
+        existingRow.name,
+        name,
+      );
+    }
+
+    if (hasThumbPayload && savedThumbnail != null && typeof savedThumbnail === 'string') {
+      savedThumbnail = msc_normalizeThumbnailUrlForPersistence(
+        { id, name },
+        savedThumbnail,
+      );
     }
 
     store.updateProject({
@@ -1527,7 +2270,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       name,
       path: root,
       port: msc_assertPortNotReserved(port),
-      thumbnail_url: thumbnail_url ?? null,
+      thumbnail_url: savedThumbnail ?? null,
       start_script: start,
       build_script: build,
       pkg_manager: det.pkg_manager,
@@ -1535,8 +2278,28 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       ...(is_archived !== undefined ? { is_archived } : {}),
       ...(notes !== undefined ? { notes } : {}),
     });
+    const updatedRow =
+      typeof store.getProject === 'function' ? store.getProject(id) : null;
+    const changeSummary = msc_summarizeProjectSettingsRowDiff(existingRow, updatedRow);
+    let thumbnail_url_for_renderer = null;
+    if (updatedRow) {
+      if (msc_rowUsesInternalVaultThumbnail(updatedRow)) {
+        msc_bumpVaultThumbPulse(id, Date.now());
+        const again =
+          typeof store.getProject === 'function' ? store.getProject(id) : updatedRow;
+        thumbnail_url_for_renderer = msc_rendererVaultThumbnailHref(again);
+      } else {
+        thumbnail_url_for_renderer =
+          updatedRow.thumbnail_url != null ? String(updatedRow.thumbnail_url) : null;
+      }
+    }
     msc_emitProjectsUpdated();
-    return { ok: true, detection: det };
+    return {
+      ok: true,
+      detection: det,
+      thumbnail_url_for_renderer,
+      changeSummary,
+    };
   });
 
   ipcMain.handle('vpe:add-project', async (event, payload) => {
@@ -1564,13 +2327,18 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
       }
     }
 
+    const thumbNorm = msc_normalizeThumbnailUrlForPersistence(
+      { id, name: payload.name },
+      payload.thumbnail_url ?? null,
+    );
+
     store.insertProject({
       id,
       name: payload.name,
       path: root,
       port: msc_assertPortNotReserved(portNum),
       status: 'stopped',
-      thumbnail_url: payload.thumbnail_url ?? null,
+      thumbnail_url: thumbNorm ?? null,
       start_script: det.start_script,
       build_script: det.build_script,
       pkg_manager: det.pkg_manager,
@@ -1742,9 +2510,33 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     return result.filePaths[0];
   });
 
-  ipcMain.handle('vpe:pick-thumbnail', async (_event, projectId) => {
-    if (!projectId) throw new Error('VPE: Missing project id');
-    const result = await dialog.showOpenDialog({
+  ipcMain.handle('vpe:pick-thumbnail', async (_event, arg) => {
+    /** @type {{ projectId?: string | null; draftDisplayName?: string | null }} */
+    const opts =
+      typeof arg === 'string'
+        ? { projectId: arg, draftDisplayName: null }
+        : arg && typeof arg === 'object' && !Array.isArray(arg)
+          ? arg
+          : {};
+
+    const projectIdRaw = opts.projectId != null ? String(opts.projectId).trim() : '';
+    const draftName =
+      opts.draftDisplayName != null && String(opts.draftDisplayName).trim()
+        ? String(opts.draftDisplayName).trim()
+        : '';
+
+    /** @type {ReturnType<typeof store.getProject> | null} */
+    let row = projectIdRaw ? store.getProject(projectIdRaw) : null;
+
+    const displayName = row ? String(row.name) : draftName;
+    if (!displayName) {
+      throw new Error(
+        'VPE: Cannot store thumbnail — register the project first, or scan a folder so the vault name exists.',
+      );
+    }
+
+    const win = BrowserWindow.getFocusedWindow();
+    const result = await dialog.showOpenDialog(win || undefined, {
       title: 'Select project thumbnail image',
       properties: ['openFile'],
       filters: [
@@ -1754,28 +2546,49 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     if (result.canceled || !result.filePaths?.[0]) return null;
 
     const src = result.filePaths[0];
-    const extRaw = path.extname(src).toLowerCase().replace('.', '');
-    const ok = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(extRaw);
-    const extForFile = ok ? `.${extRaw === 'jpeg' ? 'jpg' : extRaw}` : path.extname(src) || '.png';
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const destDir = msc_userDataMediaThumbnailsDir();
-    fs.mkdirSync(destDir, { recursive: true });
-    const fallbackDest = path.join(destDir, `${projectId}${extForFile}`);
-    const dest = msc_optimizeThumbnailIfNeeded(src, fallbackDest);
-    const stat = fs.statSync(dest);
-    if (stat.size > 12 * 1024 * 1024) {
-      throw new Error('VPE: Thumbnail file is too large (max 12 MB).');
+    let outPath;
+    try {
+      outPath = await msc_writeVaultInternalThumbnail(src, displayName);
+    } catch (err) {
+      const m =
+        err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
+      throw new Error(m);
     }
-    const mimeByExt = {
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.webp': 'image/webp',
-      '.gif': 'image/gif',
-    };
-    const mime = mimeByExt[path.extname(dest).toLowerCase()] || 'image/png';
-    const b64 = fs.readFileSync(dest).toString('base64');
-    return `data:${mime};base64,${b64}`;
+
+    const hrefBase = pathToFileURL(outPath).href;
+
+    if (row) {
+      const pt =
+        row.project_type == null || String(row.project_type).trim() === ''
+          ? null
+          : String(row.project_type).trim();
+
+      store.updateProject({
+        id: row.id,
+        name: row.name,
+        path: row.path,
+        port: row.port,
+        thumbnail_url: hrefBase,
+        start_script: row.start_script,
+        build_script: row.build_script,
+        pkg_manager: row.pkg_manager,
+        project_type: pt,
+        is_archived: row.is_archived === true || row.is_archived === 1,
+        notes: row.notes != null ? String(row.notes) : null,
+      });
+      msc_bumpVaultThumbPulse(row.id, Date.now());
+      try {
+        msc_emitProjectsUpdated();
+      } catch (_) {
+        /* */
+      }
+      const merged = { ...row, thumbnail_url: hrefBase };
+      return msc_rendererVaultThumbnailHref(merged, Date.now());
+    }
+
+    return `${hrefBase}?pulse=${encodeURIComponent(String(Date.now()))}`;
   });
 
   ipcMain.handle('vpe:vault-add-file', async (event, projectId) => {
@@ -1786,8 +2599,16 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     const win =
       BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
     const picked = await dialog.showOpenDialog(win || undefined, {
-      title: 'Add file to Project Vault',
+      title: 'Add file to Project Vault — all types',
       properties: ['openFile'],
+      filters: [
+        { name: 'All Files', extensions: ['*'] },
+        { name: 'Archives', extensions: ['zip', 'rar', '7z', 'tar', 'gz'] },
+        {
+          name: 'Documents & bundles',
+          extensions: ['pdf', 'md', 'txt', 'html', 'htm', 'exe', 'msi'],
+        },
+      ],
     });
     if (picked.canceled || !picked.filePaths?.[0]) return { ok: false, canceled: true };
     const dest = msc_vault_copyFile(row.name, picked.filePaths[0]);
@@ -1803,7 +2624,12 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     if (!fs.existsSync(dir)) return { ok: true, dir, files: [] };
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     const files = entries
-      .filter((e) => e.isFile())
+      .filter(
+        (e) =>
+          e.isFile() &&
+          !msc_isVaultInternalThumbBase(e.name) &&
+          !msc_isVaultKeepFile(e.name),
+      )
       .map((e) => ({
         name: e.name,
         path: path.join(dir, e.name),
@@ -1830,6 +2656,14 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     const base = path.basename(raw.replace(/\\/g, '/'));
     if (!base || base === '.' || base === '..') {
       throw new Error('VPE: Invalid file name');
+    }
+    if (msc_isVaultInternalThumbBase(base)) {
+      throw new Error(
+        'VPE: Internal card thumbnail (_vpe_thumb.png) cannot be deleted from the vault list — replace it via Project Settings.',
+      );
+    }
+    if (msc_isVaultKeepFile(base)) {
+      throw new Error('VPE: The .vpe_keep placeholder cannot be deleted from the vault list.');
     }
     const row = store.getProject(id);
     if (!row) throw new Error('VPE: Project not found');
@@ -2216,6 +3050,44 @@ ipcMain.handle('vpe:open-shell', async (_event, { path: projectPath, type }) => 
       const dest = msc_vault_copyFile(row.name, srcPath);
       return { ok: true, dest, name: path.basename(dest) };
     });
+  }
+
+  ipcMain.handle('vpe:purge-unused-media', async () => {
+    try {
+      const migration = msc_greatPurgeThumbnailMigration(store);
+      const scrub = msc_purgeUnusedMediaScrub(store);
+      const vaultSync = msc_syncVaultPhysicalFolders(store);
+      msc_emitProjectsUpdated();
+      console.log('[VPE HARD SCRUB COMPLETE]', { migration, scrub });
+      console.log('[VPE VAULT SYNC COMPLETE]', vaultSync);
+      console.log('[VPE STANDBY]');
+      return { ok: true, migration, scrub, vaultSync };
+    } catch (err) {
+      const m =
+        err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
+      console.warn('[VPE purge-unused-media]', m);
+      return { ok: false, error: m };
+    }
+  });
+
+  /** v1.6.7 Hard Scrub — registry remap + aggressive media/vault cleanup once per process. */
+  if (!global.__vpeHardScrubV167BootDone) {
+    global.__vpeHardScrubV167BootDone = true;
+    try {
+      const migration = msc_greatPurgeThumbnailMigration(store);
+      const scrub = msc_purgeUnusedMediaScrub(store);
+      console.log('[VPE HARD SCRUB COMPLETE]', { migration, scrub });
+    } catch (e) {
+      console.warn('[VPE BOOT] Hard Scrub v1.6.7 failed', e?.message ?? e);
+    }
+    try {
+      const vaultSync = msc_syncVaultPhysicalFolders(store);
+      console.log('[VPE VAULT SYNC COMPLETE]', vaultSync);
+    } catch (e2) {
+      console.warn('[VPE BOOT] Vault physical sync failed', e2?.message ?? e2);
+    }
+    msc_emitProjectsUpdated();
+    console.log('[VPE STANDBY]');
   }
 
   console.log('[VPE SUCCESS]', 'VPE IPC handlers registered');

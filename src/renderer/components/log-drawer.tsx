@@ -495,7 +495,7 @@ export function LogDrawer({
 
   if (!expandedProp && !isDetached) {
     return (
-      <div className="vpe-log-drawer-root h-full flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 w-8">
+      <div className="vpe-log-drawer-root vpe-theme-font h-full flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 w-8">
         <button
           type="button"
           onClick={() => onExpandedChange?.(true)}
@@ -513,7 +513,7 @@ export function LogDrawer({
     return (
       <div
         ref={floatingRef}
-        className="vpe-log-drawer-root fixed z-[100] flex flex-col bg-[#1c1c1c] border border-[#333333] rounded shadow-2xl"
+        className="vpe-log-drawer-root vpe-theme-font fixed z-[100] flex flex-col bg-[#1c1c1c] border border-[#333333] rounded shadow-2xl"
         style={{
           left: floatingPosition.x,
           top: floatingPosition.y,
@@ -526,7 +526,7 @@ export function LogDrawer({
           className="h-10 bg-[#161616] border-b border-[#333333] flex items-center justify-between px-3 cursor-move select-none rounded-t"
           onMouseDown={startDrag}
         >
-          <h2 className="font-sans font-semibold text-white text-sm tracking-tight">SYSTEM_LOGS</h2>
+          <h2 className="font-semibold text-white text-sm tracking-tight">SYSTEM_LOGS</h2>
           <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
             <button 
               onClick={() => setIsDetached(false)}
@@ -558,7 +558,7 @@ export function LogDrawer({
           >
             <div className="relative z-30 space-y-0.5 min-w-0 overflow-x-hidden" style={{ fontSize: logFontPx }}>
               {logs.map((log, index) => (
-                <div key={index} className="flex font-sans leading-relaxed min-w-0">
+                <div key={index} className="flex leading-relaxed min-w-0">
                   {log.time && (
                     <span className="text-[#444444] mr-2 select-none shrink-0">[{log.time}]</span>
                   )}
@@ -576,7 +576,7 @@ export function LogDrawer({
 
         {/* Floating Command Input */}
         <div className="h-8 px-4 border-t border-[#333333] bg-[#121212] flex items-center shrink-0">
-          <span className="font-sans text-[#00cc66] mr-2 shrink-0" style={{ fontSize: logFontPx }}>root@vpe:~#</span>
+          <span className="text-[#00cc66] mr-2 shrink-0" style={{ fontSize: logFontPx }}>root@vpe:~#</span>
           <input
             ref={inputRef}
             type="text"
@@ -584,7 +584,7 @@ export function LogDrawer({
             onChange={(e) => setCommandInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a command..."
-            className="flex-1 bg-transparent font-sans text-white placeholder:text-[#555555] focus:outline-none"
+            className="flex-1 bg-transparent text-white placeholder:text-[#555555] focus:outline-none"
             style={{ fontSize: logFontPx }}
           />
           <div className="w-0.5 h-4 bg-[#4fde82] animate-pulse" />
@@ -592,10 +592,10 @@ export function LogDrawer({
 
         {/* Floating Status Bar */}
         <div className="px-4 py-2 border-t border-[#333333] bg-[#161616] flex items-center justify-between shrink-0 rounded-b">
-          <span className="font-sans text-[11px] text-[#A0A0A0]">
+          <span className="text-[11px] text-[#A0A0A0]">
             PID: 48291 | RUNTIME: 824H
           </span>
-          <span className="font-sans text-[10px] text-[#555555]">DETACHED</span>
+          <span className="text-[10px] text-[#555555]">DETACHED</span>
         </div>
 
         {/* Resize handle for floating window */}
@@ -632,7 +632,7 @@ export function LogDrawer({
 
   return (
     <div 
-      className="vpe-log-drawer-root relative h-full min-h-0 flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 transition-all duration-200"
+      className="vpe-log-drawer-root vpe-theme-font relative h-full min-h-0 flex flex-col bg-[#1c1c1c] border-l border-[#333333] shrink-0 transition-all duration-200"
       style={{ width, borderRadius: '4px 0 0 4px' }}
     >
       {/* Resize Handle — above terminal hit target; terminal content inset with left-1 */}
@@ -645,7 +645,7 @@ export function LogDrawer({
       {/* Tab Bar - SQUARED with 4px top radius only, dark grey active state */}
       <div className="h-10 bg-[#161616] border-b border-[#333333] flex items-center px-2 overflow-x-auto shrink-0">
         {projects.length === 0 ? (
-          <span className="font-sans text-xs text-[#555555] px-2">No projects</span>
+          <span className="text-xs text-[#555555] px-2">No projects</span>
         ) : (
           projects.map((project) => {
             const isActive = selectedProject === project.id
@@ -658,7 +658,7 @@ export function LogDrawer({
                 onClick={() => handleProjectSelect(project.id)}
                 title={isSystemTab ? 'All projects (merged by time)' : project.name}
                 className={`
-                  flex items-center gap-2 px-3 py-1.5 font-sans text-xs transition-all shrink-0 mr-1
+                  flex items-center gap-2 px-3 py-1.5 text-xs transition-all shrink-0 mr-1
                   ${isActive 
                     ? 'bg-[#252525] text-white rounded-t' 
                     : 'text-[#A0A0A0] hover:text-white hover:bg-[#252525]/50'
@@ -687,7 +687,7 @@ export function LogDrawer({
       {/* Empty State */}
       {projects.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="font-sans text-[13px] text-[#A0A0A0] text-center px-4">
+          <p className="text-[13px] text-[#A0A0A0] text-center px-4">
             No logs available.
           </p>
         </div>
@@ -695,7 +695,7 @@ export function LogDrawer({
         <>
           {/* Header with collapse and detach buttons */}
           <div className="px-4 py-3 border-b border-[#333333] flex items-center justify-between shrink-0">
-            <h2 className="font-sans font-semibold text-white text-sm tracking-tight">SYSTEM_LOGS</h2>
+            <h2 className="font-semibold text-white text-sm tracking-tight">SYSTEM_LOGS</h2>
             <div className="flex items-center gap-1">
               <button 
                 onClick={() => setIsDetached(true)}
@@ -737,7 +737,7 @@ export function LogDrawer({
                 {logs.map((log, index) => (
                   <div
                     key={`${log.time}:${index}:${log.message.slice(0, 16)}`}
-                    className="flex font-sans leading-relaxed min-w-0"
+                    className="flex leading-relaxed min-w-0"
                   >
                     {log.time && (
                       <span className="text-[#444444] mr-2 select-none shrink-0">[{log.time}]</span>
@@ -756,7 +756,7 @@ export function LogDrawer({
 
           {/* Interactive Command Input */}
           <div className="h-8 px-4 border-t border-[#333333] bg-[#121212] flex items-center shrink-0">
-            <span className="font-sans text-[#00cc66] mr-2 shrink-0" style={{ fontSize: logFontPx }}>root@vpe:~#</span>
+            <span className="text-[#00cc66] mr-2 shrink-0" style={{ fontSize: logFontPx }}>root@vpe:~#</span>
             <input
               ref={inputRef}
               type="text"
@@ -764,7 +764,7 @@ export function LogDrawer({
               onChange={(e) => setCommandInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type a command..."
-              className="flex-1 bg-transparent font-sans text-white placeholder:text-[#555555] focus:outline-none"
+              className="flex-1 bg-transparent text-white placeholder:text-[#555555] focus:outline-none"
               style={{ fontSize: logFontPx }}
             />
             <div className="w-0.5 h-4 bg-[#4fde82] animate-pulse" />
@@ -772,7 +772,7 @@ export function LogDrawer({
 
           {/* Bottom Status Bar */}
           <div className="px-4 py-2 border-t border-[#333333] bg-[#161616] flex items-center justify-between shrink-0">
-            <span className="font-sans text-[11px] text-[#A0A0A0]">
+            <span className="text-[11px] text-[#A0A0A0]">
               SYSTEM READY
             </span>
             <GripVertical size={12} className="text-[#555555]" />

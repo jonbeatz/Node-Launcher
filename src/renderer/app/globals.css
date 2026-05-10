@@ -1,54 +1,10 @@
+/* Palette tokens + dark theme lock — load order owned by root layout.tsx (before this file). */
 /* Loaded via URL so static export + assetPrefix './' works under Electron file:// */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Mulish:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
-  /* VPE Squared Registry - v6 */
-  --background: #121212;
-  --foreground: #FFFFFF;
-  --card: #1c1c1c;
-  --card-foreground: #FFFFFF;
-  --popover: #1c1c1c;
-  --popover-foreground: #FFFFFF;
-  --primary: #4fde82;
-  --primary-foreground: #000000;
-  --secondary: #1c1c1c;
-  --secondary-foreground: #FFFFFF;
-  --muted: #1c1c1c;
-  --muted-foreground: #A0A0A0;
-  /** Sidebar / tab selected surface (renderer nav); accent green stays for CTAs/forms. */
-  --vpe-nav-selected: #2a2a2a;
-  --accent: #4fde82;
-  --accent-foreground: #000000;
-  --destructive: #e02b20;
-  --destructive-foreground: #FFFFFF;
-  --border: #333333;
-  --input: #333333;
-  --ring: #4fde82;
-  --terminal: #0a0a0a;
-  /* Theme accent - switchable between green and red in settings */
-  --theme-accent: #4fde82;
-  --vader-red: #e02b20;
-  --vpe-green: #4fde82;
-  /** Tactical filter active underline (v1.2.5+) */
-  --msc-accent: #4fde82;
-  --vader-glow: 0 0 15px rgba(79, 222, 130, 0.4);
-  --success: #00cc66;
-  --error: #ff4444;
-  --warning: #ffcc00;
-  --text-muted: #A0A0A0;
-  --text-dimmed: #555555;
-  /* Squared Registry - 4px max radius */
-  --radius: 4px;
-  --radius-md: 4px;
-  --radius-lg: 4px;
-  --msc-studio-bg: #121212;
-  --msc-vader-accent: #e02b20;
-}
 
 @layer base {
   * {
@@ -59,7 +15,26 @@
     outline-offset: 2px;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground;
+  }
+
+  /**
+   * v1.8.3 — Settings → Font Style maps to `--vpe-font-family` via `vpe-font-engine.ts`:
+   * VPE Classic | Mulish Studio | Google Sans (Modern) | Noto Sans | Poppins.
+   */
+  .vpe-theme-font {
+    font-family: var(--vpe-font-family), ui-sans-serif, system-ui, sans-serif !important;
+  }
+
+  /* v1.8.1 — cards/modals inherit UI stack */
+  .vpe-project-card,
+  .vpe-modal-surface {
+    font-family: inherit;
+  }
+
+  .vpe-card-title {
+    font-weight: var(--vpe-title-font-weight, 700);
+    letter-spacing: var(--vpe-title-letter-spacing, -0.02em);
   }
 }
 
@@ -124,6 +99,31 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   transition: border-color 0.15s ease;
+}
+
+/** v1.8.5 — ultra-thin metallic wire (chrome → charcoal) on Studio Dark. */
+.vpe-project-card.vpe-card-chrome-selected {
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(to bottom right, #9ca3af, #1f2937) border-box !important;
+  background-clip: padding-box, border-box !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+}
+
+/** v1.8.5 — bespoke settings depth: recessed panels + lifted open section. */
+.vpe-settings-depth [data-slot='accordion-item'] {
+  background: #121212;
+  border-bottom: 1px solid rgba(156, 163, 175, 0.14) !important;
+  border-color: rgba(156, 163, 175, 0.14) !important;
+}
+
+.vpe-settings-depth [data-slot='accordion-item'][data-state='open'] {
+  background: #1c1c1c;
+}
+
+.vpe-project-card.vpe-card-chrome-selected:hover {
+  border-color: transparent !important;
 }
 
 .vader-card:hover {
@@ -437,4 +437,27 @@ html {
 
 body {
   background-color: #121212;
+}
+
+/* v1.7.9 — dashboard grids */
+.vpe-grid-cinema {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1280px) {
+  .vpe-grid-cinema {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .vpe-grid-cinema {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vpe-grid-compact {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
 }

@@ -2,12 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-/** Exported for boot-time default view (main `default_view` vs session `localStorage`). */
+/** @deprecated v1.6.9 — view mode lives in `VpeUiLayoutProvider`; key kept for docs / boot migration. */
 export const VPE_DASHBOARD_VIEW_LS_KEY = 'vpe.settings.dashboard.viewMode'
-const LS_VIEW = VPE_DASHBOARD_VIEW_LS_KEY
 const LS_FILTER = 'vpe.settings.dashboard.activeFilter'
-
-export type DashboardViewMode = 'grid' | 'list'
 
 export type DashboardActiveFilter =
   | 'ALL'
@@ -24,17 +21,6 @@ const ALLOWED_FILTERS: DashboardActiveFilter[] = [
   'ARCHIVE',
 ]
 
-function readViewMode(): DashboardViewMode {
-  if (typeof window === 'undefined') return 'grid'
-  try {
-    const v = localStorage.getItem(LS_VIEW)
-    if (v === 'grid' || v === 'list') return v
-  } catch {
-    /* */
-  }
-  return 'grid'
-}
-
 function readActiveFilter(): DashboardActiveFilter {
   if (typeof window === 'undefined') return 'ALL'
   try {
@@ -47,31 +33,15 @@ function readActiveFilter(): DashboardActiveFilter {
 }
 
 /**
- * Persists tactical dashboard layout: grid vs list and status filter pill (incl. ARCHIVE).
+ * Persists tactical dashboard status filter pill (incl. ARCHIVE).
+ * v1.6.9: grid/cinema/compact/list moved to `useVpeUiLayout`.
  */
 export function useDashboardPersistedSettings() {
-  const [viewMode, setVm] = useState<DashboardViewMode>('grid')
   const [activeFilter, setAf] = useState<DashboardActiveFilter>('ALL')
 
   useEffect(() => {
-    setVm(readViewMode())
     setAf(readActiveFilter())
   }, [])
-
-  const setViewMode = useCallback(
-    (next: DashboardViewMode | ((p: DashboardViewMode) => DashboardViewMode)) => {
-      setVm((prev) => {
-        const v = typeof next === 'function' ? next(prev) : next
-        try {
-          localStorage.setItem(LS_VIEW, v)
-        } catch {
-          /* */
-        }
-        return v
-      })
-    },
-    [],
-  )
 
   const setActiveFilter = useCallback(
     (
@@ -91,8 +61,6 @@ export function useDashboardPersistedSettings() {
   )
 
   return {
-    viewMode,
-    setViewMode,
     activeFilter,
     setActiveFilter,
   }

@@ -36,22 +36,31 @@ export function Sandbox() {
     'px-3 py-2.5 hover:bg-[#2a2a2a] hover:no-underline text-left font-sans text-sm text-white [&>svg]:text-[#888888]'
   const accordBody = 'px-3 pb-3 pt-0 text-xs text-[#A0A0A0] leading-relaxed font-sans border-t border-[#2a2a2a]'
 
+  const instructionsShellClass =
+    'rounded-md border border-[#333333] bg-[#161616] overflow-hidden'
+
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-6 py-4 gap-4">
-      <Tabs defaultValue="strategist" className="w-full shrink-0 gap-3">
-        <TabsList className={tabListClass}>
-          <TabsTrigger value="strategist" className={tabTriggerClass}>
-            Strategist
-          </TabsTrigger>
-          <TabsTrigger value="engineer" className={tabTriggerClass}>
-            Engineer
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent
-          value="strategist"
-          className="mt-0 rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3"
-        >
-          <Accordion type="single" collapsible className="w-full space-y-2">
+      <Accordion type="single" collapsible className="w-full shrink-0">
+        <AccordionItem value="instructions" className={instructionsShellClass}>
+          <AccordionTrigger className="border-b border-[#333333] px-3 py-3 hover:bg-[#2a2a2a] hover:no-underline text-left font-sans text-sm font-medium text-white [&>svg]:text-[#888888] data-[state=open]:border-b-0">
+            Instructions
+          </AccordionTrigger>
+          <AccordionContent className="border-t border-[#2a2a2a] bg-[#161616] px-3 pb-3 pt-3">
+            <Tabs defaultValue="strategist" className="w-full gap-3">
+              <TabsList className={tabListClass}>
+                <TabsTrigger value="strategist" className={tabTriggerClass}>
+                  Strategist
+                </TabsTrigger>
+                <TabsTrigger value="engineer" className={tabTriggerClass}>
+                  Engineer
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent
+                value="strategist"
+                className="mt-0 rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3"
+              >
+                <Accordion type="single" collapsible className="w-full space-y-2">
             <AccordionItem value="step-prime" className={accordItem}>
               <AccordionTrigger className={accordTrigger}>
                 Step 1: The Brain Bank (Prime)
@@ -100,12 +109,12 @@ export function Sandbox() {
                 </p>
               </AccordionContent>
             </AccordionItem>
-          </Accordion>
-        </TabsContent>
-        <TabsContent
-          value="engineer"
-          className="mt-0 rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3"
-        >
+                </Accordion>
+              </TabsContent>
+              <TabsContent
+                value="engineer"
+                className="mt-0 rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3"
+              >
           <p className="text-[10px] text-[#888888] uppercase tracking-[0.12em] mb-2 font-sans">
             Technical workflow
           </p>
@@ -154,9 +163,12 @@ export function Sandbox() {
                 </p>
               </AccordionContent>
             </AccordionItem>
-          </Accordion>
-        </TabsContent>
-      </Tabs>
+                </Accordion>
+              </TabsContent>
+            </Tabs>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <p className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.12em] shrink-0">
         VPE Sandbox — Studio Dark preview (#121212)

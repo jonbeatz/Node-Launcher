@@ -1,4 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
+const {
+  msc_registerVpeVaultPrivilegedScheme,
+  msc_registerVpeVaultProtocolHandler,
+} = require('./vpe-vault-protocol');
 const path = require('path');
 const fs = require('fs');
 const isDev = require('electron-is-dev');
@@ -15,6 +19,7 @@ const {
 const { msc_archiveLegacyProjectsJson } = require('./legacy-projects-archive');
 const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile');
 const { msc_startGhostWatcher } = require('./vpe-orchestrator');
+const { msc_rendererVaultThumbnailHref } = require('./vpe-thumbnail-url');
 
 // Vader Protocol: Remote debugging for MCP / Playwright CDP (override with VPE_REMOTE_DEBUG_PORT).
 const MSC_VPE_REMOTE_DEBUG_PORT = String(
@@ -62,7 +67,7 @@ function msc_ipcLegacyProjectRows(store) {
     detectedPackageManager: row.pkg_manager,
     preferredPort: row.port,
     status: row.status,
-    lastThumbnail: row.thumbnail_url,
+    lastThumbnail: msc_rendererVaultThumbnailHref(row, null) ?? row.thumbnail_url ?? null,
   }));
 }
 
@@ -177,6 +182,9 @@ function msc_configureWritablePaths() {
   }
 }
 msc_configureWritablePaths();
+
+/** v1.7.6 — before `ready`; pairs with `msc_registerVpeVaultProtocolHandler` on startup. */
+msc_registerVpeVaultPrivilegedScheme();
 
 /**
  * Window / taskbar icon: dev → repo `media/icon.ico` (matches electron-builder `win.icon`);
@@ -313,7 +321,20 @@ function msc_createWindow() {
   msc_attachEngineAfterWindow(mainWindow);
 
   if (isDev) {
-    mainWindow.webContents.openDevTools();
+    /** DevTools never auto-open (avoids disconnect overlay). Toggle with Ctrl+Shift+I only. */
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown') return;
+      const win = mainWindow;
+      if (!win || win.isDestroyed()) return;
+      const keyI =
+        input.key === 'I' ||
+        input.key === 'i' ||
+        input.code === 'KeyI';
+      if (input.control && input.shift && keyI) {
+        win.webContents.toggleDevTools();
+        event.preventDefault();
+      }
+    });
 
     let mscDevLoadRetries = 0;
     const MSC_DEV_FAIL_RELOAD_MAX = 50;
@@ -467,7 +488,14 @@ app.on('will-finish-launching', () => {
   }
 });
 
-app.on('ready', msc_createWindow);
+app.on('ready', () => {
+  try {
+    msc_registerVpeVaultProtocolHandler(() => msc_getDatabase());
+  } catch (e) {
+    console.error('[VPE]', 'vpe-vault protocol registration failed', e?.message ?? e);
+  }
+  msc_createWindow();
+});
 
 app.on('before-quit', () => {
   msc_vpeAppQuitting = true;

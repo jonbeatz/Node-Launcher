@@ -6,7 +6,7 @@
 
 - **Start of day:** Open this file, tick the **Session verification** section, then skim **Quick mental model**.
 - **New agent / fresh chat:** Paste or `@`-reference this file so the model loads the index; then point at a task.
-- **New session + project setup (agents):** On **Start Project** (or equivalent), follow **[Start-Project.md](../prompts/Start-Project.md)** for the canonical paste block + numbered steps—or after reading §1 here, **run start API**: from repo root, **`.\vpe-start-api.ps1`** ([API-SetUp-Master.md](API-SetUp-Master.md)). Do this **early**—before relying on overrides / model routing. Confirm **`[VPE STANDBY]`** then **Uvicorn** on **4000** (**API is Live**). Summarize **[VADER_STATION_LOG.md](../../VADER_STATION_LOG.md)**. If **`.\google-api\gcp_key.json`** is missing, note **blocked**; do not guess credentials.
+- **New session + project setup (agents):** On **Start Project** (or equivalent), follow **[Start-Project.md](../prompts/Start-Project.md)** for the canonical paste block + numbered steps—or after reading §1 here, **run start API**: from repo root in a **Cursor integrated terminal split pane**, **`.\vpe-start-api.ps1`** ([API-SetUp-Master.md](API-SetUp-Master.md)); in **another** pane run **`ngrok http 4000`** globally (**v1.7.7** *API-setup* ritual: **ngrok** on **User PATH**, split panes only — **not** VPE Electron **`package.json`** semver; **no** `.\ngrok.exe` / repo cwd required). **No** external windows. Do this **early**—before relying on overrides / model routing. Confirm **`[VPE STANDBY]`** then **Uvicorn** on **4000** (**API is Live**). Summarize **[VADER_STATION_LOG.md](../../VADER_STATION_LOG.md)**. If **`.\google-api\gcp_key.json`** is missing, note **blocked**; do not guess credentials.
 - **Deep work:** This file is an **index**, not a copy of the Constitution—follow the **read order** below when anything seems ambiguous.
 
 ---
@@ -38,11 +38,11 @@ If sources disagree, follow this order (**highest wins first**):
 | **Persistence** | Canonical store under **`app.getPath('userData')/vpe-db`** (SQLite/JSON); thumbnails under **`userData` media**. Legacy `projects.json` may be migrated/archived. |
 | **E2E / CI** | Playwright, Chromium; **`CI=true`** for deterministic bind—see [../../playwright.config.ts](../../playwright.config.ts) and [.github/workflows/ci.yml](../../.github/workflows/ci.yml). |
 | **Electron debug** | **`npm run dev:main`** uses **`--remote-debugging-port=9222`** — for MCP attach workflows. |
-| **Cursor ↔ Vertex (new session)** | **Start Project** ritual: [Start-Project.md](../prompts/Start-Project.md). Run **`.\vpe-start-api.ps1`** early (**port 4000**, **`.\google-api\`**) — [API-SetUp-Master.md](API-SetUp-Master.md). After **`[VPE STANDBY]`**, confirm Uvicorn on **4000** → **API is Live**. Log summary: **[VADER_STATION_LOG.md](../../VADER_STATION_LOG.md)**. |
+| **Cursor ↔ Vertex (new session)** | **Start Project** ritual: [Start-Project.md](../prompts/Start-Project.md). **`.\vpe-start-api.ps1`** + global **`ngrok http 4000`** in **split integrated terminal panes** (**v1.7.7** = LiteLLM/ngrok runbook — [API-SetUp-Master.md](API-SetUp-Master.md); **shipped VPE** semver = root **`package.json`**). After **`[VPE STANDBY]`**, confirm Uvicorn on **4000** → **API is Live**. Log summary: **[VADER_STATION_LOG.md](../../VADER_STATION_LOG.md)**. |
 | **Managed catalog dev (v1.2.3+)** | **`vpe:toggle-status`** → **`project-runner`**: if **`package.json`** exists and **`node_modules`** missing, runs **`install && dev`** in one shell; IPC may return **`installing`**, **`projectKind: 'v0-prototype'`** when **`components/ui`** is present; first HTTP health probe delay **10s** during bootstrap; UI **INSTALLING** / stop kills the compound process. |
 | **Prompt Vault / Sandbox (v1.3.x)** | Maintenance **Prompt Vault**: accordion templates; **Edit** → **`vpe:update-vault-item`** (**v1.2.9+**); **v1.3.0** collapses **create** behind **+ Create New Master Directive**. **Sandbox:** **react-live** preview; **v1.3.5+** **Strategist** / **Engineer** instructional **Accordions** + **Tabs**. Sidebar/dashboard selection surfaces **`#2a2a2a`** ([VPE-BUILD-PROTOCOL](VPE-BUILD-PROTOCOL.md) Standards). **E2E:** **`npm run test:e2e:electron`**. |
 | **Ghost watcher & dashboard layout (v1.3.2+)** | Main **`msc_startGhostWatcher`** ([`vpe-orchestrator.js`](../../src/main/vpe-orchestrator.js)): ~**60s** tick on **Windows** — **node.exe** **LISTENING** on a catalog port **>** launcher port, **no** row on that port with **`status`** **running** → **`vpe:ghost-detected`** ({ **`ports`**, **`at`** }); clear → **`vpe:ghost-cleared`**. Preload **`subscribeGhostPresence`** → TopBar **Activity** **amber** pulse (open **System Health** / **Scorched Earth**). **Renderer-only prefs:** **`vpe.settings.dashboard.viewMode`** + **`vpe.settings.dashboard.activeFilter`** (**ARCHIVE** included) via **`useDashboardPersistedSettings`**. See [Checkpoint.md](Checkpoint.md) (**Build v1.3.2**). |
-| **Sandbox & Vault (v1.3.3+)** | **v1.6.0:** Dev branch **`VPE-v1.6.x-Dev`** + shipped **`1.6.0`**; catalog **vault** on disk + **journal** (**`notes`** JSON). **v1.5.0:** hygiene + docs alignment (historical milestone). **v1.3.7:** **`asarUnpack`** + **`src/main/pm2-client.js`** (**`msc_getPm2`**) for packaged PM2 / **Stop All**. **v1.3.6:** App settings IPC + boot defaults (**`vpe-ipc.js`**, **`app-settings-modal.tsx`**, **`main.js`**). **v1.3.5:** **VPE Sandbox** nav lives under **Vault** in [`app-sidebar.tsx`](../../src/renderer/components/app-sidebar.tsx); **Strategist** + **Engineer** in [`Sandbox.tsx`](../../src/renderer/components/Sandbox.tsx) use **Radix Accordion** for steps; **+ Add New Project** in [`top-bar.tsx`](../../src/renderer/components/top-bar.tsx). **Prompt Vault** ([`PromptVault.tsx`](../../src/renderer/components/PromptVault.tsx)): optional **`type`** + **[CMD]**/**[DIR]**/**[SNP]**; **Copy** → **Prime AI Assistant**. **CI:** [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) uses **`npm run lint -- --fix || true`**. See [Checkpoint.md](Checkpoint.md) (**Build v1.5.0**). |
+| **Sandbox & Vault (v1.3.3+)** | **Shipped:** read **`package.json`** (doc sync **1.9.6**). **v1.6.x baseline:** Dev branch **`VPE-v1.6.x-Dev`** + catalog **vault** on disk + **journal** (**`notes`** JSON) — [Checkpoint — Build v1.6.0](Checkpoint.md). **v1.9.x dashboard:** cards/list indicators, thumbnail **paperclip**, solid **Play/Stop** — [`VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md). **v1.5.0:** hygiene + docs alignment (historical). **v1.3.7:** **`asarUnpack`** + **`src/main/pm2-client.js`** (**`msc_getPm2`**) for packaged PM2 / **Stop All**. **v1.3.6:** App settings IPC + boot defaults (**`vpe-ipc.js`**, **`app-settings-modal.tsx`**, **`main.js`**). **v1.3.5:** **VPE Sandbox** nav lives under **Vault** in [`app-sidebar.tsx`](../../src/renderer/components/app-sidebar.tsx); **Strategist** + **Engineer** in [`Sandbox.tsx`](../../src/renderer/components/Sandbox.tsx) use **Radix Accordion** for steps; **+ Add New Project** in [`top-bar.tsx`](../../src/renderer/components/top-bar.tsx). **Prompt Vault** ([`PromptVault.tsx`](../../src/renderer/components/PromptVault.tsx)): optional **`type`** + **[CMD]**/**[DIR]**/**[SNP]**; **Copy** → **Prime AI Assistant**. **CI:** [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) uses **`npm run lint -- --fix || true`**. See [Checkpoint.md](Checkpoint.md) (**Build v1.5.0**). |
 | **CPU temperature** | **Removed (v1.1.6+); UI scrub v1.1.7:** no WMI / PowerShell thermal in main; System Health has **no** temperature field. Do not restore without [VPE-BUILD-PROTOCOL.md](VPE-BUILD-PROTOCOL.md) sign-off. |
 
 ---
@@ -59,6 +59,7 @@ Read when you need **“where we are today”** or **exact command sequences**:
 | [**VPE-BUILD-PROTOCOL.md**](VPE-BUILD-PROTOCOL.md) | **Canonical build sequencing** — **`vader:sync`**, **`vader:clean-sync`**, **`vader:dev-to-forge`**, **`vader:post-dev-forge`**, **`&&`**, **`concurrently`**, **`asar`** / **`npmRebuild`**; catalog **managed dev bootstrap** (**v1.2.3**) |
 | [API-SetUp-Master.md](API-SetUp-Master.md) | **LiteLLM + ngrok → Vertex AI**; Cursor Base URL + `master_key`; **post–Cursor-restart reconnect** checklist |
 | [Stability-Fix-Backlog.md](Stability-Fix-Backlog.md) | Packaging, ASAR, winCodeSign, native rebuild, telemetry—**resolved** symptoms |
+| [**THUMBNAIL-IPC-INVESTIGATION.md**](THUMBNAIL-IPC-INVESTIGATION.md) | **RESOLVED (v1.7.6)** — **`vpe-vault:`** protocol handler; historical attempts (**v1.6.9 → v1.7.3**) retained for context |
 
 ---
 
@@ -70,7 +71,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] **Start Project shortcut:** [Start-Project.md](../prompts/Start-Project.md) — operator paste block + agent steps (recommended).
 - [ ] **Read** §1 **Non-negotiable read order** (at least **`.cursorrules`** + this file’s API row in §2).
-- [ ] **Start API** — **`.\vpe-start-api.ps1`** at repo root (PowerShell). Unless already live on **4000**, tick **skipped**. After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000** → **API is Live**. [API-SetUp-Master.md](API-SetUp-Master.md).
+- [ ] **Start API** — In a **Cursor integrated terminal pane** at repo root: **`.\vpe-start-api.ps1`**; in **another** pane: **`ngrok http 4000`** (global PATH). Unless LiteLLM is already live on **4000**, tick **skipped**. After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000** → **API is Live**. [API-SetUp-Master.md](API-SetUp-Master.md).
 - [ ] **Station log** — skim **[VADER_STATION_LOG.md](../../VADER_STATION_LOG.md)** and state one-line status.
 - [ ] Then continue with **Environment** and **Quick smoke** below.
 
@@ -78,7 +79,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 
 - [ ] Repo root: `d:\Cursor_Projectz\Node-Launcher` (or note actual path).
 - [ ] Intended branch matches [Checkpoint.md](Checkpoint.md) (or `git status` is intentional).
-- [ ] VPE Version: **v1.5.0** (see root `package.json` if disputed)
+- [ ] VPE Version: read root **`package.json`** (do not trust this line if it drifts). Thumbnails: **`vpe-vault:`** (**v1.7.6**); handoff doc [THUMBNAIL-IPC-INVESTIGATION.md](THUMBNAIL-IPC-INVESTIGATION.md).
 - [ ] Node matches team expectation (CI uses Node **20**; local may differ—note if so).
 - [ ] **`npm install`** already run after last `package.json` change (`legacy-peer-deps` via [../../.npmrc](../../.npmrc)).
 
@@ -89,7 +90,7 @@ Copy into chat as “done / skipped / blocked” if useful.
 ### Quick smoke
 
 - [ ] **`npm run dev`** → shell loads at **3000**; no unexpected red in main/renderer consoles.
-- [ ] **"start API"** / **Start Project** → **`.\vpe-start-api.ps1`** at repo root; **`.\google-api\gcp_key.json`** + **`.\google-api\litellm_config.yaml`** · **port 4000**. **`[VPE STANDBY]`** then **Uvicorn** on **4000** → **"API is Live"**.
+- [ ] **"start API"** / **Start Project** → **`.\vpe-start-api.ps1`** + global **`ngrok http 4000`** in **split integrated panes** (no external PowerShell windows); **`.\google-api\gcp_key.json`** + **`.\google-api\litellm_config.yaml`** · **port 4000**. **`[VPE STANDBY]`** then **Uvicorn** on **4000** → **"API is Live"**.
 - [ ] Optional: **`CI=true`** + **`npm run test:e2e`** before a big merge (see Custom-Commands).
 
 ### Docs honest?

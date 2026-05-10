@@ -8,7 +8,7 @@ When the operator says **Start Project**, **start project**, **cold session**, o
 
 Paste into a new Agent chat (`@`-attach optional):
 
-> **Start Project.** Initialize per **START-HERE.md** and **AGENT-BOOT-CHECKLIST.md**. §4 **First actions:** run **`.\vpe-start-api.ps1`** from repo root (*Golden Ticket*). Confirm **`[VPE STANDBY]`** in that window and **Uvicorn** on **`http://0.0.0.0:4000`** (Vertex bridge **port 4000**); report **API is Live** when true. Summarize **`VADER_STATION_LOG.md`**. Ready for **VPE-Dev** mission — standing by.
+> **Start Project.** Initialize per **START-HERE.md** and **AGENT-BOOT-CHECKLIST.md**. §4 **First actions:** in **Cursor integrated terminal split panes**, run **`.\vpe-start-api.ps1`** from repo root (*Golden Ticket*) and global **`ngrok http 4000`** in another pane (**v1.7.7** = *API-setup* milestone: integrated terminals only, no external windows — **not** the Electron **`package.json`** semver). Confirm **`[VPE STANDBY]`** and **Uvicorn** on **`http://0.0.0.0:4000`** (Vertex bridge **port 4000**); report **API is Live** when true. Summarize **`VADER_STATION_LOG.md`**. Ready for **VPE-Dev** mission — standing by.
 
 ---
 
@@ -16,7 +16,7 @@ Paste into a new Agent chat (`@`-attach optional):
 
 1. **Load context:** Skim [.cursor/docs/START-HERE.md](../docs/START-HERE.md); read [.cursor/docs/AGENT-BOOT-CHECKLIST.md](../docs/AGENT-BOOT-CHECKLIST.md) §1 (read order), §2 (mental model), §4 (**First actions**). Ensure **`.cursorrules`** / **`SKILL.md`** constraints are respected if in scope.
 
-2. **§4 First actions — API:** From **repo root**, run **`.\vpe-start-api.ps1`** in a terminal unless LiteLLM is **already** listening on **4000** (and ngrok on **4000**) — then report **skipped (already live)**.
+2. **§4 First actions — API:** From **repo root**, in **split integrated terminals**, run **`.\vpe-start-api.ps1`** and global **`ngrok http 4000`** unless LiteLLM is **already** listening on **4000** (and ngrok forwarding **4000**) — then report **skipped (already live)**.
 
 3. **Confirm bridge:** After **`[VPE STANDBY]`** script output, verify **LiteLLM** shows **Uvicorn** on **4000**. closing phrase: **API is Live** once confirmed.
 
@@ -28,6 +28,6 @@ Paste into a new Agent chat (`@`-attach optional):
 
 ## Session hook note
 
-If **Cursor Hooks** **`sessionStart`** is enabled ([`.cursor/hooks.json`](../hooks.json)), a **non-blocking** **`Start-Process`** may already open **`vpe-start-api.ps1`** in a new PowerShell window. Avoid duplicate binds: if port **4000** is in use, report status instead of stacking failures.
+If **Cursor Hooks** **`sessionStart`** is enabled ([`.cursor/hooks.json`](../hooks.json)), a **non-blocking** reminder runs **`start-api.ps1`** (prints split-pane instructions only — **v1.7.5**, no new windows). Avoid duplicate binds: if port **4000** is in use, report status instead of stacking failures.
 
 Secrets: **`.\google-api\gcp_key.json`** — [.cursor/docs/API-SetUp-Master.md](../docs/API-SetUp-Master.md).

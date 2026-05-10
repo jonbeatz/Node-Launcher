@@ -1,6 +1,13 @@
 /** Tactical project type filtering (shields) — used by dashboard + sidebar (v1.2.5+). */
 
-export type VpeTacticalProjectFilter = 'all' | 'v0' | 'electron' | 'web' | 'node'
+export type VpeTacticalProjectFilter =
+  | 'all'
+  | 'v0'
+  | 'electron'
+  | 'web'
+  | 'node'
+  /** v1.8.7 — uncategorized / unknown shields (“Other” in UI). */
+  | 'unknown'
 
 export interface VpeTacticalCounts {
   all: number
@@ -37,6 +44,12 @@ export function msc_applyTacticalProjectFilter<
   T extends { shield_project_type?: string | null },
 >(projects: T[], filter: VpeTacticalProjectFilter): T[] {
   if (filter === 'all') return projects
+  if (filter === 'unknown') {
+    return projects.filter((p) => {
+      const t = (p.shield_project_type ?? 'unknown') as string
+      return !['v0', 'electron', 'web', 'node'].includes(t)
+    })
+  }
   return projects.filter((p) => (p.shield_project_type ?? 'unknown') === filter)
 }
 
@@ -46,7 +59,7 @@ export const VPE_TACTICAL_NAV_META: {
   label: string
   countKey: keyof Pick<
     VpeTacticalCounts,
-    'all' | 'v0' | 'electron' | 'web' | 'node'
+    'all' | 'v0' | 'electron' | 'web' | 'node' | 'unknown'
   >
 }[] = [
   { id: 'all', label: 'All', countKey: 'all' },
@@ -54,4 +67,5 @@ export const VPE_TACTICAL_NAV_META: {
   { id: 'electron', label: 'Desktop Apps', countKey: 'electron' },
   { id: 'web', label: 'Web Engines', countKey: 'web' },
   { id: 'node', label: 'Node', countKey: 'node' },
+  { id: 'unknown', label: 'Other', countKey: 'unknown' },
 ]

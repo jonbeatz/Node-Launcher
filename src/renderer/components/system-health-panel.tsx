@@ -14,7 +14,11 @@ import {
   Stethoscope,
 } from 'lucide-react'
 import { useVpeSystemStats } from '@/hooks/use-vpe-system-stats'
-import { getVpeApi } from '@/lib/vpe-bridge'
+import {
+  getVpeApi,
+  msc_withIpcTimeout,
+  VPE_GET_PROJECTS_TIMEOUT_MS,
+} from '@/lib/vpe-bridge'
 
 interface Warning {
   id: string
@@ -58,7 +62,16 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
   const refreshGhostWarnings = useCallback(async () => {
     const api = getVpeApi()
     if (!api?.getProjects) return
-    const projects = await api.getProjects()
+    let projects
+    try {
+      projects = await msc_withIpcTimeout(
+        api.getProjects(),
+        VPE_GET_PROJECTS_TIMEOUT_MS,
+        'vpe:getProjects',
+      )
+    } catch {
+      return
+    }
     const newWarnings: Warning[] = []
     projects.forEach((p) => {
       if (p.status === 'stopped' && p.health_reachable) {
@@ -414,9 +427,6 @@ export function SystemHealthPanel({ isOpen, onClose }: SystemHealthPanelProps) {
             )}
           </button>
 
-        <p className="font-sans text-[10px] text-[#555555] text-center pt-2">
-          Powered by the MSC Media Engine v1.6.0
-        </p>
         </div>
       </div>
     </>

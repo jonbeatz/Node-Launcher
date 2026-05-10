@@ -10,6 +10,8 @@ export function msc_shieldColorHex(t?: string | null): string {
       return '#4fde82'
     case 'node':
       return '#737373'
+    case 'unknown':
+      return '#00FFFF'
     default:
       return '#f59e0b'
   }
@@ -25,6 +27,8 @@ export function msc_shieldTypeTitle(t?: string | null): string {
       return 'Web (Next/React)'
     case 'node':
       return 'Node'
+    case 'unknown':
+      return 'Other / uncategorized'
     default:
       return 'Unknown manifest'
   }

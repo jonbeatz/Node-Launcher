@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutGrid, List, FolderPlus } from 'lucide-react'
+import { LayoutGrid, List, FolderPlus, Loader2, Grid2x2 } from 'lucide-react'
 import { AppSidebar } from '@/components/app-sidebar';
 import { TopBar } from '@/components/top-bar';
 import { Footer } from '@/components/footer';
@@ -28,6 +28,8 @@ import {
   getVpeApi,
   msc_formatUnknownIPCError,
   msc_rowToDashboardProject,
+  msc_withIpcTimeout,
+  VPE_GET_PROJECTS_TIMEOUT_MS,
 } from '@/lib/vpe-bridge'
 import {
   msc_applyTacticalProjectFilter,
@@ -36,13 +38,21 @@ import {
 } from '@/lib/project-tactical-filter'
 import {
   useDashboardPersistedSettings,
-  VPE_DASHBOARD_VIEW_LS_KEY,
   type DashboardActiveFilter,
 } from '@/state/useSettings'
+import { VpeUiLayoutProvider, useVpeUiLayout } from '@/context/vpe-ui-layout-context'
 import { msc_projectMatchesVaultSearch } from '@/lib/vpe-vault-search'
 
 type FilterType = DashboardActiveFilter
 type NavItem = 'dashboard' | 'maintenance' | 'sandbox' | 'settings'
+
+function msc_dashboardDefaultViewFromSettings(
+  v: unknown,
+): 'cinema' | 'compact' | 'list' {
+  if (v === 'list' || v === 'compact' || v === 'cinema') return v
+  if (v === 'card') return 'cinema'
+  return 'cinema'
+}
 
 interface Project {
   id: string
@@ -80,6 +90,11 @@ interface Project {
   is_archived?: boolean
   notes?: string | null
   vault_has_files?: boolean
+  /** Registry (SQLite v13+); paperclip requires true + vault reference files. */
+  has_documentation?: boolean
+  project_folder_created_at?: string | null
+  project_folder_modified_at?: string | null
+  dev_session_started_at?: string | null
 }
 
 /** Browser fallback when `window.vpeAPI` is unavailable (Next standalone). */
@@ -186,12 +201,8 @@ function DashboardContent() {
   const [clientReady, setClientReady] = useState(false)
   const [projectsReady, setProjectsReady] = useState(false)
   const [activeNav, setActiveNav] = useState<NavItem>('dashboard')
-  const {
-    viewMode,
-    setViewMode,
-    activeFilter,
-    setActiveFilter,
-  } = useDashboardPersistedSettings()
+  const { activeFilter, setActiveFilter } = useDashboardPersistedSettings()
+  const { viewMode, setViewMode } = useVpeUiLayout()
   /** v1.2.5 — tactical shield filter (synced with sidebar + filter nav). */
   const [tacticalProjectFilter, setTacticalProjectFilter] =
     useState<VpeTacticalProjectFilter>('all')
@@ -220,6 +231,8 @@ function DashboardContent() {
   >(null)
   const [nukeLogLines, setNukeLogLines] = useState<string[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  /** v1.8.9 — sidebar Favorites link filters the dashboard to starred projects only. */
+  const [favoriteFilterActive, setFavoriteFilterActive] = useState(false)
   /** v1.2.3 — main auto `install && dev`; cleared when dev output signals or process stops. */
   const [devInstallUiByProject, setDevInstallUiByProject] = useState<
     Record<string, boolean>
@@ -229,6 +242,20 @@ function DashboardContent() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null)
 
   const appliedBootDefaultView = useRef(false)
+  /** v1.6.8 — under 500px window width: force slim list (sidebar snap beside IDE). */
+  const [sidebarNarrow, setSidebarNarrow] = useState(false)
+
+  useEffect(() => {
+    const q = () => setSidebarNarrow(window.innerWidth < 500)
+    q()
+    window.addEventListener('resize', q)
+    return () => window.removeEventListener('resize', q)
+  }, [])
+
+  const effectiveViewMode = sidebarNarrow ? 'list' : viewMode
+  const isCinemaGrid = effectiveViewMode === 'cinema'
+  const isCompactGrid = effectiveViewMode === 'compact'
+  const isGridLayout = isCinemaGrid || isCompactGrid
 
   const refreshProjects = useCallback(async () => {
     const api = getVpeApi()
@@ -237,10 +264,19 @@ function DashboardContent() {
       return
     }
     try {
-      const rows = await api.getProjects()
+      const rows = await msc_withIpcTimeout(
+        api.getProjects(),
+        VPE_GET_PROJECTS_TIMEOUT_MS,
+        'vpe:getProjects',
+      )
       setProjects(rows.map(msc_rowToDashboardProject))
-    } catch {
-      addToast('Failed to load registry', 'error', 'Check SQLite engine in main process')
+    } catch (err: unknown) {
+      addToast(
+        'Failed to load registry',
+        'error',
+        msc_formatUnknownIPCError(err),
+      )
+      setProjects(FALLBACK_PROJECTS)
     }
   }, [addToast])
 
@@ -264,7 +300,7 @@ function DashboardContent() {
     })()
   }, [clientReady, refreshProjects])
 
-  /** v1.6.0 — main `default_view`: card → grid; ignore stale session list when default is card. */
+  /** v1.6.9 — hydrate shell `viewMode` from SQLite `default_view` once per boot. */
   useEffect(() => {
     if (!clientReady || !projectsReady || appliedBootDefaultView.current) return
     const api = getVpeApi()
@@ -278,17 +314,7 @@ function DashboardContent() {
       .then((s) => {
         if (cancelled) return
         appliedBootDefaultView.current = true
-        const dv = s?.default_view
-        if (dv === 'list') {
-          setViewMode('list')
-        } else {
-          try {
-            localStorage.setItem(VPE_DASHBOARD_VIEW_LS_KEY, 'grid')
-          } catch {
-            /* */
-          }
-          setViewMode('grid')
-        }
+        setViewMode(msc_dashboardDefaultViewFromSettings(s?.default_view))
       })
       .catch(() => {
         if (!cancelled) appliedBootDefaultView.current = true
@@ -358,14 +384,16 @@ function DashboardContent() {
       setAddProjectModalOpen(true)
     }
 
-    // Ctrl+1 - Grid View
+    // Ctrl+1 — Cinema, Ctrl+2 — Compact, Ctrl+3 — List
     if (e.ctrlKey && e.key === '1') {
       e.preventDefault()
-      setViewMode('grid')
+      setViewMode('cinema')
     }
-
-    // Ctrl+2 - List View
     if (e.ctrlKey && e.key === '2') {
+      e.preventDefault()
+      setViewMode('compact')
+    }
+    if (e.ctrlKey && e.key === '3') {
       e.preventDefault()
       setViewMode('list')
     }
@@ -436,6 +464,27 @@ function DashboardContent() {
     setSelectedProject(projectName)
     setSelectedProjectId(row?.id ?? '')
   }, [projects])
+
+  useEffect(() => {
+    if (!projects.length) return
+    setSelectedProjectId((prev) => {
+      if (prev && projects.some((p) => p.id === prev)) return prev
+      return projects[0].id
+    })
+    setSelectedProject((prev) => {
+      if (prev && projects.some((p) => p.name === prev)) return prev
+      return projects[0].name
+    })
+  }, [projects])
+
+  const explorerActionTitle = useMemo(() => {
+    const row =
+      (selectedProjectId && projects.find((p) => p.id === selectedProjectId)) ||
+      projects[0]
+    const p = row?.path?.trim()
+    if (!p) return 'Open selected project folder in Explorer'
+    return `Open project folder: ${p}`
+  }, [projects, selectedProjectId])
 
   const handleRepair = (projectName: string) => {
     msc_pickProjectMeta(projectName)
@@ -853,17 +902,30 @@ function DashboardContent() {
 
   const handleOpenExplorer = async () => {
     const api = getVpeApi()
+    const row =
+      (selectedProjectId && projects.find((p) => p.id === selectedProjectId)) ||
+      projects[0]
+    const targetPath = row?.path?.trim()
+    if (!targetPath) {
+      addToast('Explorer', 'warning', 'No project folder available to open.')
+      return
+    }
     if (api?.openExplorer) {
-      const res = await api.openExplorer('D:/Cursor_Projectz/Node-Launcher')
+      const res = await api.openExplorer(targetPath)
       if (!res.ok) {
         addToast('Explorer failed', 'error', res.error)
       }
     } else {
-      addToast('Opening Explorer...', 'info')
+      addToast('Explorer', 'info', 'Run inside Electron to open folders.')
     }
   }
 
   const handleNavigation = (nav: string) => {
+    if (nav === 'favorites-filter') {
+      setFavoriteFilterActive((prev) => !prev)
+      setActiveNav('dashboard')
+      return
+    }
     if (nav === 'settings') {
       setAppSettingsModalOpen(true)
       return
@@ -876,6 +938,7 @@ function DashboardContent() {
         'electron',
         'web',
         'node',
+        'unknown',
       ]
       if (allowed.includes(raw as VpeTacticalProjectFilter)) {
         setTacticalProjectFilter(raw as VpeTacticalProjectFilter)
@@ -886,8 +949,11 @@ function DashboardContent() {
     if (nav.startsWith('favorite:')) {
       const id = nav.slice('favorite:'.length)
       setActiveNav('dashboard')
-      setActiveLogProject(id)
-      setLogDrawerExpanded(true)
+      const row = projects.find((p) => p.id === id)
+      if (row) {
+        setSelectedProjectId(id)
+        setSelectedProject(row.name)
+      }
       return
     }
     if (nav === 'maintenance:vault') {
@@ -944,7 +1010,13 @@ function DashboardContent() {
       )
     }
 
-    return msc_applyTacticalProjectFilter(list, tacticalProjectFilter)
+    list = msc_applyTacticalProjectFilter(list, tacticalProjectFilter)
+
+    if (favoriteFilterActive) {
+      list = list.filter((p) => Boolean(p.is_favorite))
+    }
+
+    return list
   }, [
     projects,
     searchTerm,
@@ -952,6 +1024,7 @@ function DashboardContent() {
     tacticalProjectFilter,
     commandSearchActive,
     commandSearchTerm,
+    favoriteFilterActive,
   ])
 
   // Projects for log drawer (only show projects with logs open)
@@ -973,8 +1046,18 @@ function DashboardContent() {
   if (!clientReady || !projectsReady) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-[#121212]">
-        <div className="font-sans text-sm text-[#A0A0A0] uppercase tracking-[0.08em]">
-          Initializing Vader Project Engine...
+        <div className="flex flex-col items-center gap-4 text-center px-6">
+          <Loader2
+            className="h-10 w-10 text-[#e02b20] animate-spin"
+            aria-hidden
+          />
+          <div className="font-sans text-sm text-[#eaeaea] uppercase tracking-[0.12em]">
+            Syncing…
+          </div>
+          <p className="font-sans text-xs text-[#6a6a6a] max-w-sm leading-relaxed normal-case tracking-normal">
+            Loading project registry from the engine (large vaults may take up to
+            60s).
+          </p>
         </div>
       </div>
     )
@@ -999,6 +1082,7 @@ function DashboardContent() {
           favorites={favorites}
           tacticalActive={tacticalProjectFilter}
           tacticalCounts={tacticalCounts}
+          favoriteFilterActive={favoriteFilterActive}
         />
 
         {/* Main Area */}
@@ -1061,6 +1145,20 @@ function DashboardContent() {
                     <div className="px-6 py-3 flex items-center justify-between gap-4">
                       {/* Left: status filter pills — catalog total lives on TopBar breadcrumb only (v1.3.5). */}
                       <div className="flex flex-wrap items-center gap-2 min-w-0">
+                        {favoriteFilterActive ? (
+                          <>
+                            <span className="inline-flex h-7 items-center rounded border border-[#ffcc00]/35 bg-[#1a1508] px-3 font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[#facc15]">
+                              Viewing Favorites
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setFavoriteFilterActive(false)}
+                              className="h-7 rounded border border-[#444444] bg-[#1c1c1c] px-3 font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[#eaeaea] transition-colors hover:border-[#555555] hover:bg-[#252525] vader-focus"
+                            >
+                              Show All
+                            </button>
+                          </>
+                        ) : null}
                         {FILTERS.map((filter) => (
                           <button
                             key={filter.id}
@@ -1089,32 +1187,39 @@ function DashboardContent() {
                         ) : null}
                       </div>
 
-                      {/* Right: grid / list toggle */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => setViewMode('grid')}
-                          className={`
-                            w-7 h-7 rounded flex items-center justify-center transition-all border border-transparent vader-focus
-                            ${viewMode === 'grid' 
-                              ? 'bg-[#2a2a2a] text-white border-[#444444]' 
-                              : 'bg-transparent text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]/50'
-                            }
-                          `}
-                        >
-                          <LayoutGrid size={16} />
-                        </button>
-                        <button
-                          onClick={() => setViewMode('list')}
-                          className={`
-                            w-7 h-7 rounded flex items-center justify-center transition-all border border-transparent vader-focus
-                            ${viewMode === 'list' 
-                              ? 'bg-[#2a2a2a] text-white border-[#444444]' 
-                              : 'bg-transparent text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]/50'
-                            }
-                          `}
-                        >
-                          <List size={16} />
-                        </button>
+                      {/* Right: unified view mode (v1.6.9) */}
+                      <div
+                        className="flex flex-wrap items-center justify-end gap-1 shrink-0"
+                        role="group"
+                        aria-label="Dashboard view mode"
+                      >
+                        {(
+                          [
+                            { mode: 'cinema' as const, label: 'CINEMA', Icon: LayoutGrid },
+                            { mode: 'compact' as const, label: 'COMPACT', Icon: Grid2x2 },
+                            { mode: 'list' as const, label: 'LIST', Icon: List },
+                          ] as const
+                        ).map(({ mode, label, Icon }) => {
+                          const active = effectiveViewMode === mode
+                          return (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => setViewMode(mode)}
+                              className={`
+                                flex h-7 items-center gap-1.5 rounded border border-transparent px-2.5 font-sans text-[10px] font-medium uppercase tracking-wide transition-all duration-200 vader-focus
+                                ${active
+                                  ? 'bg-[#2a2a2a] text-white border-[#444444]'
+                                  : 'bg-transparent text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a]/50'
+                                }
+                              `}
+                              title={`${label} view`}
+                            >
+                              <Icon size={14} className="shrink-0 opacity-90" />
+                              <span className="hidden min-[420px]:inline">{label}</span>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
 
@@ -1133,6 +1238,7 @@ function DashboardContent() {
                     onStopAll={handleStopAll}
                     onRefreshAll={handleRefreshAll}
                     onOpenExplorer={handleOpenExplorer}
+                    explorerActionTitle={explorerActionTitle}
                   />
 
                   {/* Project Content */}
@@ -1183,18 +1289,14 @@ function DashboardContent() {
                           </>
                         )}
                       </div>
-                    ) : viewMode === 'grid' ? (
-                      /* Grid View */
+                    ) : isGridLayout ? (
+                      /* Cinema / compact grid */
                       <motion.div
-                        key={tacticalProjectFilter}
+                        key={`${tacticalProjectFilter}-${effectiveViewMode}`}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.22 }}
-                        className="grid gap-5"
-                        style={{
-                          gridTemplateColumns:
-                            'repeat(auto-fill, minmax(380px, 1fr))',
-                        }}
+                        className={`transition-[gap] duration-200 ease-out ${isCompactGrid ? 'vpe-grid-compact' : 'vpe-grid-cinema'}`}
                       >
                         <AnimatePresence mode="popLayout">
                           {filteredProjects.map((project) => (
@@ -1205,48 +1307,54 @@ function DashboardContent() {
                               animate={{ opacity: 1 }}
                               exit={{ opacity: 0 }}
                               transition={{ duration: 0.18 }}
+                              className="transition-all duration-200 ease-out"
                             >
-                          <Msc_ProjectCard
-                            id={project.id}
-                            name={project.name}
-                            port={project.port}
-                            uptime={project.uptime}
-                            status={project.status}
-                            health_http_code={project.health_http_code}
-                            health_checked_at={project.health_checked_at}
-                            health_reachable={project.health_reachable}
-                            isFavorite={project.is_favorite}
-                            node_modules_missing={project.node_modules_missing}
-                            onToggleFavorite={() => handleToggleFavorite(project.id)}
-                            thumbnailUrl={
-                              project.thumbnail_url ?? undefined
-                            }
-                            hasBuilt={project.hasBuilt}
-                            onStart={() => void handleToggleStatus(project.id)}
-                            onStop={() => void handleToggleStatus(project.id)}
-                            onInstallAndStart={() => void handleInstallAndStart(project.id)}
-                            onBuild={() => void handleRunBuild(project.id)}
-                            onLogs={() => handleLogs(project.id)}
-                            onViewErrorConsole={() => handleLogs(project.id)}
-                            onRepair={() => handleRepair(project.name)}
-                            onNuke={() => handleNuke(project.name)}
-                            onSettings={() => handleSettings(project.name)}
-                            onUnregister={() => handleUnregister(project.name)}
-                            onContextMenu={(e) => handleContextMenu(e, project.id)}
-                            onOpenInBrowser={() =>
-                              void handleOpenProjectUrl(project.id)
-                            }
-                            devInstallInProgress={Boolean(
-                              devInstallUiByProject[project.id],
-                            )}
-                            shieldProjectType={
-                              project.shield_project_type ?? 'unknown'
-                            }
-                            hasDocumentationReferences={
-                              (project.notes?.trim().length ?? 0) > 0 ||
-                              Boolean(project.vault_has_files)
-                            }
-                          />
+                              <Msc_ProjectCard
+                                id={project.id}
+                                name={project.name}
+                                isCompact={isCompactGrid}
+                                projectPath={project.path}
+                                project_folder_created_at={
+                                  project.project_folder_created_at
+                                }
+                                project_folder_modified_at={
+                                  project.project_folder_modified_at
+                                }
+                                port={project.port}
+                                status={project.status}
+                                devSessionStartedAt={project.dev_session_started_at ?? null}
+                                health_http_code={project.health_http_code}
+                                health_checked_at={project.health_checked_at}
+                                health_reachable={project.health_reachable}
+                                isFavorite={project.is_favorite}
+                                node_modules_missing={project.node_modules_missing}
+                                onToggleFavorite={() => handleToggleFavorite(project.id)}
+                                thumbnailUrl={
+                                  project.thumbnail_url ?? undefined
+                                }
+                                hasBuilt={project.hasBuilt}
+                                onStart={() => void handleToggleStatus(project.id)}
+                                onStop={() => void handleToggleStatus(project.id)}
+                                onInstallAndStart={() => void handleInstallAndStart(project.id)}
+                                onBuild={() => void handleRunBuild(project.id)}
+                                onLogs={() => handleLogs(project.id)}
+                                onViewErrorConsole={() => handleLogs(project.id)}
+                                onCardInteraction={() => msc_pickProjectMeta(project.name)}
+                                onSettings={() => handleSettings(project.name)}
+                                onUnregister={() => handleUnregister(project.name)}
+                                onContextMenu={(e) => handleContextMenu(e, project.id)}
+                                onOpenInBrowser={() =>
+                                  void handleOpenProjectUrl(project.id)
+                                }
+                                devInstallInProgress={Boolean(
+                                  devInstallUiByProject[project.id],
+                                )}
+                                shieldProjectType={
+                                  project.shield_project_type ?? 'unknown'
+                                }
+                                vaultHasReferenceFiles={Boolean(project.vault_has_files)}
+                                isSelected={selectedProjectId === project.id}
+                              />
                             </motion.div>
                           ))}
                         </AnimatePresence>
@@ -1255,6 +1363,8 @@ function DashboardContent() {
                       /* List View */
                       <ProjectListView
                         projects={filteredProjects}
+                        explorerTargetId={selectedProjectId}
+                        listVariant={sidebarNarrow ? 'slim' : 'default'}
                         selectedIds={selectedIds}
                         onSelectProject={(id, selected) => {
                           setSelectedIds(prev => selected ? [...prev, id] : prev.filter(x => x !== id))
@@ -1265,13 +1375,8 @@ function DashboardContent() {
                         onToggleStatus={handleToggleStatus}
                         onBuild={(id) => void handleRunBuild(id)}
                         onLogs={handleLogs}
-                        onRepair={(id) => {
-                          const project = projects.find(p => p.id === id)
-                          if (project) handleRepair(project.name)
-                        }}
-                        onNuke={(id) => {
-                          const project = projects.find(p => p.id === id)
-                          if (project) handleNuke(project.name)
+                        onProjectRowFocus={(_id, name) => {
+                          msc_pickProjectMeta(name)
                         }}
                         onSettings={(id) => {
                           const project = projects.find(p => p.id === id)
@@ -1502,14 +1607,9 @@ function DashboardContent() {
           try {
             await refreshProjects()
             setSettingsModalOpen(false)
-            addToast(
-              'Settings saved',
-              'success',
-              'Detection refreshed from package.json',
-            )
-    } catch {
-      addToast('Save failed', 'error', 'Save failed')
-    }
+          } catch (err: unknown) {
+            addToast('Save failed', 'error', msc_formatUnknownIPCError(err))
+          }
         }}
         onDelete={() => {
           setSettingsModalOpen(false)
@@ -1519,6 +1619,14 @@ function DashboardContent() {
         onCleanModules={() =>
           addToast('Cleaning node_modules…', 'info')
         }
+        onTacticalRepair={() => {
+          setSettingsModalOpen(false)
+          handleRepair(selectedProject)
+        }}
+        onTacticalNuke={() => {
+          setSettingsModalOpen(false)
+          handleNuke(selectedProject)
+        }}
       />
 
       <DeleteConfirmModal
@@ -1531,7 +1639,6 @@ function DashboardContent() {
       <AppSettingsModal
         isOpen={appSettingsModalOpen}
         onClose={() => setAppSettingsModalOpen(false)}
-        onSave={() => addToast('Settings saved', 'success')}
         projects={projects.map((p) => ({ id: p.id, name: p.name }))}
       />
     </div>
@@ -1541,7 +1648,9 @@ function DashboardContent() {
 export default function DashboardPage() {
   return (
     <ToastProvider>
-      <DashboardContent />
+      <VpeUiLayoutProvider>
+        <DashboardContent />
+      </VpeUiLayoutProvider>
     </ToastProvider>
   )
 }

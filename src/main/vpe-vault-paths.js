@@ -9,6 +9,25 @@ const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
 
+/** Internal card thumbnail stored inside each project vault (never mixed with Omni attachments UI). */
+const VPE_VAULT_INTERNAL_THUMB = '_vpe_thumb.png';
+
+/** Placeholder so empty project vault dirs stay materialized (hidden on Windows via `attrib +h`). */
+const VPE_VAULT_KEEP_FILE = '.vpe_keep';
+
+function msc_isVaultKeepFile(fileName) {
+  return String(fileName || '') === VPE_VAULT_KEEP_FILE;
+}
+
+function msc_isVaultInternalThumbBase(fileName) {
+  const b = String(fileName || '').toLowerCase();
+  return (
+    b === '_vpe_thumb.png' ||
+    b === '_vpe_thumb.jpg' ||
+    b === '_vpe_thumb.jpeg'
+  );
+}
+
 /** Sanitized single path segment for vault folder name (registry `name`). */
 function msc_safeVaultFolderName(name) {
   const raw = String(name || 'project')
@@ -107,6 +126,10 @@ function msc_vaultRenameProjectFolder(oldDisplayName, newDisplayName) {
 }
 
 module.exports = {
+  VPE_VAULT_INTERNAL_THUMB,
+  VPE_VAULT_KEEP_FILE,
+  msc_isVaultKeepFile,
+  msc_isVaultInternalThumbBase,
   msc_safeVaultFolderName,
   msc_projectVaultRootDir,
   msc_projectVaultProjectDir,

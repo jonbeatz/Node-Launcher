@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { msc_validateProjectPath } = require('./path-guard');
+const { msc_enrichRowThumbnailForRenderer } = require('./vpe-thumbnail-url');
 
 /**
  * @internal Exported for catalog tooling; primary consumers use {@link msc_detectProjectScripts}.
@@ -102,12 +103,33 @@ function msc_ipcEnrichProjectsRow(row) {
     overrideRaw && msc_allowedShieldType(overrideRaw)
       ? /** @type {'v0'|'electron'|'web'|'node'|'unknown'} */ (overrideRaw)
       : detected_project_type;
-  return {
+
+  /** @type {string | null} */
+  let project_folder_created_at = null;
+  /** @type {string | null} */
+  let project_folder_modified_at = null;
+  try {
+    const root = msc_validateProjectPath(String(row.path));
+    const st = fs.statSync(root);
+    if (st.isDirectory()) {
+      const bt = st.birthtime;
+      const mt = st.mtime;
+      if (bt && !Number.isNaN(bt.getTime())) project_folder_created_at = bt.toISOString();
+      if (mt && !Number.isNaN(mt.getTime())) project_folder_modified_at = mt.toISOString();
+    }
+  } catch (_) {
+    /* path missing or guard */
+  }
+
+  const enriched = {
     ...row,
     node_modules_missing,
     detected_project_type,
     shield_project_type,
+    project_folder_created_at,
+    project_folder_modified_at,
   };
+  return msc_enrichRowThumbnailForRenderer(enriched);
 }
 
 module.exports = {

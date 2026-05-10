@@ -93,7 +93,10 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
   const handlePickThumbnail = async () => {
     if (!window.vpeAPI?.pickThumbnail) return
     try {
-      const href = await window.vpeAPI.pickThumbnail(projectData.id)
+      const href = await window.vpeAPI.pickThumbnail(
+        projectData.id,
+        projectData.name || null,
+      )
       if (!href) return
       setProjectData((prev) => ({ ...prev, thumbnailUrl: href }))
     } catch {

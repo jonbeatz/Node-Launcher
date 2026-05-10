@@ -24,8 +24,7 @@ export function Msc_ProjectFilterNav({
       {VPE_TACTICAL_NAV_META.map((pill) => {
         const isActive = activeFilter === pill.id
         const n = counts[pill.countKey]
-        const dot =
-          pill.id === 'all' ? '#737373' : msc_shieldColorHex(pill.id)
+        const dot = pill.id === 'all' ? '#737373' : msc_shieldColorHex(pill.id)
         return (
           <button
             key={pill.id}
@@ -42,7 +41,11 @@ export function Msc_ProjectFilterNav({
             `}
           >
             <span
-              className="rounded-full shrink-0"
+              className={`rounded-full shrink-0 ${
+                pill.id === 'unknown'
+                  ? 'ring-1 ring-[#00FFFF]/45 shadow-[0_0_6px_rgba(0,255,255,0.2)]'
+                  : ''
+              }`}
               style={{
                 width: 10,
                 height: 10,

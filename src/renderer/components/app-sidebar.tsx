@@ -33,6 +33,8 @@ interface AppSidebarProps {
   /** v1.2.5 tactical filter (mirrors dashboard pills). */
   tacticalActive?: VpeTacticalProjectFilter
   tacticalCounts?: VpeTacticalCounts
+  /** v1.8.9 — dashboard shows starred projects only when true. */
+  favoriteFilterActive?: boolean
 }
 
 export function AppSidebar({
@@ -43,11 +45,11 @@ export function AppSidebar({
   favorites = [],
   tacticalActive = 'all',
   tacticalCounts,
+  favoriteFilterActive = false,
 }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
-  const { engineeringOpen, setEngineeringOpen, vaultOpen, setVaultOpen, favoritesOpen, setFavoritesOpen } =
-    useSidebarAccordionState()
+  const { projectsOpen, setProjectsOpen, vaultOpen, setVaultOpen } = useSidebarAccordionState()
 
   const tc: VpeTacticalCounts = tacticalCounts ?? {
     all: 0,
@@ -66,14 +68,12 @@ export function AppSidebar({
   const vaultTabActive = (tab: MaintenanceTab) =>
     maintenanceActive && maintenanceTab === tab
 
-  const msc_sidebarShieldTint = (
-    tacticalId: VpeTacticalProjectFilter,
-  ): string =>
+  const msc_sidebarShieldTint = (tacticalId: VpeTacticalProjectFilter): string =>
     tacticalId === 'all' ? '#737373' : msc_shieldColorHex(tacticalId)
 
   return (
     <aside
-      className={`vpe-sidebar ${sidebarWidth} h-full flex flex-col bg-[#1c1c1c] border-r border-[#333333] transition-all duration-200 shrink-0`}
+      className={`vpe-sidebar vpe-theme-font ${sidebarWidth} h-full flex flex-col bg-[#1c1c1c] border-r border-[#333333] transition-all duration-200 shrink-0`}
     >
       <div className="p-2 border-b border-[#333333]">
         <button
@@ -89,13 +89,6 @@ export function AppSidebar({
         <div className="space-y-4">
           {/* Dashboard — flat (v1.3.5): full-width Dashboard button; Add lives in TopBar */}
           <div>
-            {!collapsed && (
-              <div className="px-2 mb-2">
-                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
-                  Dashboard
-                </span>
-              </div>
-            )}
             <div className="space-y-2">
               <button
                 type="button"
@@ -117,28 +110,86 @@ export function AppSidebar({
                 title={collapsed ? 'Dashboard' : undefined}
               >
                 <LayoutDashboard size={18} />
-                {!collapsed && <span className="font-sans text-sm font-semibold">Dashboard</span>}
+                {!collapsed && <span className="text-sm font-semibold">Dashboard</span>}
               </button>
             </div>
           </div>
+
+          {collapsed && (
+            <div className="px-1">
+              <button
+                type="button"
+                onClick={() => onNavigate?.('favorites-filter')}
+                onMouseEnter={() => setHoveredItem('favorites-filter')}
+                onMouseLeave={() => setHoveredItem(null)}
+                className={`
+                  w-full flex items-center justify-center rounded p-2 transition-all duration-200 vader-focus
+                  ${
+                    favoriteFilterActive
+                      ? 'bg-[#2a2a2a] text-white'
+                      : hoveredItem === 'favorites-filter'
+                        ? 'bg-[#2a2a2a] text-white'
+                        : 'text-[#A0A0A0] hover:bg-[#2a2a2a] hover:text-white'
+                  }
+                `}
+                title="Favorites — show starred projects only"
+              >
+                <Star size={16} className="text-[#ffcc00] fill-[#ffcc00]" aria-hidden />
+              </button>
+            </div>
+          )}
 
           {!collapsed && (
             <div>
               <button
                 type="button"
-                onClick={() => setEngineeringOpen(!engineeringOpen)}
+                onClick={() => setProjectsOpen(!projectsOpen)}
                 className="w-full px-2 mb-2 flex items-center justify-between group"
               >
-                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left">
-                  Engineering
+                <span className="text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left">
+                  Projects
                 </span>
                 <ChevronDown
                   size={10}
-                  className={`text-[#A0A0A0] transition-transform shrink-0 ${engineeringOpen ? '' : '-rotate-90'}`}
+                  className={`text-[#A0A0A0] transition-transform shrink-0 ${projectsOpen ? '' : '-rotate-90'}`}
                 />
               </button>
-              {engineeringOpen && (
+              {projectsOpen && (
                 <div className="space-y-0.5 pl-1">
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.('favorites-filter')}
+                    onMouseEnter={() => setHoveredItem('favorites-filter')}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    title={`Favorites (${favorites.length})`}
+                    className={`
+                        flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs transition-all duration-200 vader-focus font-sans
+                        ${
+                          favoriteFilterActive
+                            ? 'bg-[#2a2a2a] text-white'
+                            : hoveredItem === 'favorites-filter'
+                              ? 'bg-[#2a2a2a] text-white'
+                              : 'text-[#E8E8E8] hover:bg-[#2a2a2a] hover:text-white'
+                        }
+                      `}
+                  >
+                    <span
+                      className="shrink-0 rounded-full ring-1 ring-black/40"
+                      style={{
+                        width: 10,
+                        height: 10,
+                        backgroundColor: '#ffcc00',
+                      }}
+                      aria-hidden
+                    />
+                    <span className="truncate flex-1 text-left font-medium">Favorites</span>
+                    <span
+                      className="shrink-0 tabular-nums text-[var(--text-muted,#A0A0A0)]"
+                      style={{ fontSize: '0.7rem' }}
+                    >
+                      ({favorites.length})
+                    </span>
+                  </button>
                   {VPE_TACTICAL_NAV_META.map((item) => {
                     const n = tc[item.countKey]
                     const isOn = tacticalActive === item.id
@@ -163,7 +214,11 @@ export function AppSidebar({
                       `}
                       >
                         <span
-                          className="shrink-0 rounded-full"
+                          className={`shrink-0 rounded-full ${
+                            item.id === 'unknown'
+                              ? 'ring-1 ring-[#00FFFF]/50 shadow-[0_0_8px_rgba(0,255,255,0.22)]'
+                              : ''
+                          }`}
                           style={{
                             width: 10,
                             height: 10,
@@ -195,7 +250,7 @@ export function AppSidebar({
                 onClick={() => setVaultOpen(!vaultOpen)}
                 className="w-full px-2 mb-2 flex items-center justify-between group"
               >
-                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left">
+                <span className="text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left">
                   Vault
                 </span>
                 <ChevronDown
@@ -224,7 +279,7 @@ export function AppSidebar({
                   title={collapsed ? 'Prompt Vault' : undefined}
                 >
                   <BookOpen size={18} />
-                  {!collapsed && <span className="font-sans text-sm font-medium">Prompt Vault</span>}
+                  {!collapsed && <span className="text-sm font-medium">Prompt Vault</span>}
                 </button>
                 <button
                   type="button"
@@ -244,7 +299,7 @@ export function AppSidebar({
                   title={collapsed ? 'Repair Logs' : undefined}
                 >
                   <ScrollText size={18} />
-                  {!collapsed && <span className="font-sans text-sm font-medium">Repair Logs</span>}
+                  {!collapsed && <span className="text-sm font-medium">Repair Logs</span>}
                 </button>
                 <button
                   type="button"
@@ -264,51 +319,8 @@ export function AppSidebar({
                   title={collapsed ? 'VPE Sandbox' : undefined}
                 >
                   <FlaskConical size={18} />
-                  {!collapsed && <span className="font-sans text-sm font-medium">VPE Sandbox</span>}
+                  {!collapsed && <span className="text-sm font-medium">VPE Sandbox</span>}
                 </button>
-              </div>
-            )}
-          </div>
-
-          <div>
-            {!collapsed && (
-              <button
-                type="button"
-                onClick={() => setFavoritesOpen(!favoritesOpen)}
-                className="w-full px-2 mb-2 flex items-center justify-between group"
-              >
-                <span className="font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] group-hover:text-white transition-colors text-left flex items-center gap-2">
-                  <Star size={10} className="text-[#ffcc00] fill-[#ffcc00] shrink-0" />
-                  Favorites
-                </span>
-                <ChevronDown
-                  size={10}
-                  className={`text-[#A0A0A0] transition-transform ${favoritesOpen ? '' : '-rotate-90'}`}
-                />
-              </button>
-            )}
-            {(favoritesOpen || collapsed) && (
-              <div className="space-y-1">
-                {favorites.length > 0 ? (
-                  favorites.map((fav) => (
-                    <button
-                      key={fav.id}
-                      onClick={() => onNavigate?.(`favorite:${fav.id}`)}
-                      className="w-full flex items-center gap-3 p-2 rounded text-[#A0A0A0] hover:text-white hover:bg-[#2a2a2a] transition-all vader-focus group"
-                      title={collapsed ? fav.name : undefined}
-                    >
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#333333] group-hover:bg-[#ffcc00] shrink-0" />
-                      {!collapsed && (
-                        <span className="font-sans text-xs truncate text-left">{fav.name}</span>
-                      )}
-                      {collapsed && <Star size={14} className="text-[#ffcc00] fill-[#ffcc00] mx-auto" />}
-                    </button>
-                  ))
-                ) : (
-                  !collapsed && (
-                    <div className="px-2 py-1 text-[10px] text-[#555555] italic">No favorites yet</div>
-                  )
-                )}
               </div>
             )}
           </div>
@@ -331,7 +343,7 @@ export function AppSidebar({
           title={collapsed ? 'Stop All Projects' : undefined}
         >
           <Square size={18} />
-          {!collapsed && <span className="font-sans text-sm font-medium">STOP ALL</span>}
+          {!collapsed && <span className="text-sm font-medium">STOP ALL</span>}
         </button>
       </div>
 
@@ -355,7 +367,7 @@ export function AppSidebar({
           title={collapsed ? 'Settings' : undefined}
         >
           <Settings size={18} />
-          {!collapsed && <span className="font-sans text-sm font-medium">Settings</span>}
+          {!collapsed && <span className="text-sm font-medium">Settings</span>}
         </button>
       </div>
     </aside>

@@ -4,6 +4,8 @@ const { msc_launcherRendererPort } = require('../launcher-port');
 const {
   MSC_VPE_APP_SETTINGS_DEFAULTS,
   msc_normalizeAppSettingsRow,
+  msc_normalizeDefaultView,
+  msc_normalizeFontStyle,
 } = require('../settings-defaults');
 
 /** One-time migrate source; cwd file is archived to media/_vpe_archive after boot. */
@@ -86,6 +88,8 @@ function rowFromTuple(tuple) {
     health_reachable: null,
     is_archived: 0,
     notes: null,
+    dev_session_started_at: null,
+    has_documentation: 1,
   };
 }
 
@@ -110,11 +114,19 @@ class SqlitePersistence {
   }
 
   setProjectRunning(projectId) {
-    this._db.prepare(`UPDATE projects SET status = 'running' WHERE id = ?`).run(projectId);
+    this._db
+      .prepare(
+        `UPDATE projects SET status = 'running', dev_session_started_at = ? WHERE id = ?`,
+      )
+      .run(new Date().toISOString(), projectId);
   }
 
   setProjectStopped(projectId) {
-    this._db.prepare(`UPDATE projects SET status = 'stopped' WHERE id = ?`).run(projectId);
+    this._db
+      .prepare(
+        `UPDATE projects SET status = 'stopped', dev_session_started_at = NULL WHERE id = ?`,
+      )
+      .run(projectId);
   }
 
   setProjectFavorite(projectId, isFavorite) {
@@ -263,7 +275,7 @@ class SqlitePersistence {
         this._db
           .prepare(
             `INSERT INTO settings (id, minimize_to_tray, theme_accent, launch_at_login, auto_start_projects, default_view)
-             VALUES (1, 0, ?, 0, 0, 'card')`,
+             VALUES (1, 0, ?, 0, 0, 'cinema')`,
           )
           .run(MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent);
         return { id: 1, ...msc_normalizeAppSettingsRow({}) };
@@ -283,23 +295,26 @@ class SqlitePersistence {
       this._db
         .prepare(
           `INSERT INTO settings (id, minimize_to_tray, theme_accent, launch_at_login, auto_start_projects, default_view)
-           VALUES (1, 0, ?, 0, 0, 'card')`,
+           VALUES (1, 0, ?, 0, 0, 'cinema')`,
         )
         .run(MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent);
       cur = this._db.prepare(`SELECT * FROM settings WHERE id = 1`).get();
     }
-    const merged = { ...msc_normalizeAppSettingsRow(cur || {}), ...patch };
+    const merged = msc_normalizeAppSettingsRow({ ...(cur || {}), ...patch });
     const minimize = merged.minimize_to_tray ? 1 : 0;
     const launch = merged.launch_at_login ? 1 : 0;
     const autoStart = merged.auto_start_projects ? 1 : 0;
-    const dv = merged.default_view === 'list' ? 'list' : 'card';
+    const dv = msc_normalizeDefaultView(merged.default_view);
     const accent = merged.theme_accent || MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent;
+    const fontStyle = msc_normalizeFontStyle(merged.font_style);
+    const prs = merged.port_range_start;
+    const pre = merged.port_range_end;
     this._db
       .prepare(
-        `UPDATE settings SET minimize_to_tray = ?, theme_accent = ?, launch_at_login = ?, auto_start_projects = ?, default_view = ?
+        `UPDATE settings SET minimize_to_tray = ?, theme_accent = ?, launch_at_login = ?, auto_start_projects = ?, default_view = ?, font_style = ?, port_range_start = ?, port_range_end = ?
          WHERE id = 1`,
       )
-      .run(minimize, accent, launch, autoStart, dv);
+      .run(minimize, accent, launch, autoStart, dv, fontStyle, prs, pre);
     return this.getSettings();
   }
 
@@ -444,6 +459,14 @@ class JsonPersistence {
         p.notes = null;
         changed = true;
       }
+      if (p.dev_session_started_at === undefined) {
+        p.dev_session_started_at = null;
+        changed = true;
+      }
+      if (p.has_documentation === undefined) {
+        p.has_documentation = 1;
+        changed = true;
+      }
     }
     const list = Object.values(this._data.projects);
     for (const p of list) {
@@ -496,6 +519,7 @@ class JsonPersistence {
         health_http_code: null,
         health_checked_at: null,
         health_reachable: null,
+        dev_session_started_at: null,
       };
     }
   }
@@ -538,6 +562,7 @@ class JsonPersistence {
     const p = this._data.projects[projectId];
     if (p) {
       p.status = 'running';
+      p.dev_session_started_at = new Date().toISOString();
       this.save();
     }
   }
@@ -546,6 +571,7 @@ class JsonPersistence {
     const p = this._data.projects[projectId];
     if (p) {
       p.status = 'stopped';
+      p.dev_session_started_at = null;
       this.save();
     }
   }
@@ -718,14 +744,8 @@ class JsonPersistence {
   /** @param {Object.<string, *>} patch */
   updateAppSettings(patch) {
     const cur = msc_normalizeAppSettingsRow(this._data.settings);
-    const merged = { ...cur, ...patch };
-    this._data.settings = {
-      minimize_to_tray: merged.minimize_to_tray,
-      launch_at_login: merged.launch_at_login,
-      auto_start_projects: merged.auto_start_projects,
-      default_view: merged.default_view === 'list' ? 'list' : 'card',
-      theme_accent: merged.theme_accent || MSC_VPE_APP_SETTINGS_DEFAULTS.theme_accent,
-    };
+    const merged = msc_normalizeAppSettingsRow({ ...cur, ...patch });
+    this._data.settings = merged;
     this.save();
     return this.getSettings();
   }
@@ -876,6 +896,50 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
       db.exec(`ALTER TABLE settings ADD COLUMN default_view TEXT NOT NULL DEFAULT 'card'`);
     }
     ver = 9;
+  }
+
+  if (ver < 10) {
+    const sn = msc_sqliteTableColumnNames(db, 'settings');
+    if (!sn.includes('font_style')) {
+      db.exec(
+        `ALTER TABLE settings ADD COLUMN font_style TEXT NOT NULL DEFAULT 'mulish_studio'`,
+      );
+    }
+    ver = 10;
+  }
+
+  if (ver < 11) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('dev_session_started_at')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN dev_session_started_at TEXT`);
+    }
+    ver = 11;
+  }
+
+  if (ver < 12) {
+    let sn = msc_sqliteTableColumnNames(db, 'settings');
+    if (!sn.includes('port_range_start')) {
+      db.exec(
+        `ALTER TABLE settings ADD COLUMN port_range_start INTEGER NOT NULL DEFAULT 3000`,
+      );
+      sn = msc_sqliteTableColumnNames(db, 'settings');
+    }
+    if (!sn.includes('port_range_end')) {
+      db.exec(
+        `ALTER TABLE settings ADD COLUMN port_range_end INTEGER NOT NULL DEFAULT 3020`,
+      );
+    }
+    ver = 12;
+  }
+
+  if (ver < 13) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('has_documentation')) {
+      db.exec(
+        `ALTER TABLE projects ADD COLUMN has_documentation INTEGER NOT NULL DEFAULT 1`,
+      );
+    }
+    ver = 13;
   }
 
   db.pragma(`user_version = ${ver}`);

@@ -7,9 +7,17 @@ interface QuickActionsBarProps {
   onStopAll: () => void
   onRefreshAll: () => void
   onOpenExplorer: () => void
+  /** v1.8.0 — tooltip reflects the resolved project path target */
+  explorerActionTitle?: string
 }
 
-export function QuickActionsBar({ onStartAll, onStopAll, onRefreshAll, onOpenExplorer }: QuickActionsBarProps) {
+export function QuickActionsBar({
+  onStartAll,
+  onStopAll,
+  onRefreshAll,
+  onOpenExplorer,
+  explorerActionTitle = 'Open selected project folder in Explorer',
+}: QuickActionsBarProps) {
   return (
     <div className="flex items-center gap-1 px-6 pb-2">
       <button
@@ -36,7 +44,7 @@ export function QuickActionsBar({ onStartAll, onStopAll, onRefreshAll, onOpenExp
       <button
         onClick={onOpenExplorer}
         className="w-7 h-7 rounded flex items-center justify-center text-[#A0A0A0] hover:text-[#4fde82] hover:bg-[#252525] transition-all vader-focus"
-        title="Open VPE Directory"
+        title={explorerActionTitle}
       >
         <FolderOpen size={14} />
       </button>

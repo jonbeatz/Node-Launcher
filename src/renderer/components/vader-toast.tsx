@@ -9,6 +9,8 @@ interface Toast {
   description?: string
   type?: 'success' | 'error' | 'warning' | 'info'
   action?: { label: string; onClick: () => void }
+  /** Auto-dismiss delay (default 4000ms). */
+  durationMs?: number
 }
 
 interface ToastContextType {
@@ -18,6 +20,7 @@ interface ToastContextType {
     type?: Toast['type'],
     description?: string,
     action?: Toast['action'],
+    durationMs?: number,
   ) => void
   removeToast: (id: string) => void
 }
@@ -32,8 +35,11 @@ export function useToast() {
   return context
 }
 
+const VPE_TOAST_DEDUPE_MS = 1600
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
+  const dedupeRef = useRef<Map<string, number>>(new Map())
 
   const addToast = useCallback(
     (
@@ -41,11 +47,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       type: Toast['type'] = 'info',
       description?: string,
       action?: Toast['action'],
+      durationMs?: number,
     ) => {
+    const key = `${type ?? 'info'}::${title}`
+    const now = Date.now()
+    const last = dedupeRef.current.get(key)
+    if (last !== undefined && now - last < VPE_TOAST_DEDUPE_MS) {
+      return
+    }
+    dedupeRef.current.set(key, now)
+
     const id = Math.random().toString(36).substr(2, 9)
     setToasts(prev => {
       // Max 5 toasts
-      const newToasts = [...prev, { id, title, description, type, action }]
+      const newToasts = [...prev, { id, title, description, type, action, durationMs }]
       if (newToasts.length > 5) {
         return newToasts.slice(-5)
       }
@@ -80,8 +95,12 @@ function ToastContainer({ toasts, onRemove }: { toasts: Toast[]; onRemove: (id: 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
   const [isPaused, setIsPaused] = useState(false)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const remainingRef = useRef(4000)
+  const remainingRef = useRef(toast.durationMs ?? 4000)
   const startTimeRef = useRef(Date.now())
+
+  useEffect(() => {
+    remainingRef.current = toast.durationMs ?? 4000
+  }, [toast.id, toast.durationMs])
 
   useEffect(() => {
     if (isPaused) {
@@ -129,9 +148,9 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="font-sans text-[13px] font-medium text-white">{toast.title}</p>
+        <p className="text-[13px] font-medium text-white">{toast.title}</p>
         {toast.description && (
-          <p className="font-sans text-[11px] text-[#A0A0A0] mt-0.5 break-words">{toast.description}</p>
+          <p className="text-[11px] text-[#A0A0A0] mt-0.5 break-words">{toast.description}</p>
         )}
         {toast.action && (
           <button
@@ -140,7 +159,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
               toast.action?.onClick()
               onRemove(toast.id)
             }}
-            className="mt-2 h-7 px-3 rounded border border-[#4fde82] font-sans text-[11px] font-medium uppercase tracking-wide text-[#4fde82] hover:bg-[#4fde82] hover:text-black transition-colors"
+            className="mt-2 h-7 px-3 rounded border border-[#4fde82] text-[11px] font-medium uppercase tracking-wide text-[#4fde82] hover:bg-[#4fde82] hover:text-black transition-colors"
           >
             {toast.action.label}
           </button>

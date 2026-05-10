@@ -1,5 +1,6 @@
 /**
- * v1.6.0 — Project journal: `notes` column holds JSON `{ v: 1, entries: [...] }` or legacy plain text.
+ * v1.6.0+ — Project journal: `notes` column holds JSON `{ v: 1, entries: [...] }` or legacy plain text.
+ * v1.6.2 — `msc_journalUpdateEntry` edits body text in place; **`at`** timestamp is preserved.
  */
 
 export interface VpeJournalEntry {
@@ -87,4 +88,15 @@ export function msc_journalRemoveEntry(
   id: string,
 ): VpeJournalEntry[] {
   return entries.filter((e) => e.id !== id)
+}
+
+/** Replace text for an entry by `id`; preserves original ISO `at` timestamp. No-op if trimmed text is empty. */
+export function msc_journalUpdateEntry(
+  entries: VpeJournalEntry[],
+  id: string,
+  text: string,
+): VpeJournalEntry[] {
+  const t = text.trim()
+  if (!t) return entries
+  return entries.map((e) => (e.id === id ? { ...e, text: t } : e))
 }

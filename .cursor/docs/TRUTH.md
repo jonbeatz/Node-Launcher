@@ -2,6 +2,8 @@
 
 This document is the **Constitution** of the Vader Project Engine. It serves as the absolute technical source of truth. If any document conflicts with this, **this document wins**.
 
+**Shipped release vs. this title:** The **v2.0** label names the *architecture constitution*, not the npm/Electron semver. **Authoritative shipped patch** is root **`package.json` → `version`** (currently **1.9.6** — re-read the file if disputed). Product/UI deltas: **[`VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md)** · milestone index: [Checkpoint.md — Build v1.9.6](Checkpoint.md).
+
 ## 1. Architectural Integrity
 - **The Vader Shield:** The renderer layer must remain "dumb" regarding the OS. It may only communicate through **`src/preload`** (canonical gate: **`preload.js`**) via **`contextBridge`** — **`nodeIntegration`** off.
 - **Process Survival:** PM2 is the daemon. Closing the Electron UI does NOT kill dev servers unless a "Stop" command is explicitly issued.
