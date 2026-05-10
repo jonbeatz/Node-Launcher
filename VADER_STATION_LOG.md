@@ -4,6 +4,14 @@
 
 ---
 
+## v2.0.0 - THE VADER STATION CORE. Full modular refactor complete. Components: ProjectGrid, StationSidebar, Domain IPC, Schema Guards, and Support Bundle.
+
+**Ship:** **`package.json` `2.0.0`** · preload **`vpeInfo.version`**. **Support:** App Settings → **Database & State** → **Generate Support Bundle** (Desktop JSON: OS/Node/Electron, redacted paths, last 100 unified log lines, PM2 list) · IPC **`vpe:generate-support-bundle`**. **API / ngrok:** only under **`google-api/`** (global **`ngrok`** via User PATH — **`scripts/vpe-verify-ngrok-path.ps1`** is a PATH check, not a second binary).
+
+**`[VPE STANDBY]`** unchanged.
+
+---
+
 ## v2.0.0 Refactor Initiation - Phase A: Documentation Sanitation. Eliminated ghost duplicates to establish a single source of truth.
 
 **Canon paths:** Constitution, build law, boot, and capabilities live only under **`.cursor/docs/core/`**. Runbooks (**`START-HERE.md`**, **`Custom-Commands.md`**, **`Stability.md`**, **`PRD.md`**, **`Checkpoint.md`**) live only under **`.cursor/docs/guides/`**. The **`.cursor/docs/`** directory root retains **adjunct** references only (**`API-SetUp-Master.md`**, **`THUMBNAIL-IPC-INVESTIGATION.md`**, **`Rebuid-Commands.md`**). Retired names: root-level duplicates of core/guides files, **`AGENT-BOOT-CHECKLIST.md`** (use **`core/AGENT-BOOT.md`**), **`Stability-Fix-Backlog.md`** (use **`guides/Stability.md`**).
@@ -15,6 +23,30 @@
 ## v2.0.0 Phase B - Component Decomposition. Extracted ProjectGrid and StationSidebar from page.tsx to improve maintainability.
 
 **Islands:** **`src/renderer/components/dashboard/ProjectGrid.tsx`** — dashboard filters, cinema/compact/list toggle, tactical nav, quick actions, grid/list body. **`src/renderer/components/layout/StationSidebar.tsx`** — thin wrapper over **`AppSidebar`** for composition. **`src/renderer/app/page.tsx`** remains the orchestration shell (state, IPC, modals).
+
+**`[VPE STANDBY]`** unchanged.
+
+---
+
+## v2.0.0 Phase C - IPC Domain Modularization. Split vpe-ipc.js into projects, vault, and system domains for better maintainability.
+
+**`src/main/ipc/`:** **`project-handlers.js`** (registry, CRUD, settings, repair log, catalog, dev toggle/build), **`vault-handlers.js`** (thumbnails, per-project vault files, prompt vault, external URLs, E2E vault copy), **`system-handlers.js`** (diagnostics, scorched-earth, stats, stop-all, terminal IPC, snapshots, explorer/shell, launcher ports, media purge). **`vpe-ipc.js`** builds shared **`ipcCtx`** and registers the three modules during init; boot hard scrub + **`[VPE STANDBY]`** unchanged.
+
+**`[VPE STANDBY]`** unchanged.
+
+---
+
+## v2.0.0 Phase D - Hardening & CI. Gated remote debugging, upgraded CI to include lint/types, and resolved xterm dependency conflicts.
+
+**Security:** Chromium remote-debugging (CDP) is enabled only when **`electron-is-dev`** is true or **`VPE_ALLOW_CDP=1`** is set; packaged apps do not open the CDP port by default. **`npm start`** no longer passes **`--remote-debugging-port`** ( **`dev:main`** still may, for local MCP/Playwright). **CI:** **`.github/workflows/ci.yml`** runs **`npm run lint`**, **`npm run typecheck`** (**`tsc --noEmit`**), **`node --check`** on main/preload/IP domain JS, then **`npm run build:renderer`**. **Deps:** removed legacy **`xterm`** (use **`@xterm/xterm`** when wiring the log terminal); removed **`@vercel/analytics`** (not applicable to the Electron shell).
+
+**`[VPE STANDBY]`** unchanged.
+
+---
+
+## v2.0.0 Phase E - Quality & Schema Safety. Added SQLite migration tests, expanded Playwright smoke tests, and implemented path-redacting logger.
+
+**SQLite:** **`test/fixtures/sqlite-v13-schema.sql`** — structure-only snapshot note for **`user_version = 13`** (incl. **`has_documentation`**). **`test/verify-migrations.js`** + **`npm run test:migrations`** — in-memory DB, shared **`VPE_SQLITE_BASE_DDL`** / **`msc_sqliteMigrateSchemaAndPorts`** from **`persistent-store.js`**. **E2E:** **`e2e/electron/vader-station-heartbeat.spec.ts`** — **`data-testid`** on sidebar + **`ProjectGrid`**, asserts **`[VPE STANDBY]`** in main logs; Electron harness sets **`VPE_ALLOW_CDP=1`** (Phase D gate). **Logger:** **`src/main/lib/logger.js`** — **`INFO` / `WARN` / `ERROR`**, **`msc_redactUserPaths`** (`<USER_PATH>`). **CI:** migration script + **`node --check`** on **`logger.js`**.
 
 **`[VPE STANDBY]`** unchanged.
 

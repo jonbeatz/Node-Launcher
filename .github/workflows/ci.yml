@@ -2,7 +2,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  build:
+  integrity:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,7 +13,20 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
+      - name: Lint (renderer)
+        run: npm run lint
+      - name: Typecheck (renderer)
+        run: npm run typecheck
+      - name: Syntax check (main process + preload)
+        run: |
+          set -e
+          for f in src/main/main.js src/main/vpe-ipc.js src/preload/preload.js src/main/lib/logger.js src/main/lib/support-bundle.js; do
+            node --check "$f"
+          done
+          for f in src/main/ipc/*.js; do
+            node --check "$f"
+          done
+      - name: SQLite migration guard
+        run: npm run test:migrations
       - name: Build Renderer
         run: npm run build:renderer
-      - name: Build Check
-        run: echo "Build verified. Skipping E2E and Lint blocks for high-speed delivery."

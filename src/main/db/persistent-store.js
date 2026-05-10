@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { msc_launcherRendererPort } = require('../launcher-port');
+const { msc_logWarn } = require('../lib/logger');
 const {
   MSC_VPE_APP_SETTINGS_DEFAULTS,
   msc_normalizeAppSettingsRow,
@@ -10,6 +11,54 @@ const {
 
 /** One-time migrate source; cwd file is archived to media/_vpe_archive after boot. */
 const LEGACY_REGISTRY = path.join(process.cwd(), 'projects.json');
+
+/** Final `PRAGMA user_version` after `msc_sqliteMigrateSchemaAndPorts` (v1.9.8: `has_documentation`). */
+const VPE_SQLITE_USER_VERSION = 13;
+
+/**
+ * Initial DDL before incremental migrations (see `msc_sqliteMigrateSchemaAndPorts`).
+ * Kept as one string so tests and `msc_createPersistentStore` share the same source of truth.
+ */
+const VPE_SQLITE_BASE_DDL = `
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        path TEXT NOT NULL,
+        port INTEGER NOT NULL DEFAULT 3000,
+        status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'stopped')),
+        thumbnail_url TEXT,
+        start_script TEXT NOT NULL DEFAULT 'dev',
+        build_script TEXT NOT NULL DEFAULT 'build',
+        pkg_manager TEXT NOT NULL DEFAULT 'npm',
+        is_favorite INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        level TEXT NOT NULL CHECK (level IN ('info', 'warn', 'error')),
+        message TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_logs_project_id ON logs(project_id);
+
+      CREATE TABLE IF NOT EXISTS repair_runs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        project_name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('success', 'partial', 'failed')),
+        description TEXT NOT NULL,
+        files_changed INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_repair_runs_created ON repair_runs(created_at DESC);
+    `;
+
+function msc_sqliteApplyBaseSchema(db) {
+  db.exec(VPE_SQLITE_BASE_DDL);
+}
 
 /**
  * Writable DB directory: `app.getPath("userData")/vpe-db` in Electron (avoids SQLite inside read-only app.asar).
@@ -1003,49 +1052,14 @@ function msc_createPersistentStore() {
     rawDb.pragma('journal_mode = WAL');
     rawDb.pragma('foreign_keys = ON');
 
-    rawDb.exec(`
-      CREATE TABLE IF NOT EXISTS projects (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        path TEXT NOT NULL,
-        port INTEGER NOT NULL DEFAULT 3000,
-        status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'stopped')),
-        thumbnail_url TEXT,
-        start_script TEXT NOT NULL DEFAULT 'dev',
-        build_script TEXT NOT NULL DEFAULT 'build',
-        pkg_manager TEXT NOT NULL DEFAULT 'npm',
-        is_favorite INTEGER NOT NULL DEFAULT 0
-      );
-
-      CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        project_id TEXT NOT NULL,
-        timestamp TEXT NOT NULL,
-        level TEXT NOT NULL CHECK (level IN ('info', 'warn', 'error')),
-        message TEXT NOT NULL,
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_logs_project_id ON logs(project_id);
-
-      CREATE TABLE IF NOT EXISTS repair_runs (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL,
-        project_name TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('success', 'partial', 'failed')),
-        description TEXT NOT NULL,
-        files_changed INTEGER NOT NULL DEFAULT 0
-      );
-      CREATE INDEX IF NOT EXISTS idx_repair_runs_created ON repair_runs(created_at DESC);
-    `);
+    msc_sqliteApplyBaseSchema(rawDb);
 
     msc_sqliteMigrateSchemaAndPorts(rawDb);
     msc_seedSqlite(rawDb);
     storeSingleton = new SqlitePersistence(rawDb);
     console.log('VPE persistence: SQLite (better-sqlite3)');
   } catch (err) {
-    console.warn(
+    msc_logWarn(
       'VPE: SQLite unavailable (Electron/Node ABI or build tools); using JSON store.',
       err?.message ?? err,
     );
@@ -1068,6 +1082,9 @@ function msc_getPersistentStore() {
 module.exports = {
   msc_createPersistentStore,
   msc_getPersistentStore,
+  msc_sqliteApplyBaseSchema,
+  msc_sqliteMigrateSchemaAndPorts,
+  VPE_SQLITE_USER_VERSION,
   /** @deprecated Migrate once at boot, then archived — do not rely on cwd path */
   MSC_LEGACY_PROJECTS_JSON_PATH: LEGACY_REGISTRY,
 };

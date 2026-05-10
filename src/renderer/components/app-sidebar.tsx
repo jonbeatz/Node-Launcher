@@ -73,6 +73,7 @@ export function AppSidebar({
 
   return (
     <aside
+      data-testid="vpe-station-sidebar"
       className={`vpe-sidebar vpe-theme-font ${sidebarWidth} h-full flex flex-col bg-[#1c1c1c] border-r border-[#333333] transition-all duration-200 shrink-0`}
     >
       <div className="p-2 border-b border-[#333333]">

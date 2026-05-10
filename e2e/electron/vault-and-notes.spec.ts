@@ -97,6 +97,7 @@ test.describe.serial('Electron static shell + vault / notes IPC', () => {
         ELECTRON_ENABLE_LOGGING: '1',
         ELECTRON_IS_DEV: '0',
         VPE_E2E: '1',
+        VPE_ALLOW_CDP: '1',
         VPE_E2E_USER_DATA: userDataDir,
         VPE_REMOTE_DEBUG_PORT: String(debugPort),
       },

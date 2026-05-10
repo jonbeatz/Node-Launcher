@@ -1,0 +1,592 @@
+'use strict';
+
+/**
+ * IPC domain: project registry, CRUD, app settings, repair log, catalog, dev toggle/build.
+ *
+ * @typedef {import('../../renderer/types/vpe-ipc.ts').VpeProjectRow} VpeProjectRow
+ * @typedef {import('../../renderer/types/vpe-ipc.ts').Project} Project
+ */
+
+/**
+ * @param {import('electron').IpcMain} ipcMain
+ * @param {Record<string, unknown>} c — built by `msc_registerVpeIpc` (shared IPC context).
+ */
+function msc_registerProjectIpc(ipcMain, c) {
+  const {
+    store,
+    projectRunner,
+    vpeRuntime,
+    msc_emitProjectsUpdated,
+    msc_vpeStopAllEngines,
+    msc_findAvailablePort,
+    msc_assertPortNotReserved,
+    msc_managedPortFloor,
+    MSC_VPE_RENDERER_PORT,
+    msc_applyLoginStartupFromStore,
+    msc_summarizeAppSettingsChanges,
+    msc_summarizeProjectSettingsRowDiff,
+    msc_ipcEnrichProjectsRow,
+    msc_vaultDirHasUserReferenceFiles,
+    msc_validateProjectPath,
+    msc_detectProjectScripts,
+    msc_classifyProjectType,
+    msc_patchPackageJsonStripScriptPorts,
+    msc_allowedShieldType,
+    msc_vaultRenameProjectFolder,
+    msc_remapVaultThumbAfterProjectRename,
+    msc_normalizeThumbnailUrlForPersistence,
+    msc_rowUsesInternalVaultThumbnail,
+    msc_bumpVaultThumbPulse,
+    msc_rendererVaultThumbnailHref,
+    VPE_SYSTEM_REPAIR_PROJECT_ID,
+    VPE_CATALOG_VERSION,
+    msc_rowToCatalogPayload,
+    msc_safeExportBasename,
+    msc_parseCatalogJson,
+    msc_normalizeCatalogProjectType,
+    msc_normalizeCatalogArchived,
+    fs,
+    path,
+    BrowserWindow,
+    dialog,
+    randomUUID,
+  } = c;
+
+  ipcMain.handle('vpe:get-app-settings', () => {
+    try {
+      return typeof store.getSettings === 'function' ? store.getSettings() : {};
+    } catch (e) {
+      console.warn('[VPE ERROR]', 'get-app-settings', e?.message ?? e);
+      return {};
+    }
+  });
+
+  ipcMain.handle('vpe:update-app-settings', (_evt, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('VPE: Invalid app settings payload.');
+    }
+    if (typeof store.updateAppSettings !== 'function') {
+      throw new Error('VPE: updateAppSettings not available on store.');
+    }
+    const before =
+      typeof store.getSettings === 'function' ? store.getSettings() : {};
+    const next = store.updateAppSettings(payload);
+    msc_applyLoginStartupFromStore(store);
+    const changeSummary = msc_summarizeAppSettingsChanges(before, next, payload);
+    return { ok: true, settings: next, changeSummary };
+  });
+
+  ipcMain.handle('vpe:update-setting-launch-startup', (_evt, value) => {
+    const v =
+      value === true ||
+      value === 1 ||
+      value === '1' ||
+      String(value).toLowerCase() === 'true';
+    if (typeof store.updateAppSettings !== 'function') {
+      throw new Error('VPE: updateAppSettings not available on store.');
+    }
+    const before =
+      typeof store.getSettings === 'function' ? store.getSettings() : {};
+    const next = store.updateAppSettings({ launch_at_login: v });
+    msc_applyLoginStartupFromStore(store);
+    const changeSummary = msc_summarizeAppSettingsChanges(before, next, {
+      launch_at_login: v,
+    });
+    return { ok: true, settings: next, changeSummary };
+  });
+
+  ipcMain.handle('vpe:getProjects', () =>
+    store.listProjectsAlphabetical().map((row) => {
+      const enriched = msc_ipcEnrichProjectsRow(row);
+      return {
+        ...enriched,
+        vault_has_files: msc_vaultDirHasUserReferenceFiles(row.name),
+      };
+    }),
+  );
+
+  ipcMain.handle('vpe:get-repair-runs', (_event, limit) => {
+    const n = Number(limit);
+    return typeof store.listRepairRunsDesc === 'function'
+      ? store.listRepairRunsDesc(Number.isFinite(n) && n > 0 ? n : 200)
+      : [];
+  });
+
+  ipcMain.handle('vpe:record-repair-run', (_event, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('VPE: Invalid repair payload');
+    }
+    const projectId = payload.projectId != null ? String(payload.projectId) : '';
+    if (!projectId) throw new Error('VPE: Missing project id');
+    const row =
+      projectId === VPE_SYSTEM_REPAIR_PROJECT_ID ? null : store.getProject(projectId);
+    if (projectId !== VPE_SYSTEM_REPAIR_PROJECT_ID && !row) {
+      throw new Error('VPE: Project not found');
+    }
+    const name =
+      projectId === VPE_SYSTEM_REPAIR_PROJECT_ID
+        ? typeof payload.projectName === 'string' && payload.projectName.trim()
+          ? payload.projectName.trim()
+          : 'VPE System'
+        : typeof payload.projectName === 'string' && payload.projectName.trim()
+          ? payload.projectName.trim()
+          : String(row.name);
+    const st = payload.status;
+    const status =
+      st === 'partial' || st === 'failed' || st === 'success' ? st : 'success';
+    const desc =
+      typeof payload.description === 'string' && payload.description.trim()
+        ? payload.description.trim()
+        : 'Repair apply';
+    let files = Number(payload.filesChanged);
+    if (!Number.isFinite(files) || files < 0) files = 0;
+    const id = randomUUID();
+    const created_at = new Date().toISOString();
+    store.insertRepairRun({
+      id,
+      project_id: projectId,
+      project_name: name,
+      created_at,
+      status,
+      description: desc,
+      files_changed: Math.round(files),
+    });
+    return { ok: true, id };
+  });
+
+  ipcMain.handle('vpe:auto-fix-port', async (_event, projectId) => {
+    if (!projectId) throw new Error('VPE: Missing project id');
+    const row = store.getProject(projectId);
+    if (!row) throw new Error('VPE: Project not found');
+
+    const root = msc_validateProjectPath(row.path);
+    const det = msc_detectProjectScripts(root);
+    const newPort = await msc_findAvailablePort(msc_managedPortFloor(), projectId, det.is_nextjs);
+
+    store.updateProject({
+      id: row.id,
+      name: row.name,
+      path: root,
+      port: msc_assertPortNotReserved(newPort),
+      thumbnail_url: row.thumbnail_url ?? null,
+      start_script: det.start_script,
+      build_script: det.build_script,
+      pkg_manager: det.pkg_manager,
+      project_type: row.project_type ?? null,
+      is_archived:
+        row.is_archived === true ||
+        row.is_archived === 1,
+      notes: row.notes == null || typeof row.notes === 'undefined' ? null : String(row.notes),
+    });
+    msc_emitProjectsUpdated();
+    return { ok: true, port: newPort, start_script: det.start_script };
+  });
+
+  ipcMain.handle('vpe:inspect-project', async (_event, projectPath) => {
+    const root = msc_validateProjectPath(projectPath);
+    const det = msc_detectProjectScripts(root);
+    const project_type = msc_classifyProjectType(root);
+    const suggestedPort = await msc_findAvailablePort(msc_managedPortFloor(), null, det.is_nextjs);
+    return {
+      ok: true,
+      path: root,
+      detection: det,
+      project_type,
+      suggestedPort,
+      reservedPort: MSC_VPE_RENDERER_PORT,
+    };
+  });
+
+  ipcMain.handle('vpe:getLogs', (event, projectId) => {
+    if (!projectId) return [];
+    return store.logsForProjectDesc(projectId, 100);
+  });
+
+  ipcMain.handle('vpe:get-unified-logs', (_event, limit) => {
+    const n = Number(limit);
+    const cap = Number.isFinite(n) && n > 0 ? Math.min(n, 800) : 300;
+    return typeof store.logsRecentAll === 'function'
+      ? store.logsRecentAll(cap)
+      : [];
+  });
+
+  ipcMain.handle('vpe:patch-start-script', async (_event, projectId) => {
+    if (!projectId) throw new Error('VPE: Missing project id');
+    const row = store.getProject(projectId);
+    if (!row) throw new Error('VPE: Project not found');
+    const root = msc_validateProjectPath(row.path);
+    const scriptName = (row.start_script || 'dev').toString();
+    const { previous, next, backupPath } = msc_patchPackageJsonStripScriptPorts(
+      root,
+      scriptName,
+    );
+    msc_emitProjectsUpdated();
+    return { ok: true, previous, next, backupPath, scriptName };
+  });
+
+  /**
+   * Start/stop managed dev. v1.2.3+: missing `node_modules` + `package.json` runs shell
+   * `install && run <start_script>` inside `project-runner` (not `vpe:execute-terminal-command`).
+   * Install bootstrap delays first HTTP health probe to **10s** so the UI/Open flow is not starved.
+   */
+  ipcMain.handle('vpe:toggle-status', async (event, projectId) =>
+    projectRunner.toggleStatus(projectId),
+  );
+
+  ipcMain.handle('vpe:run-build', async (event, projectId) =>
+    projectRunner.runBuild(projectId),
+  );
+
+  ipcMain.handle('vpe:save-settings', (event, payload) => {
+    const {
+      id,
+      name,
+      path: projectPath,
+      port,
+      start_script,
+      build_script,
+      thumbnail_url,
+      project_type: projectTypeIncoming,
+    } = payload;
+    if (!id) throw new Error('VPE: Missing project id');
+
+    const root = msc_validateProjectPath(projectPath);
+    const det = msc_detectProjectScripts(root);
+    const start = (start_script || det.start_script || 'dev').toString();
+    const build = (build_script || det.build_script || 'build').toString();
+
+    let project_type = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'project_type')) {
+      if (
+        projectTypeIncoming == null ||
+        String(projectTypeIncoming).trim() === '' ||
+        String(projectTypeIncoming).trim().toLowerCase() === 'auto'
+      ) {
+        project_type = null;
+      } else {
+        const cand = String(projectTypeIncoming).trim().toLowerCase();
+        project_type = msc_allowedShieldType(cand) ? cand : null;
+      }
+    }
+
+    let is_archived = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'is_archived')) {
+      const v = payload.is_archived;
+      is_archived = v === true || v === 1;
+    }
+
+    let notes = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'notes')) {
+      const n = payload.notes;
+      notes = n == null ? null : String(n);
+    }
+
+    const existingRow = typeof store.getProject === 'function' ? store.getProject(id) : null;
+    const hasThumbPayload = Object.prototype.hasOwnProperty.call(payload, 'thumbnail_url');
+    let savedThumbnail = hasThumbPayload ? thumbnail_url : existingRow?.thumbnail_url ?? null;
+
+    if (existingRow && String(existingRow.name) !== String(name)) {
+      try {
+        msc_vaultRenameProjectFolder(existingRow.name, name);
+      } catch (e) {
+        console.warn(
+          '[VPE]',
+          'vault folder rename on project name change',
+          e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e),
+        );
+      }
+      savedThumbnail = msc_remapVaultThumbAfterProjectRename(
+        savedThumbnail,
+        existingRow.name,
+        name,
+      );
+    }
+
+    if (hasThumbPayload && savedThumbnail != null && typeof savedThumbnail === 'string') {
+      savedThumbnail = msc_normalizeThumbnailUrlForPersistence(
+        { id, name },
+        savedThumbnail,
+      );
+    }
+
+    store.updateProject({
+      id,
+      name,
+      path: root,
+      port: msc_assertPortNotReserved(port),
+      thumbnail_url: savedThumbnail ?? null,
+      start_script: start,
+      build_script: build,
+      pkg_manager: det.pkg_manager,
+      ...(project_type !== undefined ? { project_type } : {}),
+      ...(is_archived !== undefined ? { is_archived } : {}),
+      ...(notes !== undefined ? { notes } : {}),
+    });
+    const updatedRow =
+      typeof store.getProject === 'function' ? store.getProject(id) : null;
+    const changeSummary = msc_summarizeProjectSettingsRowDiff(existingRow, updatedRow);
+    let thumbnail_url_for_renderer = null;
+    if (updatedRow) {
+      if (msc_rowUsesInternalVaultThumbnail(updatedRow)) {
+        msc_bumpVaultThumbPulse(id, Date.now());
+        const again =
+          typeof store.getProject === 'function' ? store.getProject(id) : updatedRow;
+        thumbnail_url_for_renderer = msc_rendererVaultThumbnailHref(again);
+      } else {
+        thumbnail_url_for_renderer =
+          updatedRow.thumbnail_url != null ? String(updatedRow.thumbnail_url) : null;
+      }
+    }
+    msc_emitProjectsUpdated();
+    return {
+      ok: true,
+      detection: det,
+      thumbnail_url_for_renderer,
+      changeSummary,
+    };
+  });
+
+  ipcMain.handle('vpe:add-project', async (event, payload) => {
+    const root = msc_validateProjectPath(payload.path);
+    const det = msc_detectProjectScripts(root);
+    const id = payload.id || randomUUID();
+    const rawPort = payload.port;
+    const portNum =
+      rawPort != null && Number.isFinite(Number(rawPort))
+        ? Number(rawPort)
+        : await msc_findAvailablePort(msc_managedPortFloor(), id, det.is_nextjs);
+
+    let project_type = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'project_type')) {
+      const incoming = payload.project_type;
+      if (
+        incoming == null ||
+        String(incoming).trim() === '' ||
+        String(incoming).trim().toLowerCase() === 'auto'
+      ) {
+        project_type = null;
+      } else {
+        const cand = String(incoming).trim().toLowerCase();
+        project_type = msc_allowedShieldType(cand) ? cand : null;
+      }
+    }
+
+    const thumbNorm = msc_normalizeThumbnailUrlForPersistence(
+      { id, name: payload.name },
+      payload.thumbnail_url ?? null,
+    );
+
+    store.insertProject({
+      id,
+      name: payload.name,
+      path: root,
+      port: msc_assertPortNotReserved(portNum),
+      status: 'stopped',
+      thumbnail_url: thumbNorm ?? null,
+      start_script: det.start_script,
+      build_script: det.build_script,
+      pkg_manager: det.pkg_manager,
+      ...(project_type !== undefined ? { project_type } : {}),
+    });
+    msc_emitProjectsUpdated();
+    return { ok: true, id };
+  });
+
+  ipcMain.handle('vpe:delete-project', (event, projectId) => {
+    if (!projectId) throw new Error('VPE: Missing project id');
+    projectRunner.stopProject(projectId);
+    store.deleteProject(projectId);
+    msc_emitProjectsUpdated();
+    return { ok: true };
+  });
+
+  ipcMain.handle('vpe:catalog-export', async (event, opts) => {
+    const scope = opts && opts.scope === 'single' ? 'single' : 'full';
+    const projectId = opts?.projectId != null ? String(opts.projectId) : '';
+    let rows;
+    if (scope === 'single') {
+      if (!projectId) throw new Error('VPE: Select a project to export.');
+      const row = store.getProject(projectId);
+      if (!row) throw new Error('VPE: Project not found.');
+      rows = [msc_rowToCatalogPayload(row)];
+    } else {
+      rows = store.listProjectsAlphabetical().map(msc_rowToCatalogPayload);
+    }
+    const payload = {
+      vpe_catalog_version: VPE_CATALOG_VERSION,
+      exported_at: new Date().toISOString(),
+      scope,
+      projects: rows,
+    };
+    const win =
+      BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+    const defaultName =
+      scope === 'single' && rows[0]
+        ? `vpe-project-${msc_safeExportBasename(rows[0].name)}.json`
+        : 'vpe-projects-catalog.json';
+    const { canceled, filePath } = await dialog.showSaveDialog(win || undefined, {
+      title: 'Export project catalog',
+      defaultPath: defaultName,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
+    return { ok: true, path: filePath };
+  });
+
+  ipcMain.handle('vpe:catalog-import', async (event, opts) => {
+    const mode = opts && opts.mode === 'replace' ? 'replace' : 'merge';
+    const win =
+      BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = await dialog.showOpenDialog(win || undefined, {
+      title: 'Import project catalog',
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (canceled || !filePaths?.[0]) return { ok: false, canceled: true };
+
+    const text = fs.readFileSync(filePaths[0], 'utf8');
+    const catalogProjects = msc_parseCatalogJson(text);
+    if (mode === 'replace') {
+      await msc_vpeStopAllEngines();
+      if (typeof store.clearEntireRegistry !== 'function') {
+        throw new Error('VPE: Store does not support registry reset.');
+      }
+      store.clearEntireRegistry();
+    }
+
+    const errors = [];
+    let imported = 0;
+    for (const raw of catalogProjects) {
+      try {
+        const id = raw.id != null ? String(raw.id) : randomUUID();
+        const name = String(raw.name || 'Project').trim() || 'Project';
+        const root = msc_validateProjectPath(raw.path);
+        const det = msc_detectProjectScripts(root);
+        let portNum = Number(raw.port);
+        if (!Number.isFinite(portNum) || portNum <= 0) {
+          // eslint-disable-next-line no-await-in-loop
+          portNum = await msc_findAvailablePort(msc_managedPortFloor(), id, det.is_nextjs);
+        }
+        portNum = msc_assertPortNotReserved(portNum);
+        const rawPm = String(raw.pkg_manager || '').toLowerCase();
+        const pkg_manager =
+          rawPm === 'yarn' || rawPm === 'pnpm' || rawPm === 'npm' ? rawPm : det.pkg_manager;
+        const start_script = String(raw.start_script || det.start_script || 'dev');
+        const build_script = String(raw.build_script || det.build_script || 'build');
+        const thumbnail_url =
+          raw.thumbnail_url === undefined || raw.thumbnail_url === null
+            ? null
+            : String(raw.thumbnail_url);
+        const catPt = msc_normalizeCatalogProjectType(raw.project_type);
+        const catArchived =
+          raw.is_archived === undefined
+            ? undefined
+            : msc_normalizeCatalogArchived(raw.is_archived);
+        let catNotes = undefined;
+        if (Object.prototype.hasOwnProperty.call(raw, 'notes')) {
+          const nv = raw.notes;
+          catNotes = nv == null ? null : String(nv);
+        }
+
+        const existing = store.getProject(id);
+        if (mode === 'merge' && existing) {
+          const base = {
+            id,
+            name,
+            path: root,
+            port: portNum,
+            thumbnail_url,
+            start_script,
+            build_script,
+            pkg_manager,
+          };
+          let merged =
+            catPt !== undefined ? { ...base, project_type: catPt } : base;
+          if (catArchived !== undefined) merged = { ...merged, is_archived: catArchived };
+          if (catNotes !== undefined) merged = { ...merged, notes: catNotes };
+          store.updateProject(merged);
+        } else {
+          store.insertProject({
+            id,
+            name,
+            path: root,
+            port: portNum,
+            status: 'stopped',
+            thumbnail_url,
+            start_script,
+            build_script,
+            pkg_manager,
+            project_type: catPt ?? null,
+            is_archived:
+              catArchived !== undefined ? catArchived : false,
+            ...(catNotes !== undefined ? { notes: catNotes } : {}),
+          });
+        }
+        imported += 1;
+      } catch (e) {
+        const msg = e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e);
+        errors.push({ id: raw?.id, message: msg });
+      }
+    }
+    msc_emitProjectsUpdated();
+    return { ok: true, imported, errors };
+  });
+
+  ipcMain.handle('vpe:clear-all-projects', async () => {
+    await msc_vpeStopAllEngines();
+    if (typeof store.clearEntireRegistry !== 'function') {
+      throw new Error('VPE: Store does not support registry reset.');
+    }
+    store.clearEntireRegistry();
+    msc_emitProjectsUpdated();
+    return { ok: true };
+  });
+
+  ipcMain.handle('vpe:open-directory', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select project folder',
+      properties: ['openDirectory'],
+    });
+    if (result.canceled || !Array.isArray(result.filePaths) || !result.filePaths[0]) {
+      return null;
+    }
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle('vpe:nuke-project', async (_event, projectId) => {
+    if (!projectId) throw new Error('VPE: Missing project id');
+    const row = store.getProject(projectId);
+    if (!row) throw new Error('VPE: Project not found');
+    projectRunner.stopProject(projectId);
+    store.setProjectStopped(projectId);
+    msc_emitProjectsUpdated();
+    const pm = vpeRuntime.pm2Manager;
+    if (pm && typeof pm.nukeProject === 'function') {
+      await pm.nukeProject(projectId);
+      msc_emitProjectsUpdated();
+      return { ok: true, id: projectId };
+    }
+    return { ok: true, id: projectId, skipped: 'pm2_unavailable' };
+  });
+
+  ipcMain.handle('vpe:clear-repair-history', async () => {
+    store.clearRepairHistory();
+    return { ok: true };
+  });
+
+  ipcMain.handle('vpe:delete-repair-run', async (_event, repairId) => {
+    if (!repairId) throw new Error('VPE: Missing repair run id');
+    store.deleteRepairRun(repairId);
+    return { ok: true };
+  });
+
+  ipcMain.handle('vpe:set-project-favorite', async (_event, { projectId, isFavorite }) => {
+    if (!projectId) throw new Error('VPE: Missing project id');
+    store.setProjectFavorite(projectId, isFavorite);
+    msc_emitProjectsUpdated();
+    return { ok: true };
+  });
+}
+
+module.exports = { msc_registerProjectIpc };

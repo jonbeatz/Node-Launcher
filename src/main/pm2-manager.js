@@ -160,6 +160,47 @@ class MSC_PM2Manager {
    * Remove or stop PM2 process named `projectId` so it won't fight dashboard spawns.
    * Must not hang when PM2 RPC is down (was causing `vpe:stop-all` "reply was never sent").
    */
+  /**
+   * Support bundle: non-destructive `pm2.list` snapshot (paths redacted upstream).
+   * @returns {Promise<{ ok: boolean; error?: string; processes: Record<string, unknown>[] }>}
+   */
+  async msc_listProcessesForSupport() {
+    const connected = await this.msc_ensureConnected();
+    if (!connected) {
+      return { ok: false, error: 'pm2_not_connected', processes: [] };
+    }
+    return new Promise((resolve) => {
+      try {
+        pm2.list((err, list) => {
+          if (err) {
+            return resolve({
+              ok: false,
+              error: String(err.message || err),
+              processes: [],
+            });
+          }
+          const safe = (Array.isArray(list) ? list : []).map((proc) => ({
+            name: proc?.name,
+            pm_id: proc?.pm_id,
+            status: proc?.pm2_env?.status,
+            cpu: proc?.monit?.cpu,
+            memory: proc?.monit?.memory,
+            pm_cwd: proc?.pm2_env?.pm_cwd,
+            pm_exec_path: proc?.pm2_env?.pm_exec_path,
+            exec_mode: proc?.pm2_env?.exec_mode,
+          }));
+          resolve({ ok: true, processes: safe });
+        });
+      } catch (e) {
+        resolve({
+          ok: false,
+          error: String(e?.message ?? e),
+          processes: [],
+        });
+      }
+    });
+  }
+
   async msc_evictPm2Slot(projectId) {
     const id = String(projectId);
     const connected = await this.msc_ensureConnected();

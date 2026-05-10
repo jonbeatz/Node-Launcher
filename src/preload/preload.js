@@ -125,6 +125,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   purgeLauncherPorts: () => msc_invoke('vpe:purge-launcher-ports'),
   scorchedEarth: () => msc_invoke('vpe:scorched-earth'),
   purgeUnusedMedia: () => msc_invoke('vpe:purge-unused-media'),
+  generateSupportBundle: () => msc_invoke('vpe:generate-support-bundle'),
   runForgeDiagnostics: () => msc_invoke('vpe:run-diagnostics'),
   promptVaultRead: () => msc_invoke('vpe:prompt-vault-read'),
   promptVaultWrite: (data) => msc_invoke('vpe:prompt-vault-write', data),
@@ -138,7 +139,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '1.9.9',
+  version: '2.0.0',
   hardware: '9700x Tuned',
 });
 

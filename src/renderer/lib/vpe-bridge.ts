@@ -353,6 +353,12 @@ export interface VpeApi {
       projectsSynced: number
     }
   }>
+  /** v2.0.0 — redacted JSON diagnostic file on Desktop */
+  generateSupportBundle?: () => Promise<{
+    ok: boolean
+    path?: string
+    error?: string
+  }>
   runForgeDiagnostics?: () => Promise<{
     ok: boolean
     checks: { id: string; ok: boolean; detail?: string }[]

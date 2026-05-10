@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, FolderOpen, Download, Upload, Trash2 } from 'lucide-react'
+import { X, FolderOpen, Download, Upload, Trash2, LifeBuoy } from 'lucide-react'
 import { useToast } from '@/components/vader-toast'
 import { getVpeApi, type VpeAppSettings } from '@/lib/vpe-bridge'
 import { useVpeUiLayout } from '@/context/vpe-ui-layout-context'
@@ -77,6 +77,22 @@ export function AppSettingsModal({
     const n = parseInt(window.localStorage.getItem(VPE_TERM_SCROLL_KEY) || '1000', 10)
     return Number.isFinite(n) ? Math.min(50_000, Math.max(100, n)) : 1000
   })
+
+  const handleGenerateSupportBundle = async () => {
+    const api = getVpeApi()
+    if (!api?.generateSupportBundle) return
+    setDbBusy(true)
+    try {
+      const res = await api.generateSupportBundle()
+      if (res.ok && res.path) {
+        addToast('Support bundle saved', 'success', res.path)
+      } else if (res.error) {
+        addToast('Support bundle failed', 'error', res.error)
+      }
+    } finally {
+      setDbBusy(false)
+    }
+  }
 
   const handleTakeSnapshot = async () => {
     const api = getVpeApi()
@@ -739,6 +755,16 @@ export function AppSettingsModal({
                 >
                   <Upload size={14} />
                   RESTORE STATE SNAPSHOT
+                </button>
+                <button
+                  type="button"
+                  disabled={dbBusy}
+                  onClick={() => void handleGenerateSupportBundle()}
+                  title="Save redacted diagnostics (system, last 100 log lines, PM2) to Desktop"
+                  className="h-9 rounded bg-[#252525] border border-[#333333] text-xs text-[#A0A0A0] hover:text-white hover:border-[#e02b20] active:border-[#e02b20] active:text-[#e02b20] transition-all vader-focus flex items-center justify-center gap-2 disabled:opacity-50 sm:col-span-2"
+                >
+                  <LifeBuoy size={14} className="shrink-0" />
+                  GENERATE SUPPORT BUNDLE
                 </button>
               </div>
             </div>

@@ -113,7 +113,10 @@ export function ProjectGrid({
   onOpenProjectUrl,
 }: ProjectGridProps) {
   return (
-    <>
+    <div
+      data-testid="vpe-project-grid"
+      className="flex flex-col min-h-0 flex-1 w-full"
+    >
       <div className="shrink-0">
         {/* Filter Pills Bar */}
         <div className="px-6 py-3 flex items-center justify-between gap-4">
@@ -364,6 +367,6 @@ export function ProjectGrid({
           />
         )}
       </div>
-    </>
+    </div>
   )
 }

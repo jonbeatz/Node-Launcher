@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## 1. Project Context & Identity
 - **Project Name:** Vader Project Engine (VPE)
-- **Current Version:** follow root **`package.json` `version`** (always re-read the file if disputed). **Docs:** v2.0.0 **Phase A** = single-source paths under **`.cursor/docs/core/`** and **`.cursor/docs/guides/`** (no ghost duplicates at **`.cursor/docs/`** root).
+- **Current Version:** follow root **`package.json` `version`** (always re-read the file if disputed). **v2.0.0 — Vader Station Core:** modular IPC (`src/main/ipc/*`), dashboard islands (`ProjectGrid`, `StationSidebar`), migration guard (`test/verify-migrations.js`), path-redacting logger + Desktop **Support Bundle** (`vpe:generate-support-bundle`). **Docs:** v2.0.0 **Phase A** = single-source paths under **`.cursor/docs/core/`** and **`.cursor/docs/guides/`** (no ghost duplicates at **`.cursor/docs/`** root).
 - **Target Hardware:** AMD Ryzen 9700x / Gigabyte B650 (Optimized for high-performance I/O)
 - **OS Focus:** Windows 11 25H2 (Native optimizations for Defender/Antivirus paths)
 - **Branding:** My Studio Channel (MSC) / Vader Protocol
@@ -44,6 +44,13 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Package Manager Detection:** Check for lock files (`yarn.lock`, `pnpm-lock.yaml`, `package-lock.json`) before defaulting to npm
 - **Puppeteer Lifecycle:** Reuse single headless browser instance; capture thumbnails only after HTTP 200 health check; WebP format; cache across restarts
 - **Log Drawer:** Per-project log segregation via PM2 process ID; stream into dedicated xterm.js instance; support ANSI colors, Ctrl+F search, copy, clear view
+
+### 3.1 v2.0.0 Modular Architecture (Vader Station Core)
+- **Renderer:** **`ProjectGrid`** (`src/renderer/components/dashboard/ProjectGrid.tsx`) — filters, view modes, grid/list body. **`StationSidebar`** wraps **`AppSidebar`** (`src/renderer/components/layout/StationSidebar.tsx`).
+- **Main IPC:** Domain registrars **`src/main/ipc/project-handlers.js`**, **`vault-handlers.js`**, **`system-handlers.js`**; shared context + boot scrub in **`src/main/vpe-ipc.js`**.
+- **Quality / schema:** **`npm run test:migrations`** (in-memory SQLite via store migrations); reference **`test/fixtures/sqlite-v13-schema.sql`**. Playwright heartbeat: **`e2e/electron/vader-station-heartbeat.spec.ts`**.
+- **Support & observability:** **`src/main/lib/logger.js`** (INFO/WARN/ERROR + `<USER_PATH>` redaction). **`src/main/lib/support-bundle.js`** — Desktop JSON diagnostics; **`vpe:generate-support-bundle`** from Settings → **Database & State Actions**.
+- **API assets:** **`ngrok.exe`**, **`vpe-start-api.ps1`**, **`litellm_config.yaml`**, **`gcp_key.json`** — **only** under **`google-api/`** (no second copy at repo root; **`scripts/vpe-verify-ngrok-path.ps1`** only verifies PATH).
 
 ## 4. Active Agency & Recovery Protocols
 - **Fix Local First:** If the local environment breaks, the agent must proactively run recovery commands defined in **`package.json`** (e.g. **`npm run dev`**, **`hardened setup`** per [Custom-Commands.md](.cursor/docs/guides/Custom-Commands.md)) rather than just listing instructions.

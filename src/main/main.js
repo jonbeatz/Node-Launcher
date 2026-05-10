@@ -21,15 +21,22 @@ const { msc_reconcileStaleRunningProjects } = require('./boot-running-reconcile'
 const { msc_startGhostWatcher } = require('./vpe-orchestrator');
 const { msc_rendererVaultThumbnailHref } = require('./vpe-thumbnail-url');
 
-// Vader Protocol: Remote debugging for MCP / Playwright CDP (override with VPE_REMOTE_DEBUG_PORT).
-const MSC_VPE_REMOTE_DEBUG_PORT = String(
-  process.env.VPE_REMOTE_DEBUG_PORT || '9222',
-).replace(/[^\d]/g, '') || '9222';
-app.commandLine.appendSwitch('remote-debugging-port', MSC_VPE_REMOTE_DEBUG_PORT);
-app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
-console.log(
-  `[VPE Main] Remote debugging port enabled on http://127.0.0.1:${MSC_VPE_REMOTE_DEBUG_PORT}`,
-);
+/** CDP / remote debugging: dev-only or explicit opt-in (packaged builds stay closed by default). */
+const MSC_VPE_CDP_ALLOWED = isDev === true || String(process.env.VPE_ALLOW_CDP || '') === '1';
+if (MSC_VPE_CDP_ALLOWED) {
+  const MSC_VPE_REMOTE_DEBUG_PORT = String(
+    process.env.VPE_REMOTE_DEBUG_PORT || '9222',
+  ).replace(/[^\d]/g, '') || '9222';
+  app.commandLine.appendSwitch('remote-debugging-port', MSC_VPE_REMOTE_DEBUG_PORT);
+  app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
+  console.log(
+    `[VPE Main] Remote debugging enabled at http://127.0.0.1:${MSC_VPE_REMOTE_DEBUG_PORT} (dev or VPE_ALLOW_CDP=1)`,
+  );
+} else {
+  console.log(
+    '[VPE Main] Remote debugging disabled (production baseline). Set VPE_ALLOW_CDP=1 to enable CDP for MCP/Playwright.',
+  );
+}
 
 /** v1.6.0 — mute noisy DevTools/socket stderr unless `--verbose` is present; ghost watcher post-reconcile. */
 const MSC_VPE_VERBOSE_LOG = process.argv.includes('--verbose');

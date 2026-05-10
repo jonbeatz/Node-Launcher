@@ -1,6 +1,5 @@
-/* eslint-disable @next/next/no-page-custom-font -- v1.9.9 explicit Inter/Noto/Poppins head links for VPE + Electron */
+/* eslint-disable @next/next/no-page-custom-font -- v2.0.0 explicit Inter/Noto/Poppins head links for VPE + Electron */
 import type { Metadata, Viewport } from 'next'
-import { Analytics } from '@vercel/analytics/next'
 import './vpe-central-palette.css'
 import './globals.css'
 import { VpeRootClientShell } from '@/VpeRootClientShell'
@@ -11,7 +10,7 @@ const vpeCriticalBlockingCss =
 export const metadata: Metadata = {
   title: 'Vader Project Engine',
   description:
-    'Node.js Process Management Dashboard — MSC Media Engine Station Prime v1.9.9',
+    'Node.js Process Management Dashboard — MSC Media Engine Station Prime v2.0.0',
   generator: 'v0.app',
 }
 
@@ -49,7 +48,6 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <VpeRootClientShell>{children}</VpeRootClientShell>
-        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )
