@@ -6,6 +6,16 @@
 
 ## v2.2.0 — Fleet synergy: Silent start, Universal Green, telemetry readouts
 
+**Portable Lock (MOD 23):**
+- Forced all internal application state (userData, cache, session) into the project root at `./vpe-local-data`. 
+- Added startup log verification: `Vader Data Path: .../vpe-local-data`.
+- Ensures total isolation between different VPE instances and dev/prod environments.
+
+**Production Parity & Ghost Containment (MOD 20, 21, 22):**
+- **Quad-Purge:** `clean:dist` now wipes `dist`, `renderer/out`, and root `data` + `vpe-local-data` folders before every build.
+- **AppData Reset:** `clean:appdata` wipes both Roaming and Local AppData to ensure zero carryover of cached projects.
+- **Build Exclusion:** Added `!data` and `!vpe-local-data` to `package.json` build rules. The "Ghost" project is now impossible to bundle.
+
 **Renderer — Cinema & Compact (`Msc_ProjectCard.tsx`):**
 - **Vertical compression (MOD 12):** Replaced loose padding and title margins with a unified `flex-col gap-2` stack. Spacing is now identical between idle and running states when the banner is collapsed.
 - **Studio Readout Field (MOD 12, 14, 16):** All statuses sitting in a dark recessed field (`bg-[#121212]/60`, `border-white/5`, `rounded-[4px]`) with a fixed `min-h-[2.5rem]`.

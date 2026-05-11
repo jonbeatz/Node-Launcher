@@ -71,10 +71,15 @@ function msc_vpeDetectLocalFirstUserData() {
   const portableArgv =
     process.argv.includes('--portable') || String(process.env.VPE_PORTABLE || '') === '1';
   const cwdNodeLauncher = /node[-_]?launcher/i.test(cwd);
-  if (portableArgv || cwdNodeLauncher) {
+  if (portableArgv || cwdNodeLauncher || true) {
     process.env.VPE_LOCAL_USERDATA_ROOT = path.resolve(path.join(cwd, 'vpe-local-data'));
     console.log('[VPE] Local-first userData profile:', process.env.VPE_LOCAL_USERDATA_ROOT);
   }
+  
+  // JEDI_MOD_23: Portable Sync Lock — Force project root for all data
+  const vaderDataPath = path.join(process.cwd(), 'vpe-local-data');
+  app.setPath('userData', vaderDataPath);
+  console.log("Vader Data Path:", app.getPath('userData'));
 }
 msc_vpeDetectLocalFirstUserData();
 
