@@ -216,10 +216,9 @@ When you say **"new git branch"**, I will:
 1. Check changes and commit with an appropriate message.
 2. Push the current branch to remote.
 3. Create/switch to the next versioned branch using this pattern:
-   - `Node-Launcher-v2` … `Node-Launcher-v8` (historical milestones)
-   - **`Node-Launcher-v9`** ← *example “current”* — **always confirm with `git status`**
-   - `Node-Launcher-v10` ← *next increment*
-   - …always bump the trailing version number by **1** when cutting a new integration branch.
+   - **Current convention (v2.1.x line):** `VPE-v2.1.1`, `VPE-v2.1.2`, `VPE-v2.1.3`, … — bump the **last integer** (patch) by **1** each time you cut a new integration branch after commit + push (e.g. `VPE-v2.1.1` → next **`VPE-v2.1.2`**).
+   - **Historical:** `Node-Launcher-v2` … `Node-Launcher-v11` (older milestones; do not resurrect for new work unless restoring history).
+   - **Dev line** (ongoing feature branch): `VPE-v2.1.x-Dev` stays separate from numbered **`VPE-v2.1.N`** integration tags — **always confirm with `git status`** before committing.
 4. Confirm branch is clean and ready as a new starting point.
 
 ## Playwright MCP (aligned with VPE)
