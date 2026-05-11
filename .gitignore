@@ -53,15 +53,14 @@ Thumbs.db
 *.pid
 
 # intentional repo content (keep tracked)
-# - media/icon.ico, media/_vpe_archive/ (if present), vault placeholders (.gitkeep, .vpe_keep)
+# - `.cursor/`, `vpe-backups/`, media/icon.ico, media/_vpe_archive/ (if present), vault placeholders (.gitkeep, .vpe_keep)
 # - media/vault raster assets (.jpg/.jpeg/.png/.webp), vpe-version.lock, and src/main/db/*.sqlite (+ engine JSON) are tracked (operator policy)
-# - _design_references/: layout / UI reference snapshots
+# - _design_references/: layout / UI reference snapshots (see .cursorignore for indexer only)
 
 # Portable dev profile: SQLite + full Chromium userData (Code Cache, Session Storage, …). Never commit.
 vpe-local-data/
 
-# Portable catalog snapshots (`vpe:backup-local-db` / auto-sync on close). Never commit.
-vpe-backups/
+# Repo `.cursor/` (rules, prompts, docs, hooks) and `vpe-backups/` (catalog DB snapshots) are tracked — do not add ignore lines for them here.
 
 .playwright-mcp/
 
