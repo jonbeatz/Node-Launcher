@@ -83,6 +83,13 @@ contextBridge.exposeInMainWorld('vpeAPI', {
     return () =>
       ipcRenderer.removeListener('vpe:projects-updated', listener);
   },
+  /** JEDI_MOD_24 — project auto-restarting via watchdog. */
+  subscribeWatchdogRestart: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('vpe:project-watchdog-restart', listener);
+    return () =>
+      ipcRenderer.removeListener('vpe:project-watchdog-restart', listener);
+  },
   subscribeBootstrapDevVisible: (callback) => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('vpe:bootstrap-dev-visible', listener);

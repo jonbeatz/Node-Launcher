@@ -291,6 +291,8 @@ interface Msc_ProjectCardOwnProps {
   onViewErrorConsole?: () => void
   /** v1.2.3 — dependency auto-install before dev is still running. */
   devInstallInProgress?: boolean
+  /** JEDI_MOD_24 — project auto-restarting via watchdog. */
+  watchdogRestartInProgress?: boolean
   /** v1.2.4 — resolved shield (manual override or auto classifier). */
   shieldProjectType?: VpeShieldProjectType
   /** Vault has user reference files; v1.9.5+ paperclip on thumbnail overlay only. */
@@ -352,6 +354,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
     health_reachable,
     onViewErrorConsole,
     devInstallInProgress,
+    watchdogRestartInProgress,
     shieldProjectType,
     vaultHasReferenceFiles = false,
     isCompact = false,
@@ -440,6 +443,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const primaryBtn = getPrimaryButton()
 
   const getStatusLabel = () => {
+    if (watchdogRestartInProgress) return 'RESTARTING...'
     if (devInstallInProgress && isRunning) return 'INSTALLING'
     if (isRunning) return 'RUNNING'
     if (isError) return 'ERROR'
@@ -504,6 +508,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
 
   /** v1.9.2 — equalizer colors: green if running (Universal Green Protocol); yellow if building. */
   const healthEqualizerClass = (() => {
+    if (watchdogRestartInProgress) return 'text-[#ff7700]'
     if (isBuilding || (devInstallInProgress && isRunning)) return 'text-[#fbbf08]'
     if (isRunning) return 'text-[#22c55e]'
     return 'text-[#9ca3af]'
@@ -647,16 +652,16 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           >
             <span
               className={`block shrink-0 rounded-full border-0 ring-1 ring-white/12 shadow-[0_0_6px_rgba(0,0,0,0.65)] ${
-                isRunning ? 'motion-safe:animate-pulse' : ''
+                isRunning || watchdogRestartInProgress ? 'motion-safe:animate-pulse' : ''
               }`}
               title={dotTitle}
               style={{
                 width: 8,
                 height: 8,
-                backgroundColor: isRunning ? '#4fde82' : dotHex,
+                backgroundColor: watchdogRestartInProgress ? '#ff7700' : isRunning ? '#4fde82' : dotHex,
               }}
             />
-            {isRunning ? (
+            {isRunning || watchdogRestartInProgress ? (
               <span
                 className={`inline-flex size-[14px] shrink-0 items-center justify-center ${healthEqualizerClass}`}
               >
@@ -731,7 +736,16 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
         </div>
 
         <div className="flex h-auto flex-col gap-2 px-2.5 py-1.5">
-          {isRunning && !isStatusExpanded ? (
+          {watchdogRestartInProgress ? (
+            <div className="flex min-h-[2.5rem] w-full shrink-0 items-center justify-between gap-1.5 rounded-[4px] border border-[#ff7700]/30 bg-[#ff7700]/10 px-2 py-1.5">
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className="size-1.5 shrink-0 rounded-full bg-[#ff7700] shadow-[0_0_4px_rgba(255,119,0,0.5)] ring-1 ring-white/15 motion-safe:animate-pulse" aria-hidden />
+                <span className={`${msc_readoutLiveTextCls} text-[#ff7700]`}>
+                  RESTARTING...
+                </span>
+              </div>
+            </div>
+          ) : isRunning && !isStatusExpanded ? (
             <div className="flex min-h-[2.5rem] w-full shrink-0 items-center justify-between gap-1.5 rounded-[4px] border border-white/5 bg-[#121212]/60 px-2 py-1.5">
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 <span className={msc_readoutDotCls} aria-hidden />
@@ -967,16 +981,16 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
         >
           <span
             className={`block shrink-0 rounded-full border-0 ring-1 ring-white/12 shadow-[0_0_8px_rgba(0,0,0,0.65)] ${
-              isRunning ? 'motion-safe:animate-pulse' : ''
+              isRunning || watchdogRestartInProgress ? 'motion-safe:animate-pulse' : ''
             }`}
             title={dotTitle}
             style={{
               width: 10,
               height: 10,
-              backgroundColor: isRunning ? '#4fde82' : dotHex,
+              backgroundColor: watchdogRestartInProgress ? '#ff7700' : isRunning ? '#4fde82' : dotHex,
             }}
           />
-          {isRunning ? (
+          {isRunning || watchdogRestartInProgress ? (
             <span
               className={`inline-flex size-4 shrink-0 items-center justify-center ${healthEqualizerClass}`}
             >
@@ -1053,7 +1067,16 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             </div>
           </div>
 
-          {isRunning && !isStatusExpanded ? (
+          {watchdogRestartInProgress ? (
+            <div className="flex h-auto min-h-[2.5rem] w-full shrink-0 items-center justify-between gap-2 rounded-[4px] border border-[#ff7700]/30 bg-[#ff7700]/10 px-2 py-1.5">
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className="size-1.5 shrink-0 rounded-full bg-[#ff7700] shadow-[0_0_4px_rgba(255,119,0,0.5)] ring-1 ring-white/15 motion-safe:animate-pulse" aria-hidden />
+                <span className={`${msc_readoutLiveTextCls} text-[#ff7700]`}>
+                  RESTARTING...
+                </span>
+              </div>
+            </div>
+          ) : isRunning && !isStatusExpanded ? (
             <div className="flex h-auto min-h-[2.5rem] w-full shrink-0 items-center justify-between gap-2 rounded-[4px] border border-white/5 bg-[#121212]/60 px-2 py-1.5">
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 <span className={msc_readoutDotCls} aria-hidden />

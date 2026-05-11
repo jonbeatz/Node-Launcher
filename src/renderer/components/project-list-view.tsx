@@ -95,6 +95,8 @@ interface ProjectListViewProps {
   onToggleCompact?: () => void
   /** Per-project installing state (npm install embedded in dev start). */
   devInstallByProjectId?: Record<string, boolean>
+  /** JEDI_MOD_24 — project auto-restarting via watchdog. */
+  watchdogRestartByProjectId?: Record<string, boolean>
   /** v1.2.5 — tactical shield filter; animates list on change. */
   tacticalMotionKey?: string
   /** v1.6.8 — narrow window: hide path / HTTP / PKG, tighter rows (sidebar snap). */
@@ -125,6 +127,7 @@ export function ProjectListView({
   onUnregister,
   onOpenInBrowser,
   devInstallByProjectId = {},
+  watchdogRestartByProjectId = {},
   tacticalMotionKey = 'all',
   listVariant = 'default',
   onProjectRowFocus,
@@ -339,18 +342,21 @@ export function ProjectListView({
               const isBuilding = project.status === 'building'
               const hasBuilt = project.hasBuilt !== false
               const isDevInstalling = Boolean(devInstallByProjectId[project.id] && isRunning)
+              const isWatchdogRestarting = Boolean(watchdogRestartByProjectId[project.id])
               const zebra = index % 2 === 0 ? 'bg-[#121212]' : 'bg-[#1c1c1c]'
               const rowBg = isExplorerTarget ? 'bg-[#2a2a2a]' : zebra
               const httpCell = msc_healthCell(project)
-              const statusTitle = isDevInstalling
-                ? 'INSTALLING'
-                : project.status === 'running'
-                  ? 'RUNNING'
-                  : project.status === 'error'
-                    ? 'ERROR'
-                    : project.status === 'building'
-                      ? 'BUILDING'
-                      : 'STOPPED'
+              const statusTitle = isWatchdogRestarting
+                ? 'RESTARTING'
+                : isDevInstalling
+                  ? 'INSTALLING'
+                  : project.status === 'running'
+                    ? 'RUNNING'
+                    : project.status === 'error'
+                      ? 'ERROR'
+                      : project.status === 'building'
+                        ? 'BUILDING'
+                        : 'STOPPED'
 
               return (
                 <tr 
@@ -385,13 +391,17 @@ export function ProjectListView({
                       : '—'}
                   </td>
                   <td className="px-3 text-center">
-                    {isRunning ? (
+                    {isRunning || isWatchdogRestarting ? (
                       <div
-                        className={`inline-flex items-center justify-center mx-auto opacity-90 ${msc_listEqualizerTone(
-                          project,
-                          isDevInstalling,
-                          isBuilding,
-                        )}`}
+                        className={`inline-flex items-center justify-center mx-auto opacity-90 ${
+                          isWatchdogRestarting
+                            ? 'text-[#ff7700]'
+                            : msc_listEqualizerTone(
+                                project,
+                                isDevInstalling,
+                                isBuilding,
+                              )
+                        }`}
                       >
                         <VpeHealthEqualizerIcon size={14} title={statusTitle} />
                       </div>
@@ -466,6 +476,14 @@ export function ProjectListView({
                           className={`${slim ? 'w-6 h-6' : 'w-7 h-7'} rounded flex items-center justify-center bg-[#181818] text-[#ffcc00] cursor-not-allowed`}
                         >
                           <Hammer size={slim ? 12 : 14} className="animate-pulse" />
+                        </button>
+                      ) : isWatchdogRestarting ? (
+                        <button
+                          disabled
+                          title="Watchdog auto-restart in progress..."
+                          className={`${slim ? 'w-6 h-6' : 'w-7 h-7'} rounded flex items-center justify-center bg-[#181818] text-[#ff7700] cursor-not-allowed`}
+                        >
+                          <Loader2 size={slim ? 12 : 14} className="animate-spin" />
                         </button>
                       ) : isDevInstalling ? (
                         <button

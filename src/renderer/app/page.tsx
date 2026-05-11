@@ -179,6 +179,10 @@ function DashboardContent() {
   const [devInstallUiByProject, setDevInstallUiByProject] = useState<
     Record<string, boolean>
   >({})
+  /** JEDI_MOD_24 — project auto-restarting via watchdog. */
+  const [watchdogRestartByProject, setWatchdogRestartByProject] = useState<
+    Record<string, boolean>
+  >({})
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; projectId: string } | null>(null)
@@ -278,6 +282,32 @@ function DashboardContent() {
       }
     })
   }, [clientReady, refreshProjects])
+
+  useEffect(() => {
+    if (!clientReady) return
+    const api = getVpeApi()
+    // JEDI_MOD_24: Listen for watchdog restart events
+    const w = (window as any)
+    if (w.vpeAPI?.subscribeWatchdogRestart) {
+      return w.vpeAPI.subscribeWatchdogRestart((payload: { projectId: string; attempt: number }) => {
+        const { projectId, attempt } = payload
+        setWatchdogRestartByProject(prev => ({ ...prev, [projectId]: true }))
+        addToast(
+          'Auto-restarting project',
+          'warning',
+          `Watchdog detected unexpected exit. Restarting... (Attempt ${attempt}/3)`,
+        )
+        // Clear the restart UI after a short delay
+        setTimeout(() => {
+          setWatchdogRestartByProject(prev => {
+            const next = { ...prev }
+            delete next[projectId]
+            return next
+          })
+        }, 3000)
+      })
+    }
+  }, [clientReady, addToast])
 
   useEffect(() => {
     if (!clientReady) return
@@ -1127,6 +1157,7 @@ function DashboardContent() {
                   compactMode={compactMode}
                   onToggleCompact={() => setCompactMode(!compactMode)}
                   devInstallUiByProject={devInstallUiByProject}
+                  watchdogRestartByProject={watchdogRestartByProject}
                   onAddProject={() => setAddProjectModalOpen(true)}
                   onToggleFavorite={handleToggleFavorite}
                   onToggleStatus={handleToggleStatus}

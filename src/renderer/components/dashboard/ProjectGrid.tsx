@@ -54,6 +54,7 @@ export type ProjectGridProps = {
   compactMode: boolean
   onToggleCompact: () => void
   devInstallUiByProject: Record<string, boolean>
+  watchdogRestartByProject: Record<string, boolean>
   onAddProject: () => void
   onToggleFavorite: (projectId: string) => void
   onToggleStatus: (projectId: string) => void
@@ -100,6 +101,7 @@ export function ProjectGrid({
   compactMode,
   onToggleCompact,
   devInstallUiByProject,
+  watchdogRestartByProject,
   onAddProject,
   onToggleFavorite,
   onToggleStatus,
@@ -316,6 +318,9 @@ export function ProjectGrid({
                   devInstallInProgress={Boolean(
                     devInstallUiByProject[project.id],
                   )}
+                  watchdogRestartInProgress={Boolean(
+                    watchdogRestartByProject[project.id],
+                  )}
                   shieldProjectType={
                     project.shield_project_type ?? 'unknown'
                   }
@@ -355,6 +360,7 @@ export function ProjectGrid({
             compact={compactMode}
             onToggleCompact={onToggleCompact}
             devInstallByProjectId={devInstallUiByProject}
+            watchdogRestartByProjectId={watchdogRestartByProject}
             tacticalMotionKey={tacticalProjectFilter}
           />
         )}

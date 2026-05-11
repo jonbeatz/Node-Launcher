@@ -13,7 +13,7 @@ const {
 const LEGACY_REGISTRY = path.join(process.cwd(), 'projects.json');
 
 /** Final `PRAGMA user_version` after `msc_sqliteMigrateSchemaAndPorts` (v2.1.x: `sort_order`, `auto_sync_db_on_close`). */
-const VPE_SQLITE_USER_VERSION = 15;
+const VPE_SQLITE_USER_VERSION = 16;
 
 /**
  * Initial DDL before incremental migrations (see `msc_sqliteMigrateSchemaAndPorts`).
@@ -193,6 +193,7 @@ function rowFromTuple(tuple) {
     dev_session_started_at: null,
     has_documentation: 1,
     sort_order: 0,
+    watchdog_enabled: 1,
   };
 }
 
@@ -283,11 +284,17 @@ class SqlitePersistence {
           : String(nv);
     }
 
+    let watchdogBind = found.watchdog_enabled === 1 || found.watchdog_enabled === true ? 1 : 0;
+    if (Object.prototype.hasOwnProperty.call(payload, 'watchdog_enabled')) {
+      watchdogBind =
+        payload.watchdog_enabled === true || payload.watchdog_enabled === 1 ? 1 : 0;
+    }
+
     this._db
       .prepare(
         `
       UPDATE projects
-      SET name = ?, path = ?, port = ?, thumbnail_url = ?, start_script = ?, build_script = ?, pkg_manager = ?, project_type = ?, is_archived = ?, notes = ?
+      SET name = ?, path = ?, port = ?, thumbnail_url = ?, start_script = ?, build_script = ?, pkg_manager = ?, project_type = ?, is_archived = ?, notes = ?, watchdog_enabled = ?
       WHERE id = ?
     `,
       )
@@ -302,6 +309,7 @@ class SqlitePersistence {
         projectTypeBind,
         isArchivedBind,
         notesBind,
+        watchdogBind,
         payload.id,
       );
   }
@@ -317,11 +325,13 @@ class SqlitePersistence {
       payload.notes != null && String(payload.notes).trim() !== ''
         ? String(payload.notes)
         : null;
+    const watchdogEnabled =
+      payload.watchdog_enabled === false || payload.watchdog_enabled === 0 ? 0 : 1;
     this._db
       .prepare(
         `
-      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived, notes, watchdog_enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -337,6 +347,7 @@ class SqlitePersistence {
         pt,
         isArc,
         notesIns,
+        watchdogEnabled,
       );
   }
 
@@ -670,11 +681,15 @@ class JsonPersistence {
           n = hd === 0 ? 0 : 1;
         }
         if (n !== null && p.has_documentation !== n) {
-          p.has_documentation = n;
-          changed = true;
-        }
+        p.has_documentation = n;
+        changed = true;
       }
     }
+    if (p.watchdog_enabled === undefined) {
+      p.watchdog_enabled = 1;
+      changed = true;
+    }
+  }
     const list = Object.values(this._data.projects);
     for (const p of list) {
       if (!p || Number(p.port) !== launcher) continue;
@@ -1245,6 +1260,14 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
       sn = msc_sqliteTableColumnNames(db, 'settings');
     }
     ver = 15;
+  }
+
+  if (ver < 16) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('watchdog_enabled')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN watchdog_enabled INTEGER NOT NULL DEFAULT 1`);
+    }
+    ver = 16;
   }
 
   db.pragma(`user_version = ${ver}`);

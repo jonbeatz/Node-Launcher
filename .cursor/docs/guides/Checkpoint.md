@@ -1,13 +1,15 @@
 # VPE Checkpoint (2026-05-11)
 
-## Build v2.2.0 — Fleet Synergy (Silent Start, Universal Green, Readout Sync)
+## Build v2.2.0 — Fleet Synergy (Watchdog, Portable Lock, Universal Green)
 
 - **Version:** **`2.2.0`** — `package.json`, preload, footer → **Station Prime v2.2.0**.
+- **Watchdog auto-restart (MOD 24):** Implemented an auto-restart watchdog that automatically revives processes that exit unexpectedly. Max 3 restarts in 60 seconds. Added "RESTARTING..." status with orange glow for UI feedback.
 - **Portable Lock (MOD 23):** Forced `userData` and all writable state into `./vpe-local-data` within the project root. The app is now 100% portable and independent of system AppData folders.
 - **Ghost Containment:** Expanded `clean:dist` to a Quad-Purge (dist, renderer/out, data, vpe-local-data) and added explicit `electron-builder` exclusions to prevent local data from being "baked" into the production .exe.
 - **Renderer:** Unified `Msc_ProjectCard.tsx` layout logic. All running projects (200/307) start collapsed with a green pulsing dot and text. Telemetry expansion is manual (chevron).
 - **Typography:** Fixed 10px, 0.12em tracking across all telemetry surfaces (Cinema & Compact).
 - **Synergy:** Removed `runningStrip` prop from `ProjectMetaAccordion`; all connection UI now lives in the unified card body stack.
+- **Persistence:** Incremented SQLite `user_version` to 16, adding `watchdog_enabled` field to project rows.
 
 ## Build v2.1.0 — Vault sovereignty, Iron Curtain, `fs.rmSync` guard, session handoff
 

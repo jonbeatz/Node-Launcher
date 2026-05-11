@@ -51,6 +51,8 @@ export interface VpeProjectRow {
   project_folder_modified_at?: string | null
   /** ISO time when dev session last started (SQLite v11+); drives live uptime in renderer. */
   dev_session_started_at?: string | null
+  /** SQLite v16+ — JEDI_MOD_24: Watchdog auto-restart. */
+  watchdog_enabled?: number | boolean | null
 }
 
 /** Dashboard project shape (grids, list, cards). */
@@ -87,4 +89,6 @@ export interface Project {
   project_folder_created_at?: string | null
   project_folder_modified_at?: string | null
   dev_session_started_at?: string | null
+  /** SQLite v16+ — JEDI_MOD_24: Watchdog auto-restart. */
+  watchdog_enabled?: number | boolean | null
 }

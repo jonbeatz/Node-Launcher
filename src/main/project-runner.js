@@ -64,7 +64,7 @@ class MSC_ProjectRunner extends EventEmitter {
     super();
     this.mainWindow = mainWindow;
     this.store = store;
-    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess, healthPollTimer?: NodeJS.Timeout, healthStartedAt?: number, healthFailCount?: number }>} */
+    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess, healthPollTimer?: NodeJS.Timeout, healthStartedAt?: number, healthFailCount?: number, watchdogEnabled?: boolean, restartAttempts?: number[] }>} */
     this.children = new Map();
     /** Serialize HTTP health checks across projects (one in flight). */
     this._healthProbeChain = Promise.resolve();
@@ -465,6 +465,11 @@ class MSC_ProjectRunner extends EventEmitter {
     const boot = msc_analyzeDependencyBootstrap(projectRoot);
     let installBootstrap = false;
 
+    // JEDI_MOD_24: Initialize watchdog from the project row
+    const watchdogFromRow = row.watchdog_enabled === 1 || row.watchdog_enabled === true;
+    rec.watchdogEnabled = watchdogFromRow;
+    if (!rec.restartAttempts) rec.restartAttempts = [];
+
     /** @type {{ installing?: boolean, projectKind?: string }} */
     const extra = {};
 
@@ -517,6 +522,49 @@ class MSC_ProjectRunner extends EventEmitter {
     child.on('close', (code, signal) => {
       const r = this.children.get(row.id);
       if (!r || r.dev !== child) return;
+
+      const isUnexpectedExit = code !== 0 && code !== null;
+      const watchdogActive = !!r.watchdogEnabled;
+
+      if (watchdogActive && isUnexpectedExit) {
+        // Watchdog Logic: Check for infinite loop (max 3 restarts in 60s)
+        const now = Date.now();
+        if (!r.restartAttempts) r.restartAttempts = [];
+        r.restartAttempts = r.restartAttempts.filter(ts => now - ts < 60000);
+
+        if (r.restartAttempts.length < 3) {
+          r.restartAttempts.push(now);
+          this._persistAndBroadcastLog(
+            row.id,
+            'warn',
+            `[vpe] Watchdog: Project exited unexpectedly (code ${code}). Auto-restarting in 2s... (Attempt ${r.restartAttempts.length}/3)`,
+          );
+
+          // UI Feedback: Notify renderer of auto-restart
+          this._broadcast('vpe:project-watchdog-restart', { 
+            projectId: row.id, 
+            attempt: r.restartAttempts.length 
+          });
+
+          // Delay restart
+          setTimeout(() => {
+            const currentRec = this.children.get(row.id);
+            if (currentRec && !currentRec.dev) {
+              void this.startDev(row);
+            }
+          }, 2000);
+          
+          return; // Exit early, don't set to stopped yet
+        } else {
+          this._persistAndBroadcastLog(
+            row.id,
+            'error',
+            `[vpe] Watchdog: Max restart attempts (3) reached within 60s. Disabling watchdog for this session.`,
+          );
+          r.watchdogEnabled = false;
+        }
+      }
+
       this._clearHealthPolling(row.id);
       r.dev = undefined;
       r.healthFailCount = 0;

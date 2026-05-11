@@ -4,7 +4,13 @@
 
 ---
 
-## v2.2.0 — Fleet synergy: Silent start, Universal Green, telemetry readouts
+## v2.2.0 — Fleet synergy: Silent start, Universal Green, Watchdog auto-restart
+
+**Watchdog initialization (MOD 24):**
+- **Auto-restart logic:** Implemented a watchdog in `MSC_ProjectRunner` that automatically revives processes that exit unexpectedly (non-zero exit code).
+- **Infinite loop prevention:** Tracked restart attempts, limiting to a maximum of 3 restarts within a 60-second window to prevent runaway crashes.
+- **UI Feedback:** Added a "RESTARTING..." status with a quick orange glow and pulsing equalizer on dashboard cards when a project is being auto-revived.
+- **Persistence:** Added `watchdog_enabled` to the SQLite project registry (v16 schema) to persist watchdog preferences per project.
 
 **Portable Lock (MOD 23):**
 - Forced all internal application state (userData, cache, session) into the project root at `./vpe-local-data`. 

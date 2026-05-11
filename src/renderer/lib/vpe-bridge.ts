@@ -315,6 +315,10 @@ export interface VpeApi {
   subscribeLogUpdate: (
     callback: (data: VpeLogPayload) => void,
   ) => () => void
+  /** JEDI_MOD_24 — project auto-restarting via watchdog. */
+  subscribeWatchdogRestart?: (
+    callback: (data: { projectId: string; attempt: number }) => void,
+  ) => () => void
   subscribeProjectsUpdated: (
     callback: (data: { projects: VpeProjectRow[] }) => void,
   ) => () => void
@@ -563,6 +567,8 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
         : String(row.notes),
     vault_has_files: row.vault_has_files === true,
     has_documentation: msc_rowHasDocumentationEnabled(row.has_documentation),
+    watchdog_enabled:
+      row.watchdog_enabled === true || row.watchdog_enabled === 1,
     project_folder_created_at: row.project_folder_created_at ?? null,
     project_folder_modified_at: row.project_folder_modified_at ?? null,
   }
