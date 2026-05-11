@@ -24,7 +24,6 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
-  Activity,
 } from 'lucide-react'
 
 import { getVpeApi, type VpeShieldProjectType } from '@/lib/vpe-bridge'
@@ -38,6 +37,14 @@ export type { VpeShieldProjectType }
 /** JEDI_MOD_01 / JEDI_MOD_06 — Obsidian Glass on single outer shell (border + outline in globals). */
 const msc_obsidianGlassShellCls =
   'vpe-card-obsidian-glass box-border border border-solid border-t-white/20 border-x-white/5 border-b-white/[0.02] bg-[#1c1c1c]/80 backdrop-blur-lg shadow-[0_20px_50px_rgba(0,0,0,0.6)]'
+
+/** JEDI_MOD_14 — readout strip + green banner values share one cadence vs micro-labels. */
+const msc_readoutTracking = 'tracking-[0.12em]'
+const msc_readoutDotCls =
+  'size-1.5 shrink-0 rounded-full bg-[#4fde82] shadow-[0_0_4px_rgba(74,222,128,0.5)] ring-1 ring-white/15 motion-safe:animate-pulse'
+const msc_readoutLiveTextCls = `min-w-0 flex-1 truncate text-left text-[10px] font-semibold uppercase leading-tight ${msc_readoutTracking} text-[#4fde82]`
+const msc_readoutReadyTextCls = `min-w-0 flex-1 truncate text-left text-[10px] font-medium uppercase leading-tight ${msc_readoutTracking} text-[#888888]/45`
+const msc_readoutStatusTextCls = `min-w-0 flex-1 truncate text-left text-[10px] font-medium uppercase leading-tight ${msc_readoutTracking}`
 
 function msc_formatUptimeSeconds(total: number): string {
   if (!Number.isFinite(total) || total < 0) return '—'
@@ -99,7 +106,6 @@ function ProjectMetaAccordion({
   folderCreatedAt,
   folderModifiedAt,
   onOpenChange,
-  runningStrip,
 }: {
   isCompact: boolean
   projectId: string
@@ -107,18 +113,6 @@ function ProjectMetaAccordion({
   folderCreatedAt?: string | null
   folderModifiedAt?: string | null
   onOpenChange?: (open: boolean) => void
-  /** Compact-only: show “Started on” inside the dropdown when running (v1.8.1). */
-  runningStrip?: {
-    runUrl: string
-    healthLabel: string | null
-    healthCls: string | null
-    uptimeLabel: string
-    port?: number
-    /** HTTP 2xx — enables collapsible “green connection” strip in compact accordion. */
-    isHttpConnected?: boolean
-    isConnectionExpanded?: boolean
-    onToggleConnectionExpanded?: (e: React.MouseEvent) => void
-  } | null
 }) {
   const { addToast } = useToast()
   const [open, setOpen] = useState(false)
@@ -163,7 +157,8 @@ function ProjectMetaAccordion({
       >
         <ChevronDown
           size={isCompact ? 14 : 15}
-          className={`shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          strokeWidth={2}
+          className={`shrink-0 transition-transform duration-200 motion-safe:!animate-none ${open ? 'rotate-180' : ''}`}
         />
       </button>
       <motion.div
@@ -220,113 +215,6 @@ function ProjectMetaAccordion({
 
           {metaTab === 'details' ? (
             <>
-          {isCompact && runningStrip && (
-            <>
-              {runningStrip.isHttpConnected &&
-              runningStrip.onToggleConnectionExpanded &&
-              runningStrip.isConnectionExpanded === false ? (
-                <div className="flex min-h-6 items-center justify-between gap-2 rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2 py-0.5">
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <span
-                      className="size-1.5 shrink-0 rounded-full bg-[#4fde82] shadow-[0_0_6px_rgba(74,222,128,0.45)]"
-                      aria-hidden
-                    />
-                    <span className="truncate text-[10px] font-semibold uppercase tracking-[0.06em] text-[#7dcea0]/95">
-                      LIVE — {runningStrip.port ?? '—'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      runningStrip.onToggleConnectionExpanded?.(e)
-                    }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/25 bg-[#121212]/90 text-white transition-colors hover:border-[#4fde82] hover:bg-[#1a2620] hover:text-[#4fde82] vader-focus"
-                    title="Show connection details"
-                    aria-expanded={false}
-                    aria-label="Expand connection details"
-                  >
-                    <Activity size={13} strokeWidth={2} className="text-white" />
-                  </button>
-                </div>
-              ) : (
-                <div className="rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2 py-2">
-                  {runningStrip.isHttpConnected && runningStrip.onToggleConnectionExpanded ? (
-                    <>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1 pt-0">
-                          <span className="mt-0 mb-0.5 block text-[9px] uppercase leading-none tracking-[0.12em] text-[#5c6b62]">
-                            Started on
-                          </span>
-                          <span
-                            className="block truncate text-[12px] leading-tight text-[#7dcea0]/95"
-                            title={runningStrip.runUrl}
-                          >
-                            {runningStrip.runUrl}
-                          </span>
-                          {runningStrip.healthLabel && (
-                            <span
-                              className={`mt-0.5 block text-[11px] leading-snug ${runningStrip.healthCls ?? 'text-[#4fde82]'}`}
-                            >
-                              {runningStrip.healthLabel}
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            runningStrip.onToggleConnectionExpanded?.(e)
-                          }}
-                          className="mt-0 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/25 bg-[#121212]/90 text-white transition-colors hover:border-[#4fde82] hover:bg-[#1a2620] hover:text-[#4fde82] vader-focus"
-                          title="Hide connection details"
-                          aria-expanded
-                          aria-label="Collapse connection details"
-                        >
-                          <ChevronUp size={13} strokeWidth={2.5} className="text-white" />
-                        </button>
-                      </div>
-                      <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
-                        <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                          Uptime
-                        </span>
-                        <span className="tabular-nums text-[12px] text-[#7dcea0]/95">
-                          {runningStrip.uptimeLabel}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                        Started on
-                      </span>
-                      <span
-                        className="block truncate text-[12px] leading-tight text-[#7dcea0]/95"
-                        title={runningStrip.runUrl}
-                      >
-                        {runningStrip.runUrl}
-                      </span>
-                      {runningStrip.healthLabel && (
-                        <span
-                          className={`mt-0.5 block text-[11px] leading-snug ${runningStrip.healthCls ?? 'text-[#4fde82]'}`}
-                        >
-                          {runningStrip.healthLabel}
-                        </span>
-                      )}
-                      <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
-                        <span className="mb-0.5 block text-[9px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                          Uptime
-                        </span>
-                        <span className="tabular-nums text-[12px] text-[#7dcea0]/95">
-                          {runningStrip.uptimeLabel}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </>
-          )}
           <div>
             <span className={`mb-0.5 block uppercase tracking-wider text-[#555555] ${labelCls}`}>
               Project Started
@@ -437,9 +325,6 @@ const MSC_PROJECT_CARD_MOTION_TRANSITION = {
   scale: { duration: 0.2 },
 }
 
-/** Cinema: fixed status strip height — idle ↔ live (collapsed/expanded) does not shift card vertical rhythm. */
-const MSC_STATUS_BAR_HEIGHT = 'h-6'
-
 export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   function Msc_ProjectCard(props, forwardedRef) {
   const {
@@ -497,9 +382,8 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const [cinemaInspectOpen, setCinemaInspectOpen] = useState(false)
   const [compactInfoOpen, setCompactInfoOpen] = useState(false)
   const [reorderBusy, setReorderBusy] = useState(false)
+  /** JEDI_MOD_15 — collapsed until user expands; never synced from HTTP/IPC or storage. */
   const [isStatusExpanded, setIsStatusExpanded] = useState(false)
-  /** `null` = first run (skip pop so already-connected projects stay collapsed on load). */
-  const wasHttpConnectedRef = useRef<boolean | null>(null)
   const accordionExpanded = isCompact ? compactInfoOpen : cinemaInspectOpen
 
   useEffect(() => {
@@ -518,28 +402,21 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const isError = status === 'error'
   const isBuilding = status === 'building'
 
+  /** 2xx only — LIVE readout; never tied to banner expand (silent until chevron). */
   const isHttpConnected =
     isRunning &&
     typeof health_http_code === 'number' &&
     health_http_code >= 200 &&
     health_http_code < 300
 
+  /** JEDI_MOD_15 — collapse when stopped; resetting when card instance is reused for another `id`. */
   useEffect(() => {
-    if (!isRunning) {
-      setIsStatusExpanded(false)
-      wasHttpConnectedRef.current = false
-      return
-    }
-    if (wasHttpConnectedRef.current === null) {
-      wasHttpConnectedRef.current = isHttpConnected
-      return
-    }
-    const prev = wasHttpConnectedRef.current
-    if (isHttpConnected && !prev) {
-      setIsStatusExpanded(true)
-    }
-    wasHttpConnectedRef.current = isHttpConnected
-  }, [isRunning, isHttpConnected])
+    setIsStatusExpanded(false)
+  }, [id])
+
+  useEffect(() => {
+    if (!isRunning) setIsStatusExpanded(false)
+  }, [isRunning])
 
   const getPrimaryButton = () => {
     if (devInstallInProgress && isRunning) {
@@ -625,19 +502,11 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const showVaultPaperclip = Boolean(vaultHasReferenceFiles)
   const isIdleStopped = !isRunning && !isError && !isBuilding
 
-  /** v1.9.2 — equalizer colors only while running (glyph omitted when stopped). */
+  /** v1.9.2 — equalizer colors: green if running (Universal Green Protocol); yellow if building. */
   const healthEqualizerClass = (() => {
-    if (!isRunning) return 'text-[#9ca3af]'
     if (isBuilding || (devInstallInProgress && isRunning)) return 'text-[#fbbf08]'
-    if (
-      typeof health_http_code === 'number' &&
-      health_http_code >= 200 &&
-      health_http_code < 300
-    ) {
-      return 'text-[#22c55e]'
-    }
-    if (isBootingHttp) return 'text-[#fbbf08]'
-    return 'text-[#fbbf08]'
+    if (isRunning) return 'text-[#22c55e]'
+    return 'text-[#9ca3af]'
   })()
 
   /** High-contrast icon tiles (Favorite, Settings, Delete). */
@@ -781,7 +650,11 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
                 isRunning ? 'motion-safe:animate-pulse' : ''
               }`}
               title={dotTitle}
-              style={{ width: 8, height: 8, backgroundColor: dotHex }}
+              style={{
+                width: 8,
+                height: 8,
+                backgroundColor: isRunning ? '#4fde82' : dotHex,
+              }}
             />
             {isRunning ? (
               <span
@@ -809,9 +682,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
         </div>
 
         <div className="min-w-0 bg-[#242424]/90">
-        <div
-          className={`flex min-w-0 items-center justify-between gap-2.5 border-b border-[#2a2a2a] px-3 ${isIdleStopped ? 'py-1.5' : 'py-2'}`}
-        >
+        <div className="flex min-w-0 items-center justify-between gap-2.5 border-b border-[#2a2a2a] px-3 py-1.5">
           <div className="flex min-w-0 flex-1 items-center min-h-6 pr-0.5">
             <h3
               className="vpe-card-title min-w-0 truncate text-xs leading-snug text-white"
@@ -859,9 +730,126 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           </div>
         </div>
 
-        <div
-          className={`grid min-h-8 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.625rem] items-center gap-1 px-2.5 ${isIdleStopped ? 'py-1.5' : 'py-2'}`}
-        >
+        <div className="flex h-auto flex-col gap-2 px-2.5 py-1.5">
+          {isRunning && !isStatusExpanded ? (
+            <div className="flex min-h-[2.5rem] w-full shrink-0 items-center justify-between gap-1.5 rounded-[4px] border border-white/5 bg-[#121212]/60 px-2 py-1.5">
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className={msc_readoutDotCls} aria-hidden />
+                <span
+                  className={msc_readoutLiveTextCls}
+                  title={`${getStatusLabel()} on port ${port}${healthLine?.label ? ` · ${healthLine.label}` : ''}`}
+                >
+                  {getStatusLabel()} — {port}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsStatusExpanded((v) => !v)
+                }}
+                className="flex size-6 shrink-0 items-center justify-center rounded text-[#4fde82] transition-colors hover:bg-white/[0.06] hover:text-white vader-focus"
+                title="Show connection details"
+                aria-label="Expand connection details"
+                aria-expanded={false}
+              >
+                <ChevronDown
+                  size={11}
+                  strokeWidth={2}
+                  className="shrink-0 motion-safe:!animate-none"
+                />
+              </button>
+            </div>
+          ) : isRunning && isStatusExpanded ? null : (
+            <div className="flex min-h-[2.5rem] w-full shrink-0 items-center rounded-[4px] border border-white/5 bg-[#121212]/60 px-2 py-1.5">
+              {isIdleStopped ? (
+                <span className={msc_readoutReadyTextCls}>READY</span>
+              ) : (
+                <span
+                  className={`${msc_readoutStatusTextCls} ${
+                    isError
+                      ? 'text-[#e02b20]'
+                      : isBuilding || devInstallInProgress
+                        ? 'text-[#ffcc00]'
+                        : 'text-[#888888]'
+                  }`}
+                >
+                  {getStatusLabel()}
+                </span>
+              )}
+            </div>
+          )}
+
+          {isError && errorMessage && (
+            <div className="rounded border border-[#ff4444]/30 bg-[#ff4444]/10 p-1.5">
+              <span className="text-[10px] text-[#ff4444]">{errorMessage}</span>
+            </div>
+          )}
+
+          {/* Green telemetry: only while user-expanded (non‑2xx e.g. 307 uses recessed readout, not forced banner). */}
+          {isRunning && isStatusExpanded && (
+            <div className="rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2 py-1.5">
+              <div className="min-w-0">
+                <div className="flex items-start justify-between gap-1.5">
+                  <div className="min-w-0 flex-1 pt-0">
+                    <span className="mt-0 mb-0.5 block text-[8px] uppercase leading-none tracking-[0.12em] text-[#5c6b62]">
+                      Started on
+                    </span>
+                    <span
+                      className="block truncate text-[10px] font-medium leading-tight tracking-tight text-[#7dcea0]/95"
+                      title={runUrl}
+                    >
+                      {runUrl}
+                    </span>
+                    {healthLine && (
+                      <span
+                        className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
+                        title="GET / on project port after start"
+                      >
+                        {healthLine.label}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsStatusExpanded((v) => !v)
+                    }}
+                    className="mt-0 flex size-6 shrink-0 items-center justify-center rounded-md border border-white/25 bg-[#121212]/90 text-white transition-colors hover:border-[#4fde82] hover:bg-[#1a2620] hover:text-[#4fde82] vader-focus"
+                    title="Hide connection details"
+                    aria-label="Collapse connection details"
+                    aria-expanded
+                  >
+                    <ChevronUp size={12} strokeWidth={2.5} className="text-white" />
+                  </button>
+                </div>
+                <div className="mt-1 border-t border-[#2d4a38]/50 pt-1">
+                  <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                    Uptime
+                  </span>
+                  <span className="tabular-nums text-[10px] font-medium leading-tight tracking-tight text-[#7dcea0]/95">
+                    {liveUptime}
+                  </span>
+                </div>
+                {healthLine?.showErrorCta && onViewErrorConsole && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onViewErrorConsole()
+                    }}
+                    className="mt-1.5 text-[9px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
+                  >
+                    View error console →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="grid min-h-8 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.625rem] items-center gap-1 px-2.5 py-1.5">
           <button
             type="button"
             onClick={() => {
@@ -935,23 +923,6 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           folderCreatedAt={project_folder_created_at}
           folderModifiedAt={project_folder_modified_at}
           onOpenChange={setCompactInfoOpen}
-          runningStrip={
-            isRunning
-              ? {
-                  runUrl,
-                  healthLabel: healthLine?.label ?? null,
-                  healthCls: healthLine?.cls ?? null,
-                  uptimeLabel: liveUptime,
-                  port,
-                  isHttpConnected,
-                  isConnectionExpanded: isStatusExpanded,
-                  onToggleConnectionExpanded: (e) => {
-                    e.stopPropagation()
-                    setIsStatusExpanded((v) => !v)
-                  },
-                }
-              : null
-          }
         />
       </motion.div>
     )
@@ -1002,7 +973,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             style={{
               width: 10,
               height: 10,
-              backgroundColor: dotHex,
+              backgroundColor: isRunning ? '#4fde82' : dotHex,
             }}
           />
           {isRunning ? (
@@ -1032,10 +1003,8 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
       </div>
 
       <div className="min-w-0 bg-[#242424]/90">
-      <div className={isIdleStopped ? 'px-4 pt-3 pb-2' : 'p-4'}>
-          <div
-            className={`flex min-w-0 items-center justify-between gap-2 ${isIdleStopped ? 'mb-1' : 'mb-2'}`}
-          >
+      <div className="flex h-auto flex-col gap-2 px-4 pb-2 pt-3">
+          <div className="flex min-w-0 items-center justify-between gap-2">
             <div className="flex min-h-7 min-w-0 flex-1 items-center gap-2 pr-0.5">
               <h3
                 className="vpe-card-title min-w-0 truncate text-base leading-tight text-white"
@@ -1084,164 +1053,120 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             </div>
           </div>
 
-          <div
-            className={`mb-2 flex w-full shrink-0 items-center justify-between gap-2 ${MSC_STATUS_BAR_HEIGHT}`}
-          >
-            {isRunning && isHttpConnected && !isStatusExpanded ? (
-              <>
-                <span className="min-w-0 flex-1 truncate text-left text-[10px] font-semibold uppercase leading-none tracking-[0.08em] text-[#4fde82]">
-                  ● LIVE - {port}
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setIsStatusExpanded((v) => !v)
-                  }}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-[#4fde82] transition-colors hover:bg-[#4fde82]/15 hover:text-white vader-focus"
-                  title="Show connection details"
-                  aria-label="Expand connection details"
-                  aria-expanded={false}
+          {isRunning && !isStatusExpanded ? (
+            <div className="flex h-auto min-h-[2.5rem] w-full shrink-0 items-center justify-between gap-2 rounded-[4px] border border-white/5 bg-[#121212]/60 px-2 py-1.5">
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span className={msc_readoutDotCls} aria-hidden />
+                <span
+                  className={msc_readoutLiveTextCls}
+                  title={`${getStatusLabel()} on port ${port}${healthLine?.label ? ` · ${healthLine.label}` : ''}`}
                 >
-                  <Activity size={12} strokeWidth={2} className="text-[#4fde82]" />
-                </button>
-              </>
-            ) : isRunning && isHttpConnected && isStatusExpanded ? null : isIdleStopped ? (
-              <span className="min-w-0 flex-1 truncate text-left text-[10px] font-medium uppercase leading-none tracking-[0.08em] text-[#888888]/30">
-                READY
-              </span>
-            ) : (
-              <span
-                className={`min-w-0 flex-1 truncate text-left text-[10px] uppercase leading-none tracking-[0.08em] ${
-                  isError
-                    ? 'text-[#e02b20]'
-                    : devInstallInProgress && isRunning
-                      ? 'text-[#ffcc00]'
-                      : isRunning
-                        ? 'text-[#6ee7a8]/90'
-                        : 'text-[#888888]'
-                }`}
+                  {getStatusLabel()} — {port}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsStatusExpanded((v) => !v)
+                }}
+                className="flex size-7 shrink-0 items-center justify-center rounded text-[#4fde82] transition-colors hover:bg-white/[0.06] hover:text-white vader-focus"
+                title="Show connection details"
+                aria-label="Expand connection details"
+                aria-expanded={false}
               >
-                {getStatusLabel()}
-              </span>
-            )}
-          </div>
+                <ChevronDown size={12} strokeWidth={2} className="shrink-0 motion-safe:!animate-none" />
+              </button>
+            </div>
+          ) : isRunning && isStatusExpanded ? null : (
+            <div className="flex h-auto min-h-[2.5rem] w-full shrink-0 items-center rounded-[4px] border border-white/5 bg-[#121212]/60 px-2 py-1.5">
+              {isIdleStopped ? (
+                <span className={msc_readoutReadyTextCls}>READY</span>
+              ) : (
+                <span
+                  className={`${msc_readoutStatusTextCls} ${
+                    isError
+                      ? 'text-[#e02b20]'
+                      : isBuilding || devInstallInProgress
+                        ? 'text-[#ffcc00]'
+                        : 'text-[#888888]'
+                  }`}
+                >
+                  {getStatusLabel()}
+                </span>
+              )}
+            </div>
+          )}
 
           {isError && errorMessage && (
-            <div className="mt-3 p-2 rounded bg-[#ff4444]/10 border border-[#ff4444]/30">
+            <div className="rounded border border-[#ff4444]/30 bg-[#ff4444]/10 p-2">
               <span className="text-[11px] text-[#ff4444]">{errorMessage}</span>
             </div>
           )}
 
-          {isRunning && (!isHttpConnected || isStatusExpanded) && (
-            <div
-              className={`rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2.5 py-2 ${
-                isHttpConnected ? 'mb-2' : 'mt-3'
-              }`}
-            >
-              {isHttpConnected ? (
-                <div className="min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1 pt-0">
-                      <span className="mt-0 mb-0.5 block text-[8px] uppercase leading-none tracking-[0.12em] text-[#5c6b62]">
-                        Started on
-                      </span>
-                      <span
-                        className="block truncate text-[11px] leading-tight text-[#7dcea0]/95"
-                        title={runUrl}
-                      >
-                        {runUrl}
-                      </span>
-                      {healthLine && (
-                        <span
-                          className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
-                          title="GET / on project port after start"
-                        >
-                          {healthLine.label}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setIsStatusExpanded((v) => !v)
-                      }}
-                      className="mt-0 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/25 bg-[#121212]/90 text-white transition-colors hover:border-[#4fde82] hover:bg-[#1a2620] hover:text-[#4fde82] vader-focus"
-                      title="Hide connection details"
-                      aria-label="Collapse connection details"
-                      aria-expanded
-                    >
-                      <ChevronUp size={14} strokeWidth={2.5} className="text-white" />
-                    </button>
-                  </div>
-                  <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
-                    <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                      Uptime
+          {isRunning && isStatusExpanded && (
+            <div className="rounded border border-[#2d4a38]/80 bg-[#0f1612]/90 px-2.5 py-2">
+              <div className="min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1 pt-0">
+                    <span className="mt-0 mb-0.5 block text-[8px] uppercase leading-none tracking-[0.12em] text-[#5c6b62]">
+                      Started on
                     </span>
-                    <span className="tabular-nums text-[11px] text-[#7dcea0]/95">{liveUptime}</span>
-                  </div>
-                  {healthLine?.showErrorCta && onViewErrorConsole && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onViewErrorConsole()
-                      }}
-                      className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
-                    >
-                      View error console →
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="min-w-0">
-                  <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                    Started on
-                  </span>
-                  <span
-                    className="block truncate text-[11px] leading-tight text-[#7dcea0]/95"
-                    title={runUrl}
-                  >
-                    {runUrl}
-                  </span>
-                  {healthLine && (
                     <span
-                      className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
-                      title="GET / on project port after start"
+                      className="block truncate text-[10px] font-medium leading-tight tracking-tight text-[#7dcea0]/95"
+                      title={runUrl}
                     >
-                      {healthLine.label}
+                      {runUrl}
                     </span>
-                  )}
-                  <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
-                    <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
-                      Uptime
-                    </span>
-                    <span className="tabular-nums text-[11px] text-[#7dcea0]/95">{liveUptime}</span>
+                    {healthLine && (
+                      <span
+                        className={`mt-0.5 block text-[10px] leading-snug ${healthLine.cls}`}
+                        title="GET / on project port after start"
+                      >
+                        {healthLine.label}
+                      </span>
+                    )}
                   </div>
-                  {healthLine?.showErrorCta && onViewErrorConsole && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onViewErrorConsole()
-                      }}
-                      className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
-                    >
-                      View error console →
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsStatusExpanded((v) => !v)
+                    }}
+                    className="mt-0 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/25 bg-[#121212]/90 text-white transition-colors hover:border-[#4fde82] hover:bg-[#1a2620] hover:text-[#4fde82] vader-focus"
+                    title="Hide connection details"
+                    aria-label="Collapse connection details"
+                    aria-expanded
+                  >
+                    <ChevronUp size={12} strokeWidth={2.5} className="text-white" />
+                  </button>
                 </div>
-              )}
+                <div className="mt-1.5 border-t border-[#2d4a38]/50 pt-1.5">
+                  <span className="mb-0.5 block text-[8px] uppercase tracking-[0.12em] text-[#5c6b62]">
+                    Uptime
+                  </span>
+                  <span className="tabular-nums text-[10px] font-medium leading-tight tracking-tight text-[#7dcea0]/95">
+                    {liveUptime}
+                  </span>
+                </div>
+                {healthLine?.showErrorCta && onViewErrorConsole && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onViewErrorConsole()
+                    }}
+                    className="mt-2 text-[10px] font-medium uppercase tracking-wide text-[#e02b20] underline decoration-[#e02b20]/50 hover:text-[#ff5555]"
+                  >
+                    View error console →
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
 
-      <div
-        className={`flex min-w-0 flex-row flex-nowrap items-center gap-2 px-4 ${
-          isRunning || isError ? 'pb-3 pt-3' : isIdleStopped ? 'pb-3 pt-0' : 'pb-3 pt-1'
-        }`}
-      >
+      <div className="flex min-w-0 flex-row flex-nowrap items-center gap-2 px-4 pb-3 pt-1">
         <button
           type="button"
           onClick={() => {

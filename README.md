@@ -2,7 +2,7 @@
 
 [![Build: CI](https://github.com/jonbeatz/Node-Launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/jonbeatz/Node-Launcher/actions/workflows/ci.yml)
 
-> **MSC Media Engine — workspace `package.json` `2.1.0`** (Vader Station Core; notes in [`VADER_STATION_LOG.md`](VADER_STATION_LOG.md); build branch history in [`.cursor/docs/guides/Checkpoint.md`](.cursor/docs/guides/Checkpoint.md))
+> **MSC Media Engine — workspace `package.json` `2.2.0`** (Vader Station Core; notes in [`VADER_STATION_LOG.md`](VADER_STATION_LOG.md); build branch history in [`.cursor/docs/guides/Checkpoint.md`](.cursor/docs/guides/Checkpoint.md))
 > **Master Execution Plan:** Command Center for high-performance Node.js development
 
 The **Vader Project Engine (VPE)** is a tactical desktop command center designed to eliminate terminal clutter and automate repetitive build repairs for the **My Studio Channel (MSC)** workflow. It is engineered specifically for the **Vader** workstation (AMD Ryzen 9700x / Gigabyte B650) to deliver a process-aware interface for modern web development.
@@ -99,5 +99,5 @@ Automated patching for Next.js 15 Suspense boundaries.
 
 ---
 **Author:** Jon Beatz (MSC)  
-**Status:** Approved — release track **`2.0.0`** (Vader Station Core)
-*Powered by the MSC Media Engine v2.0.0*
+**Status:** Approved — release track **`2.2.0`** (Fleet Synergy)
+*Powered by the MSC Media Engine v2.2.0*

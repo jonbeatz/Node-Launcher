@@ -1,4 +1,11 @@
-# VPE Checkpoint (2026-05-09)
+# VPE Checkpoint (2026-05-11)
+
+## Build v2.2.0 — Fleet Synergy (Silent Start, Universal Green, Readout Sync)
+
+- **Version:** **`2.2.0`** — `package.json`, preload, footer → **Station Prime v2.2.0**.
+- **Renderer:** Unified `Msc_ProjectCard.tsx` layout logic. All running projects (200/307) start collapsed with a green pulsing dot and text. Telemetry expansion is manual (chevron).
+- **Typography:** Fixed 10px, 0.12em tracking across all telemetry surfaces (Cinema & Compact).
+- **Synergy:** Removed `runningStrip` prop from `ProjectMetaAccordion`; all connection UI now lives in the unified card body stack.
 
 ## Build v2.1.0 — Vault sovereignty, Iron Curtain, `fs.rmSync` guard, session handoff
 

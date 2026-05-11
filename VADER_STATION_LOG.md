@@ -4,23 +4,31 @@
 
 ---
 
-## v2.1.x (dev) — Cinema dashboard scale, status strip parity, grid gaps
+## v2.2.0 — Fleet synergy: Silent start, Universal Green, telemetry readouts
 
-**Renderer — Cinema (`Msc_ProjectCard.tsx`, non-compact):** Cards use **`w-full min-w-0`** so each cell fills the grid track (no max-width cap). Thumbnails stay **`aspect-[4/3]`**. Body padding and title row match the pre–density-experiment layout (**`p-4` / `px-4 pt-3 pb-2`**, **`text-base`** title, **`h-7`** favorite/settings/trash tiles). Primary action row uses **`h-7`**, **`px-4`**, **`gap-2`**; **LOGS** width tracks three **`1.75rem`** tiles via **`msc_logsStripWidthCinema`**.
+**Renderer — Cinema & Compact (`Msc_ProjectCard.tsx`):**
+- **Vertical compression (MOD 12):** Replaced loose padding and title margins with a unified `flex-col gap-2` stack. Spacing is now identical between idle and running states when the banner is collapsed.
+- **Studio Readout Field (MOD 12, 14, 16):** All statuses sitting in a dark recessed field (`bg-[#121212]/60`, `border-white/5`, `rounded-[4px]`) with a fixed `min-h-[2.5rem]`.
+- **Silent Start (MOD 13, 15):** Projects start in a collapsed "Silent" mode by default. The large green telemetry banner only appears if the user clicks the readout chevron.
+- **Universal Green Protocol (MOD 16):** Any active session (standard 200 or redirects like 307) uses the green theme (`#4fde82`) for pulsing dot and text. Amber/Yellow is retired for active runners to unify the grid.
+- **"Ghost" Chevron (MOD 16, 17):** A functional `ChevronDown` (readout) and `ChevronUp` (expanded banner) are present on ALL running projects, enabling manual telemetry toggle for non-standard ports.
+- **Typography Sync (MOD 14):** Unified 10px, 0.12em tracking type across all readout strips and green banner URL/uptime lines. Pulsing dot scaled to `size-1.5`.
 
-**Fixed status strip:** **`MSC_STATUS_BAR_HEIGHT` (`h-6`)** is always rendered. **Idle (stopped, no error/build):** muted **`READY`** (**`text-[#888888]/30`**) reserves the line. **Live + HTTP + collapsed:** **`● LIVE - {port}`** + **Activity** toggle (**`h-6 w-6`**, vertically centered). Other states (**ERROR**, **BUILDING**, running without HTTP, HTTP expanded placeholder) stay inside the same height so card rhythm does not jump when toggling run state.
-
-**Grid (`ProjectGrid.tsx` + `globals.css`):** **`items-start`** on the motion wrapper. Spacing is defined on the grid classes again: **`.vpe-grid-cinema`** **`gap: 1.25rem`**, four responsive columns; **`.vpe-grid-compact`** **`gap: 0.75rem`**, **`minmax(250px, 1fr)`** auto-fill.
-
-**Compact:** Primary **START** / **STOP** share **`box-border`**, **`min-h-7` / `max-h-7` / `h-7`**, and a **`border-transparent` / `border-[#…]`** pattern so solid and outline variants share the same vertical footprint; **Open** and **LOGS** use the same height lock.
-
-**Main / SQLite:** **`user_version` 15** — projects **`sort_order`**, settings **`auto_sync_db_on_close`** (optional **`vpe-backups`** write on quit when enabled in App Settings). See **`persistent-store.js`**, **`app-settings-modal.tsx`**, migrations in **`test/verify-migrations.js`**.
-
-**`[VPE STANDBY]`** unchanged.
+**Grid (`ProjectGrid.tsx` + `globals.css`):** Unchanged from v2.1.x baseline.
 
 ---
 
-## Session handoff — 2026-05-09 (pause)
+## Session handoff — 2026-05-11 (pause)
+
+**Git:** Branch `VPE-v2.1.1` (merged MOD 12–17). Shipped labels advanced to **v2.2.0**.
+
+**Stopped for today.** Next session (**priority backlog**):
+1. **Reorder:** Add arrow controls to reorder projects (re-prioritized from last session).
+2. **Regression:** Smoke standard 200-OK vs 307-Redirect cards to ensure chevron persistence.
+
+---
+
+## v2.1.x (historical) — Cinema dashboard scale, status strip parity, grid gaps
 
 **Git:** Work continues on **`VPE-v2.1.x-Dev`** (pushed; same tip as **`VPE-v2.0.x-Dev`** through **`017524d`** — v2.1.0 vault/Iron Curtain/docs).
 
