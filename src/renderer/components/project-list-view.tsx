@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { getVpeApi } from '@/lib/vpe-bridge'
+import { useToast } from '@/components/vader-toast'
 import { msc_shieldColorHex } from '@/lib/shield-colors'
 import {
   Play,
@@ -99,7 +101,8 @@ interface ProjectListViewProps {
   explorerTargetId?: string
 }
 
-type SortField = 'name' | 'port' | 'path'
+/** `order` = persisted registry `sort_order` (matches grid / IPC reorder). */
+type SortField = 'order' | 'name' | 'port' | 'path'
 type SortDirection = 'asc' | 'desc'
 
 /**
@@ -124,9 +127,11 @@ export function ProjectListView({
   explorerTargetId,
 }: ProjectListViewProps) {
   const slim = listVariant === 'slim'
-  const [sortField, setSortField] = useState<SortField>('name')
+  const { addToast } = useToast()
+  const [sortField, setSortField] = useState<SortField>('order')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [hoveredProject, setHoveredProject] = useState<string | null>(null)
+  const [reorderBusyId, setReorderBusyId] = useState<string | null>(null)
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -138,9 +143,19 @@ export function ProjectListView({
   }
 
   const sortedProjects = [...projects].sort((a, b) => {
+    if (sortField === 'order') {
+      const oa = Number(a.sort_order)
+      const ob = Number(b.sort_order)
+      const na = Number.isFinite(oa) ? oa : 0
+      const nb = Number.isFinite(ob) ? ob : 0
+      if (na !== nb) return sortDirection === 'asc' ? na - nb : nb - na
+      return sortDirection === 'asc'
+        ? String(a.name).localeCompare(String(b.name))
+        : String(b.name).localeCompare(String(a.name))
+    }
     const key = sortField
-    let aVal = a[key]
-    let bVal = b[key]
+    let aVal: string | number = a[key] as string | number
+    let bVal: string | number = b[key] as string | number
 
     if (typeof aVal === 'string') aVal = aVal.toLowerCase()
     if (typeof bVal === 'string') bVal = bVal.toLowerCase()
@@ -150,6 +165,23 @@ export function ProjectListView({
     return 0
   })
 
+  const handleListReorder = async (projectId: string, dir: 'up' | 'down') => {
+    if (reorderBusyId) return
+    const api = getVpeApi()
+    if (!api?.reorderProject) return
+    setReorderBusyId(projectId)
+    try {
+      const r = await api.reorderProject(projectId, dir)
+      if (!r?.ok && r?.error && r.error !== 'no_neighbor') {
+        addToast('Reorder failed', 'error', String(r.error))
+      }
+    } catch (e) {
+      addToast('Reorder failed', 'error', e instanceof Error ? e.message : String(e))
+    } finally {
+      setReorderBusyId(null)
+    }
+  }
+
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null
     return sortDirection === 'asc' ? (
@@ -158,6 +190,9 @@ export function ProjectListView({
       <ChevronDown size={12} className="text-[#4fde82]" />
     )
   }
+
+  const msc_listReorderTile =
+    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[#2a2a2a]/50 bg-[#121212] text-[#eaeaea] transition-colors vader-focus hover:bg-[#2a2a2a] disabled:opacity-40 disabled:pointer-events-none'
 
   const allSelected = projects.length > 0 && selectedIds.length === projects.length
 
@@ -208,6 +243,21 @@ export function ProjectListView({
                   onChange={(e) => onSelectAll(e.target.checked)}
                   className="w-4 h-4 rounded border-[#555555] bg-[#2a2a2a] checked:bg-[#4fde82] checked:border-[#4fde82] accent-[#4fde82]"
                 />
+              </th>
+              <th
+                className="w-14 px-1 text-center text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]"
+                title="Persisted catalog order (same as grid reorder)"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleSort('order')}
+                  className="w-full cursor-pointer hover:text-white vader-focus rounded py-0.5"
+                >
+                  <span className="flex flex-col items-center gap-0.5 leading-none">
+                    <span>Order</span>
+                    <SortIcon field="order" />
+                  </span>
+                </button>
               </th>
               <th className="w-12 px-3 text-center text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]">
                 Status
@@ -298,6 +348,36 @@ export function ProjectListView({
                       onChange={(e) => onSelectProject(project.id, e.target.checked)}
                       className="w-4 h-4 rounded border-[#555555] bg-[#2a2a2a] checked:bg-[#4fde82] checked:border-[#4fde82] accent-[#4fde82]"
                     />
+                  </td>
+                  <td className="px-1 align-middle">
+                    <div className="flex flex-col items-center gap-0.5 py-0.5">
+                      <button
+                        type="button"
+                        disabled={reorderBusyId === project.id}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleListReorder(project.id, 'up')
+                        }}
+                        className={msc_listReorderTile}
+                        title="Move up in registry"
+                        aria-label={`Move ${project.name} up`}
+                      >
+                        <ChevronUp size={12} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={reorderBusyId === project.id}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleListReorder(project.id, 'down')
+                        }}
+                        className={msc_listReorderTile}
+                        title="Move down in registry"
+                        aria-label={`Move ${project.name} down`}
+                      >
+                        <ChevronDown size={12} strokeWidth={2.5} />
+                      </button>
+                    </div>
                   </td>
                   <td className="px-3 text-center">
                     {isRunning ? (

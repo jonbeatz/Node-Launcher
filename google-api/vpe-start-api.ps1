@@ -17,9 +17,9 @@ function Write-VpeLine {
     Write-Host $Text -ForegroundColor $Color
 }
 
-Write-VpeLine "═══════════════════════════════════════════════════════" "Cyan"
-Write-VpeLine " VPE API — LiteLLM ⇄ Vertex AI (MSC) · v1.9.9 integrated" "Cyan"
-Write-VpeLine "═══════════════════════════════════════════════════════" "Cyan"
+Write-VpeLine "=======================================================" "Cyan"
+Write-VpeLine " VPE API - LiteLLM / Vertex AI (MSC) - v1.9.9 integrated" "Cyan"
+Write-VpeLine "=======================================================" "Cyan"
 
 if (-not (Test-Path -LiteralPath $KeyPath)) {
     Write-VpeLine "[VPE ERROR] Missing service account key: $KeyPath" "Red"
@@ -35,21 +35,21 @@ $env:GOOGLE_APPLICATION_CREDENTIALS = $KeyPath
 if (-not $env:PYTHONUTF8) { $env:PYTHONUTF8 = "1" }
 if (-not $env:PYTHONIOENCODING) { $env:PYTHONIOENCODING = "utf-8" }
 
-Write-VpeLine "GOOGLE_APPLICATION_CREDENTIALS → $KeyPath" "Green"
-Write-VpeLine "LiteLLM config → .\google-api\litellm_config.yaml" "Green"
-Write-VpeLine "Listen port → 4000 (locked)" "Green"
+Write-VpeLine "GOOGLE_APPLICATION_CREDENTIALS -> $KeyPath" "Green"
+Write-VpeLine "LiteLLM config -> .\google-api\litellm_config.yaml" "Green"
+Write-VpeLine "Listen port -> 4000 (locked)" "Green"
 
 Write-VpeLine "" "White"
-Write-VpeLine "── Next: open another Cursor integrated terminal pane and run (global PATH) ──" "DarkYellow"
+Write-VpeLine "-- Next: open another Cursor integrated terminal pane and run (global PATH) --" "DarkYellow"
 Write-VpeLine "ngrok http 4000" "Cyan"
 Write-VpeLine "" "White"
 
 if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
-    Write-VpeLine "[VPE WARN] ngrok not on PATH — run scripts\vpe-add-node-launcher-user-path.ps1 once, then reopen the terminal." "Yellow"
+    Write-VpeLine "[VPE WARN] ngrok not on PATH - run scripts\vpe-add-node-launcher-user-path.ps1 once, then reopen the terminal." "Yellow"
 }
 
-Write-VpeLine "[VPE STANDBY] Paths OK · ngrok (global) → separate pane · LiteLLM :4000 (this pane)" "Green"
+Write-VpeLine "[VPE STANDBY] Paths OK - ngrok (global) in separate pane - LiteLLM :4000 (this pane)" "Green"
 
-Write-VpeLine "Starting LiteLLM (this window)…" "Cyan"
+Write-VpeLine "Starting LiteLLM (this window)..." "Cyan"
 Set-Location -LiteralPath $ScriptRootSafe
 & litellm --config "./litellm_config.yaml" --port 4000

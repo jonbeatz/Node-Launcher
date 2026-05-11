@@ -5,6 +5,79 @@ const {
 } = require('./vpe-vault-protocol');
 const path = require('path');
 const fs = require('fs');
+
+function msc_ironParseSemverCore(s) {
+  const m = String(s || '')
+    .trim()
+    .replace(/^v/i, '')
+    .match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+/** @returns {boolean} true if a < b */
+function msc_ironSemverLt(a, b) {
+  const pa = msc_ironParseSemverCore(a);
+  const pb = msc_ironParseSemverCore(b);
+  if (!pa || !pb) return false;
+  for (let i = 0; i < 3; i += 1) {
+    if (pa[i] < pb[i]) return true;
+    if (pa[i] > pb[i]) return false;
+  }
+  return false;
+}
+
+/**
+ * Local-first `userData`: when running from a Node-Launcher checkout or with `--portable`,
+ * keep SQLite/cache under `process.cwd()/vpe-local-data` so legacy trees on D: do not share
+ * `%LocalAppData%/VaderProjectEngine` with other installs.
+ */
+function msc_vpeDetectLocalFirstUserData() {
+  /** Iron Curtain — before rm-guard, vault lock, and heavy main init (legacy engine / caps path). */
+  if (!process.env.VPE_E2E_USER_DATA && String(process.env.VPE_SKIP_IRON_CURTAIN || '').trim() !== '1') {
+    const cwdSeg = process.cwd().split(/[/\\]+/).some((seg) => seg === 'NODE-LAUNCHER');
+    const execBase = path.basename(process.execPath || '').toUpperCase();
+    const legacyExe = execBase.includes('NODE-LAUNCHER');
+
+    let appVer = '0.0.0';
+    try {
+      const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+      appVer = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '0.0.0').trim();
+    } catch (_) {
+      /* */
+    }
+    const legacyVersion = msc_ironSemverLt(appVer, '2.1.0');
+
+    if (cwdSeg || legacyExe || legacyVersion) {
+      const msg =
+        'CRITICAL: LEGACY ENGINE DETECTED. To prevent data corruption on your D: Drive Vault, this version has been disabled. Please use the VPE Sovereign Build.';
+      try {
+        dialog.showErrorBox('Vader Project Engine', msg);
+      } catch (_) {
+        /* */
+      }
+      try {
+        app.exit(0);
+      } catch (_) {
+        /* */
+      }
+      process.exit(0);
+    }
+  }
+
+  if (process.env.VPE_E2E_USER_DATA) return;
+  if (process.env.VPE_PORTABLE_USER_DATA_ROOT) return;
+  const cwd = process.cwd();
+  const portableArgv =
+    process.argv.includes('--portable') || String(process.env.VPE_PORTABLE || '') === '1';
+  const cwdNodeLauncher = /node[-_]?launcher/i.test(cwd);
+  if (portableArgv || cwdNodeLauncher) {
+    process.env.VPE_LOCAL_USERDATA_ROOT = path.resolve(path.join(cwd, 'vpe-local-data'));
+    console.log('[VPE] Local-first userData profile:', process.env.VPE_LOCAL_USERDATA_ROOT);
+  }
+}
+msc_vpeDetectLocalFirstUserData();
+
 const isDev = require('electron-is-dev');
 const MSC_PM2Manager = require('./pm2-manager');
 const MSC_TrayManager = require('./tray-manager');
@@ -84,73 +157,6 @@ if (!process.env.VPE_E2E_USER_DATA) {
     });
   }
 }
-
-function msc_ironParseSemverCore(s) {
-  const m = String(s || '')
-    .trim()
-    .replace(/^v/i, '')
-    .match(/^(\d+)\.(\d+)\.(\d+)/);
-  if (!m) return null;
-  return [Number(m[1]), Number(m[2]), Number(m[3])];
-}
-
-/** @returns {boolean} true if a < b */
-function msc_ironSemverLt(a, b) {
-  const pa = msc_ironParseSemverCore(a);
-  const pb = msc_ironParseSemverCore(b);
-  if (!pa || !pb) return false;
-  for (let i = 0; i < 3; i += 1) {
-    if (pa[i] < pb[i]) return true;
-    if (pa[i] > pb[i]) return false;
-  }
-  return false;
-}
-
-/**
- * Local-first `userData`: when running from a Node-Launcher checkout or with `--portable`,
- * keep SQLite/cache under `process.cwd()/vpe-local-data` so legacy trees on D: do not share
- * `%LocalAppData%/VaderProjectEngine` with other installs.
- */
-function msc_vpeDetectLocalFirstUserData() {
-  /** Iron Curtain — must run before any other logic here (legacy engine / caps install path). */
-  if (!process.env.VPE_E2E_USER_DATA && String(process.env.VPE_SKIP_IRON_CURTAIN || '').trim() !== '1') {
-    const cwdSeg = process.cwd().split(/[/\\]+/).some((seg) => seg === 'NODE-LAUNCHER');
-    const execBase = path.basename(process.execPath || '').toUpperCase();
-    const legacyExe = execBase.includes('NODE-LAUNCHER');
-
-    let appVer = '0.0.0';
-    try {
-      const pkgPath = path.join(__dirname, '..', '..', 'package.json');
-      appVer = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '0.0.0').trim();
-    } catch (_) {
-      /* */
-    }
-    const legacyVersion = msc_ironSemverLt(appVer, '2.1.0');
-
-    if (cwdSeg || legacyExe || legacyVersion) {
-      const msg =
-        'CRITICAL: LEGACY ENGINE DETECTED. To prevent data corruption on your D: Drive Vault, this version has been disabled. Please use the VPE Sovereign Build.';
-      try {
-        dialog.showErrorBox('Vader Project Engine', msg);
-      } catch (_) {
-        /* */
-      }
-      process.exit(0);
-    }
-  }
-
-  if (process.env.VPE_E2E_USER_DATA) return;
-  if (process.env.VPE_PORTABLE_USER_DATA_ROOT) return;
-  const cwd = process.cwd();
-  const portableArgv =
-    process.argv.includes('--portable') || String(process.env.VPE_PORTABLE || '') === '1';
-  const cwdNodeLauncher = /node[-_]?launcher/i.test(cwd);
-  if (portableArgv || cwdNodeLauncher) {
-    process.env.VPE_LOCAL_USERDATA_ROOT = path.resolve(path.join(cwd, 'vpe-local-data'));
-    console.log('[VPE] Local-first userData profile:', process.env.VPE_LOCAL_USERDATA_ROOT);
-  }
-}
-msc_vpeDetectLocalFirstUserData();
 
 /** v1.6.0 — mute noisy DevTools/socket stderr unless `--verbose` is present; ghost watcher post-reconcile. */
 const MSC_VPE_VERBOSE_LOG = process.argv.includes('--verbose');

@@ -606,7 +606,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   }
 
   const msc_reorderArrowStack = (
-    <div className="absolute left-2 top-1/2 z-30 hidden md:flex -translate-y-1/2 flex-col gap-0.5 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
+    <div className="absolute left-2 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-0.5 opacity-60 transition-opacity duration-200 ease-in-out group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
       <button
         type="button"
         disabled={reorderBusy}
