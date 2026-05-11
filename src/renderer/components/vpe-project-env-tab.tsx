@@ -236,7 +236,8 @@ export function Msc_ProjectEnvTab({ projectId, active }: Props) {
         </p>
       ) : null}
 
-      <div className="max-h-[220px] overflow-y-auto pr-0.5">
+      {/* JEDI_MOD_05 — gutter so scrollbar clears trash column */}
+      <div className="max-h-[220px] overflow-y-auto pr-5">
         <div className="flex flex-col gap-2">
           {lines.map((row) => {
             if (row.kind === 'blank') {

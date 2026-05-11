@@ -35,6 +35,10 @@ import { Msc_ProjectEnvTab } from '@/components/vpe-project-env-tab'
 
 export type { VpeShieldProjectType }
 
+/** JEDI_MOD_01 / JEDI_MOD_06 — Obsidian Glass on single outer shell (border + outline in globals). */
+const msc_obsidianGlassShellCls =
+  'vpe-card-obsidian-glass box-border border border-solid border-t-white/20 border-x-white/5 border-b-white/[0.02] bg-[#1c1c1c]/80 backdrop-blur-lg shadow-[0_20px_50px_rgba(0,0,0,0.6)]'
+
 function msc_formatUptimeSeconds(total: number): string {
   if (!Number.isFinite(total) || total < 0) return '—'
   const d = Math.floor(total / 86400)
@@ -145,11 +149,11 @@ function ProjectMetaAccordion({
   const valueCls = isCompact ? 'text-[12px]' : 'text-[13px]'
 
   return (
-    <div className="border-t border-[#2a2a2a] bg-[#121212]">
+    <div className="w-full min-w-0 border-t border-[#2a2a2a]/90 bg-[#121212]/95">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex w-full items-center justify-center gap-1 bg-[#121212] py-1 text-[10px] uppercase tracking-wide transition-colors vader-focus ${
+        className={`flex w-full items-center justify-center gap-1 bg-[#121212]/95 py-1 text-[10px] uppercase tracking-wide transition-colors vader-focus hover:bg-white/[0.04] ${
           isCompact
             ? 'text-[#888888] hover:text-white'
             : 'text-[#eaeaea] hover:text-[#4fde82]'
@@ -164,11 +168,13 @@ function ProjectMetaAccordion({
       </button>
       <motion.div
         initial={false}
+        layout={false}
         animate={{ height: open ? 'auto' : 0 }}
         transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-        className="overflow-hidden bg-[#121212]"
+        className="overflow-hidden bg-[#121212]/95"
+        style={{ contain: 'layout paint' }}
       >
-        <div className={`space-y-2 bg-[#121212] ${pad} pb-3 pt-2 text-[#A0A0A0]`}>
+        <div className={`space-y-2 bg-[#121212]/95 ${pad} pb-3 pt-2 text-[#A0A0A0]`}>
           <div
             className="flex gap-1 border-b border-[#2a2a2a] pb-2"
             role="tablist"
@@ -701,13 +707,13 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const openBtnIdleClass =
     'border-[#3f3f3f] bg-transparent text-[#555555] opacity-50'
 
-  const cardChromeSelected = !isError && isSelected ? 'vpe-card-chrome-selected' : ''
+  /** JEDI_MOD_09 — chrome ring only on thumb + main header stack; accordion stays studio dark. */
+  const cardChromeHeaderSelected =
+    !isError && isSelected ? 'vpe-card-chrome-selected-header' : ''
 
   /** LOGS strip width matches header icon tiles (compact 1.5rem, cinema 1.75rem). */
-  const msc_mgmtTileRem = 1.5
   const msc_mgmtTileRemCinema = 1.75
   const msc_mgmtCount = 3
-  const msc_logsStripWidth = `${msc_mgmtCount * msc_mgmtTileRem + (msc_mgmtCount - 1) * 0.25}rem`
   const msc_logsStripWidthCinema = `${msc_mgmtCount * msc_mgmtTileRemCinema + (msc_mgmtCount - 1) * 0.25}rem`
 
   const primaryIsPlayCta =
@@ -727,38 +733,53 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
     onMouseDown: msc_onCardSurfaceDown,
   }
 
+  /** JEDI_MOD_10 / JEDI_MOD_11 — Disable shell layout so accordion / selection chrome never squash the hero. */
+  const msc_cinemaShellMotionProps = {
+    ...msc_cardShellMotionProps,
+    layout: false,
+  }
+  const msc_compactShellMotionProps = {
+    ...msc_cardShellMotionProps,
+    layout: false,
+  }
+
   if (isCompact) {
     return (
       <motion.div
-        {...msc_cardShellMotionProps}
-        className={`group vader-card vpe-theme-font vpe-project-card boxBling relative w-[250px] max-w-full ${
-          compactInfoOpen ? 'overflow-visible' : 'overflow-hidden'
-        } ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'} ${cardChromeSelected}${
-          motionExtraClassName ? ` ${motionExtraClassName}` : ''
-        }`}
+        {...msc_compactShellMotionProps}
+        className={`group vader-card vpe-theme-font vpe-project-card boxBling relative w-[250px] max-w-full overflow-hidden rounded-[4px] ${
+          isError
+            ? `${msc_obsidianGlassShellCls} vpe-card-obsidian-glass--error`
+            : msc_obsidianGlassShellCls
+        } ${motionExtraClassName ? ` ${motionExtraClassName}` : ''}`}
       >
-        <div className="relative aspect-[4/3] bg-[#121212] overflow-hidden border-b border-[#333333]">
+        <div className={`flex flex-col rounded-t-[4px] ${cardChromeHeaderSelected}`}>
+        <div className="relative w-full shrink-0 border-b border-[#333333] bg-[#0a0a0a]">
           {msc_reorderArrowStack}
-          {thumbnailUrl ? (
-            // v1.7.6 — native img for `vpe-vault:` (privileged custom scheme); avoids Next/Image URL restrictions.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumbnailUrl}
-              alt={name}
-              className="absolute inset-0 h-full w-full object-cover opacity-90"
-            />
-          ) : (
-            <div className="w-full h-full vader-grid-pattern flex items-center justify-center">
-              <span className="text-[10px] text-[#333333] uppercase tracking-wider">THUMB</span>
-            </div>
-          )}
+          <div className="relative aspect-video w-full shrink-0 overflow-hidden will-change-transform">
+            {thumbnailUrl ? (
+              // v1.7.6 — native img for `vpe-vault:` (privileged custom scheme); avoids Next/Image URL restrictions.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={thumbnailUrl}
+                alt={name}
+                className="absolute inset-0 h-full w-full object-cover opacity-90"
+              />
+            ) : (
+              <div className="flex h-full min-h-0 w-full items-center justify-center vader-grid-pattern">
+                <span className="text-[10px] text-[#333333] uppercase tracking-wider">THUMB</span>
+              </div>
+            )}
+          </div>
 
           <div
-            className="absolute left-2 top-2 z-20 flex flex-col items-center gap-1 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+            className="pointer-events-none absolute left-2 top-2 z-20 flex flex-col items-center gap-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
             aria-hidden
           >
             <span
-              className="block rounded-full border-0 shrink-0 ring-1 ring-black/40"
+              className={`block shrink-0 rounded-full border-0 ring-1 ring-white/12 shadow-[0_0_6px_rgba(0,0,0,0.65)] ${
+                isRunning ? 'motion-safe:animate-pulse' : ''
+              }`}
               title={dotTitle}
               style={{ width: 8, height: 8, backgroundColor: dotHex }}
             />
@@ -774,7 +795,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           </div>
           {showVaultPaperclip ? (
             <div
-              className="absolute right-2 top-2 z-20 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+              className="pointer-events-none absolute right-2 top-2 z-20 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
               title="Vault reference files"
             >
               <span
@@ -787,8 +808,9 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           ) : null}
         </div>
 
+        <div className="min-w-0 bg-[#242424]/90">
         <div
-          className={`border-b border-[#2a2a2a] flex min-w-0 items-center justify-between gap-2.5 px-3 ${isIdleStopped ? 'py-1.5' : 'py-2'}`}
+          className={`flex min-w-0 items-center justify-between gap-2.5 border-b border-[#2a2a2a] px-3 ${isIdleStopped ? 'py-1.5' : 'py-2'}`}
         >
           <div className="flex min-w-0 flex-1 items-center min-h-6 pr-0.5">
             <h3
@@ -838,7 +860,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
         </div>
 
         <div
-          className={`px-2.5 flex flex-wrap items-center gap-1 ${isIdleStopped ? 'py-1.5' : 'py-2'}`}
+          className={`grid min-h-8 grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.625rem] items-center gap-1 px-2.5 ${isIdleStopped ? 'py-1.5' : 'py-2'}`}
         >
           <button
             type="button"
@@ -849,7 +871,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             }}
             disabled={Boolean('disabled' in primaryBtn && primaryBtn.disabled === true)}
             className={`
-              box-border min-h-7 max-h-7 h-7 flex-1 min-w-[72px] flex items-center justify-center gap-1 rounded border border-transparent py-0 leading-tight text-[10px] transition-all vader-focus
+              box-border flex h-8 min-h-8 max-h-8 w-full min-w-0 shrink-0 items-center justify-center gap-1 rounded border border-transparent py-0 text-[10px] leading-none transition-all whitespace-nowrap vader-focus
               ${primaryBtn.active
                 ? 'border-transparent bg-[#e02b20] text-white hover:bg-[#c41e17] hover:text-white'
                 : primaryBtn.disabled
@@ -874,7 +896,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
               fill={primaryIsPlayCta || primaryIsStopCta ? 'currentColor' : undefined}
               strokeWidth={primaryIsPlayCta || primaryIsStopCta ? 0 : undefined}
             />
-            <span className="truncate">{primaryBtn.label}</span>
+            <span className="min-w-0 truncate whitespace-nowrap">{primaryBtn.label}</span>
           </button>
           <button
             type="button"
@@ -883,7 +905,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
               e.stopPropagation()
               if (isRunning && onOpenInBrowser) onOpenInBrowser()
             }}
-            className={`box-border flex min-h-7 max-h-7 min-w-[4.25rem] flex-1 items-center justify-center gap-1 h-7 rounded border text-[10px] font-medium uppercase tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
+            className={`box-border flex h-8 min-h-8 max-h-8 w-full min-w-0 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded border text-[10px] font-medium uppercase leading-none tracking-wide transition-all disabled:cursor-not-allowed vader-focus ${
               isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
             }`}
             title={
@@ -893,17 +915,18 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             }
           >
             <ExternalLink size={11} className="shrink-0" />
-            Open
+            <span className="whitespace-nowrap">Open</span>
           </button>
           <button
             type="button"
             onClick={onLogs}
-            style={{ width: msc_logsStripWidth }}
-            className="box-border min-h-7 max-h-7 h-7 shrink-0 rounded border border-[#333333] bg-[#2a2a2a] flex items-center justify-center text-[#E8E8E8] hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white transition-all vader-focus"
+            className="box-border flex h-8 min-h-8 max-h-8 w-full shrink-0 items-center justify-center justify-self-center rounded border border-[#333333] bg-[#2a2a2a] text-[#E8E8E8] transition-all hover:bg-[#4b5563] hover:border-[#4b5563] hover:text-white whitespace-nowrap vader-focus"
             title="Logs"
           >
-            <Terminal size={12} />
+            <Terminal size={12} className="shrink-0" />
           </button>
+        </div>
+        </div>
         </div>
         <ProjectMetaAccordion
           isCompact
@@ -936,19 +959,23 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
 
   return (
     <motion.div
-      {...msc_cardShellMotionProps}
+      {...msc_cinemaShellMotionProps}
       className={`
-        group vader-card vpe-theme-font vpe-project-card boxBling relative w-full min-w-0
-        ${cinemaInspectOpen ? 'overflow-visible' : 'overflow-hidden'}
-        ${isError ? 'border-[#e02b20] bg-[#1c1c1c]' : 'bg-[#1c1c1c]'}
-        ${cardChromeSelected}${motionExtraClassName ? ` ${motionExtraClassName}` : ''}
+        group vader-card vpe-theme-font vpe-project-card boxBling relative w-full min-w-0 overflow-hidden rounded-[4px]
+        ${
+          isError
+            ? `${msc_obsidianGlassShellCls} vpe-card-obsidian-glass--error`
+            : msc_obsidianGlassShellCls
+        }
+        ${motionExtraClassName ? ` ${motionExtraClassName}` : ''}
       `}
     >
         <div
-          className="relative aspect-[4/3] bg-[#0a0a0a] overflow-hidden border-b border-[#333333]"
-          style={{ borderRadius: '4px 4px 0 0' }}
+          className={`flex flex-col rounded-t-[4px] ${cardChromeHeaderSelected}`}
         >
+        <div className="relative w-full shrink-0 rounded-t-[4px] border-b border-[#333333] bg-[#0a0a0a]">
         {msc_reorderArrowStack}
+        <div className="relative aspect-video w-full shrink-0 overflow-hidden will-change-transform">
         {thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -957,17 +984,20 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${cinemaInspectOpen ? 'opacity-70' : 'opacity-80'}`}
           />
         ) : (
-          <div className="w-full h-full vader-grid-pattern flex items-center justify-center">
+          <div className="flex h-full min-h-0 w-full items-center justify-center vader-grid-pattern">
             <span className="text-xs text-[#333333] uppercase tracking-wider">THUMBNAIL</span>
           </div>
         )}
+        </div>
 
         <div
-          className="absolute left-2 top-2 z-20 flex flex-col items-center gap-1 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+          className="pointer-events-none absolute left-2 top-2 z-20 flex flex-col items-center gap-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
           aria-hidden
         >
           <span
-            className="block rounded-full border-0 shrink-0 ring-1 ring-black/50"
+            className={`block shrink-0 rounded-full border-0 ring-1 ring-white/12 shadow-[0_0_8px_rgba(0,0,0,0.65)] ${
+              isRunning ? 'motion-safe:animate-pulse' : ''
+            }`}
             title={dotTitle}
             style={{
               width: 10,
@@ -987,7 +1017,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
         </div>
         {showVaultPaperclip ? (
           <div
-            className="absolute right-2 top-2 z-20 pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+            className="pointer-events-none absolute right-2 top-2 z-20 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
             title="Vault reference files"
           >
             <span
@@ -1001,6 +1031,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
 
       </div>
 
+      <div className="min-w-0 bg-[#242424]/90">
       <div className={isIdleStopped ? 'px-4 pt-3 pb-2' : 'p-4'}>
           <div
             className={`flex min-w-0 items-center justify-between gap-2 ${isIdleStopped ? 'mb-1' : 'mb-2'}`}
@@ -1284,6 +1315,8 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           <Terminal size={12} className="shrink-0" />
           <span>LOGS</span>
         </button>
+      </div>
+      </div>
       </div>
       <ProjectMetaAccordion
         isCompact={false}

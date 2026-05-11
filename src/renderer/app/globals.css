@@ -254,12 +254,104 @@
   background: #4a4a4a;
 }
 
-/* v1.2.2 — neutral depth (cards + sidebar) */
-.vpe-project-card,
+/* v1.2.2 — neutral depth (cards + sidebar). Obsidian Glass cards use their own shadow. */
+.vpe-project-card:not(.vpe-card-obsidian-glass),
 .vpe-sidebar {
   box-shadow:
     0 10px 30px rgba(0, 0, 0, 0.5),
     0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* JEDI_MOD_01 — Obsidian Glass [VPE-OBSIDIAN-GLASS] (cinema + compact shells); JEDI_MOD_06 — border-box + outline for stable specular during accordion motion */
+.vpe-project-card.vpe-card-obsidian-glass {
+  box-sizing: border-box;
+  position: relative;
+  outline: 1px solid transparent;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+  transition:
+    background 300ms ease,
+    box-shadow 300ms ease,
+    border-color 300ms ease !important;
+}
+
+/**
+ * JEDI_MOD_11 — Hover “glaze” uses ::before only (.boxBling already owns ::after). Does not alter base Tailwind BG.
+ */
+.vpe-project-card.vpe-card-obsidian-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.028) 45%,
+    rgba(255, 255, 255, 0) 72%
+  );
+}
+
+.vpe-project-card.vpe-card-obsidian-glass:hover:not(.vpe-card-obsidian-glass--error)::before {
+  opacity: 1;
+}
+
+.vpe-project-card.vpe-card-obsidian-glass:hover:not(.vpe-card-obsidian-glass--error) {
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.65) !important;
+  border-top-color: rgba(255, 255, 255, 0.24) !important;
+  border-left-color: rgba(255, 255, 255, 0.07) !important;
+  border-right-color: rgba(255, 255, 255, 0.07) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.vader-card.vpe-project-card.vpe-card-obsidian-glass:hover:not(.vpe-card-obsidian-glass--error) {
+  border-top-color: rgba(255, 255, 255, 0.24);
+  border-left-color: rgba(255, 255, 255, 0.07);
+  border-right-color: rgba(255, 255, 255, 0.07);
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+
+.vpe-project-card.vpe-card-obsidian-glass.vpe-card-obsidian-glass--error {
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(224, 43, 32, 0.88) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(224, 43, 32, 0.12) !important;
+}
+
+.vpe-project-card.vpe-card-obsidian-glass.vpe-card-obsidian-glass--error:hover {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.025)),
+    rgba(30, 20, 20, 0.88) !important;
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.68), 0 0 0 1px rgba(255, 90, 80, 0.2) !important;
+  border-color: rgba(255, 100, 90, 0.95) !important;
+}
+
+/**
+ * JEDI_MOD_09 — Metallic chrome only on the upper header stack (`.vpe-card-chrome-selected-header`),
+ * not the accordion. Padding fill stays transparent so thumb + #242424 body show through.
+ */
+.vpe-project-card.vpe-card-obsidian-glass .vpe-card-chrome-selected-header {
+  box-sizing: border-box;
+  border-radius: 4px 4px 0 0;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    linear-gradient(to bottom right, #9ca3af, #1f2937) border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: box-shadow 200ms ease, filter 200ms ease;
+}
+
+.vpe-project-card.vpe-card-obsidian-glass .vpe-card-chrome-selected-header:hover {
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    linear-gradient(to bottom right, #b0b8c4, #1f2937) border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
 /* System Log / embedded terminal — transparent fill fixes compositor black box under blur */

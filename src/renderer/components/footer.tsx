@@ -5,16 +5,9 @@ import { getVpeApi } from '@/lib/vpe-bridge'
 
 type NetLedState = 'unknown' | 'forge' | 'dev' | 'conflict'
 
-function msc_engineVersionLabel(): string {
-  if (typeof window === 'undefined') return '2.2.0'
-  const w = window as Window & { vpeInfo?: { version?: string } }
-  return w.vpeInfo?.version ?? '2.2.0'
-}
-
 export function Footer() {
   const [led, setLed] = useState<NetLedState>('unknown')
   const [purging, setPurging] = useState(false)
-  const [engineVer] = useState(() => msc_engineVersionLabel())
 
   const refresh = useCallback(async () => {
     const api = getVpeApi()
@@ -100,7 +93,7 @@ export function Footer() {
         </button>
       </div>
       <span className="font-sans text-[11px] text-[#A0A0A0]">
-        Powered by the MSC Media Engine v{engineVer}
+        Powered by the MSC Media Engine | v2.2.0
       </span>
     </footer>
   )

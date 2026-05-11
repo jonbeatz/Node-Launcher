@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { getVpeApi } from '@/lib/vpe-bridge'
 import { useToast } from '@/components/vader-toast'
@@ -21,6 +22,9 @@ import {
 import { VpeHealthEqualizerIcon } from '@/components/vpe-health-equalizer-icon'
 import { msc_rowHasDocumentationEnabled } from '@/lib/vpe-bridge'
 import type { Project } from '@/types/vpe-ipc'
+
+/** JEDI_MOD_06 — list perf tooltip: gap from the right edge of the rendered project name. */
+const MSC_LIST_PERF_TEXT_GAP_PX = 25
 
 function msc_listDocPaperclip(project: Project): boolean {
   return (
@@ -130,8 +134,54 @@ export function ProjectListView({
   const { addToast } = useToast()
   const [sortField, setSortField] = useState<SortField>('order')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
-  const [hoveredProject, setHoveredProject] = useState<string | null>(null)
-  const [reorderBusyId, setReorderBusyId] = useState<string | null>(null)
+  /** List perf bubble: portal + fixed; JEDI_MOD_06 — snap to project name text end (+25px), vertical center of text. */
+  const [listPerfTip, setListPerfTip] = useState<{
+    projectId: string
+    top: number
+    left: number
+  } | null>(null)
+  const projectNameLabelRefs = useRef(new Map<string, HTMLSpanElement>())
+
+  const syncListPerfTip = useCallback((projectId: string | null) => {
+    if (!projectId) {
+      setListPerfTip(null)
+      return
+    }
+    const label = projectNameLabelRefs.current.get(projectId)
+    if (!label) {
+      setListPerfTip(null)
+      return
+    }
+    const r = label.getBoundingClientRect()
+    setListPerfTip({
+      projectId,
+      top: r.top + r.height / 2,
+      left: r.right + MSC_LIST_PERF_TEXT_GAP_PX,
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!listPerfTip) return
+    const onReposition = () => {
+      setListPerfTip((prev) => {
+        if (!prev) return prev
+        const label = projectNameLabelRefs.current.get(prev.projectId)
+        if (!label) return null
+        const r = label.getBoundingClientRect()
+        return {
+          projectId: prev.projectId,
+          top: r.top + r.height / 2,
+          left: r.right + MSC_LIST_PERF_TEXT_GAP_PX,
+        }
+      })
+    }
+    window.addEventListener('scroll', onReposition, true)
+    window.addEventListener('resize', onReposition)
+    return () => {
+      window.removeEventListener('scroll', onReposition, true)
+      window.removeEventListener('resize', onReposition)
+    }
+  }, [listPerfTip])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -165,23 +215,6 @@ export function ProjectListView({
     return 0
   })
 
-  const handleListReorder = async (projectId: string, dir: 'up' | 'down') => {
-    if (reorderBusyId) return
-    const api = getVpeApi()
-    if (!api?.reorderProject) return
-    setReorderBusyId(projectId)
-    try {
-      const r = await api.reorderProject(projectId, dir)
-      if (!r?.ok && r?.error && r.error !== 'no_neighbor') {
-        addToast('Reorder failed', 'error', String(r.error))
-      }
-    } catch (e) {
-      addToast('Reorder failed', 'error', e instanceof Error ? e.message : String(e))
-    } finally {
-      setReorderBusyId(null)
-    }
-  }
-
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null
     return sortDirection === 'asc' ? (
@@ -190,9 +223,6 @@ export function ProjectListView({
       <ChevronDown size={12} className="text-[#4fde82]" />
     )
   }
-
-  const msc_listReorderTile =
-    'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border border-[#2a2a2a]/50 bg-[#121212] text-[#eaeaea] transition-colors vader-focus hover:bg-[#2a2a2a] disabled:opacity-40 disabled:pointer-events-none'
 
   const allSelected = projects.length > 0 && selectedIds.length === projects.length
 
@@ -245,8 +275,8 @@ export function ProjectListView({
                 />
               </th>
               <th
-                className="w-14 px-1 text-center text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]"
-                title="Persisted catalog order (same as grid reorder)"
+                className="w-11 px-1 text-center text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em]"
+                title="Persisted catalog order (grid drag still reorders)"
               >
                 <button
                   type="button"
@@ -311,7 +341,6 @@ export function ProjectListView({
               const isDevInstalling = Boolean(devInstallByProjectId[project.id] && isRunning)
               const zebra = index % 2 === 0 ? 'bg-[#121212]' : 'bg-[#1c1c1c]'
               const rowBg = isExplorerTarget ? 'bg-[#2a2a2a]' : zebra
-              const isHovered = hoveredProject === project.id
               const httpCell = msc_healthCell(project)
               const statusTitle = isDevInstalling
                 ? 'INSTALLING'
@@ -326,8 +355,8 @@ export function ProjectListView({
               return (
                 <tr 
                   key={project.id}
-                  onMouseEnter={() => setHoveredProject(project.id)}
-                  onMouseLeave={() => setHoveredProject(null)}
+                  onMouseEnter={() => syncListPerfTip(project.id)}
+                  onMouseLeave={() => syncListPerfTip(null)}
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest('input,button,a,[role="button"]'))
                       return
@@ -349,35 +378,11 @@ export function ProjectListView({
                       className="w-4 h-4 rounded border-[#555555] bg-[#2a2a2a] checked:bg-[#4fde82] checked:border-[#4fde82] accent-[#4fde82]"
                     />
                   </td>
-                  <td className="px-1 align-middle">
-                    <div className="flex flex-col items-center gap-0.5 py-0.5">
-                      <button
-                        type="button"
-                        disabled={reorderBusyId === project.id}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          void handleListReorder(project.id, 'up')
-                        }}
-                        className={msc_listReorderTile}
-                        title="Move up in registry"
-                        aria-label={`Move ${project.name} up`}
-                      >
-                        <ChevronUp size={12} strokeWidth={2.5} />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={reorderBusyId === project.id}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          void handleListReorder(project.id, 'down')
-                        }}
-                        className={msc_listReorderTile}
-                        title="Move down in registry"
-                        aria-label={`Move ${project.name} down`}
-                      >
-                        <ChevronDown size={12} strokeWidth={2.5} />
-                      </button>
-                    </div>
+                  <td className="w-11 px-1 text-center align-middle tabular-nums text-[11px] text-[#888888]">
+                    {typeof project.sort_order === 'number' &&
+                    Number.isFinite(Number(project.sort_order))
+                      ? Number(project.sort_order)
+                      : '—'}
                   </td>
                   <td className="px-3 text-center">
                     {isRunning ? (
@@ -395,7 +400,7 @@ export function ProjectListView({
                     )}
                   </td>
                   <td className="px-3">
-                    <div className="relative flex items-center gap-2 min-w-0">
+                    <div className="relative flex min-w-0 items-center gap-2">
                       <span
                         className="rounded-full shrink-0"
                         title={project.shield_project_type ?? 'unknown'}
@@ -417,28 +422,19 @@ export function ProjectListView({
                         )}
                       <button
                         onClick={() => onSettings(project.id)}
-                        className={`vpe-card-title text-[13px] hover:text-[#4fde82] transition-colors truncate text-left ${isError ? 'text-[#e02b20]' : 'text-white'}`}
+                        className={`vpe-card-title min-w-0 text-left text-[13px] transition-colors hover:text-[#4fde82] ${isError ? 'text-[#e02b20]' : 'text-white'}`}
                         type="button"
                       >
-                        {project.name}
+                        <span
+                          ref={(el) => {
+                            if (el) projectNameLabelRefs.current.set(project.id, el)
+                            else projectNameLabelRefs.current.delete(project.id)
+                          }}
+                          className="inline-block max-w-full truncate align-middle"
+                        >
+                          {project.name}
+                        </span>
                       </button>
-                      
-                      {/* Hover Tooltip with Uptime and RAM */}
-                      {isHovered && (
-                        <div className="absolute left-0 top-full mt-1 z-50 bg-[#1c1c1c] border border-[#333333] rounded px-3 py-2 shadow-lg">
-                          <div className="flex items-center gap-4 whitespace-nowrap">
-                            <span className="text-[10px] text-[#A0A0A0]">
-                              Uptime: <span className="text-white">{project.uptime}</span>
-                            </span>
-                            <span className="text-[10px] text-[#A0A0A0]">
-                              RAM: <span className="text-white">{project.ram}</span>
-                            </span>
-                            <span className="text-[10px] text-[#A0A0A0]">
-                              CPU: <span className="text-white">{project.cpu}%</span>
-                            </span>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </td>
                   <td className="px-2 text-[12px] text-[#A0A0A0]">
@@ -568,6 +564,37 @@ export function ProjectListView({
           </tbody>
         </table>
       </div>
+
+      {typeof document !== 'undefined' &&
+        listPerfTip &&
+        (() => {
+          const tipProject = sortedProjects.find((p) => p.id === listPerfTip.projectId)
+          if (!tipProject) return null
+          return createPortal(
+            <div
+              role="tooltip"
+              className="pointer-events-none fixed z-[10060] rounded border border-[#333333] bg-[#1c1c1c] px-3 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.78)]"
+              style={{
+                top: listPerfTip.top,
+                left: listPerfTip.left,
+                transform: 'translate(0, -50%)',
+              }}
+            >
+              <div className="flex items-center gap-4 whitespace-nowrap">
+                <span className="text-[10px] text-[#A0A0A0]">
+                  Uptime: <span className="text-white">{tipProject.uptime}</span>
+                </span>
+                <span className="text-[10px] text-[#A0A0A0]">
+                  RAM: <span className="text-white">{tipProject.ram}</span>
+                </span>
+                <span className="text-[10px] text-[#A0A0A0]">
+                  CPU: <span className="text-white">{tipProject.cpu}%</span>
+                </span>
+              </div>
+            </div>,
+            document.body,
+          )
+        })()}
     </motion.div>
   )
 }
