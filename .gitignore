@@ -57,6 +57,10 @@ Thumbs.db
 # - media/vault raster assets (.jpg/.jpeg/.png/.webp), vpe-version.lock, and src/main/db/*.sqlite (+ engine JSON) are tracked (operator policy)
 # - _design_references/: layout / UI reference snapshots (see .cursorignore for indexer only)
 
+# Sovereign catalog DB (LOGIC_MOD_01) — local `data/` at repo or install root; keep folder via `.gitkeep` only.
+/data/*
+!/data/.gitkeep
+
 # Portable dev profile: SQLite + full Chromium userData (Code Cache, Session Storage, …). Never commit.
 vpe-local-data/
 

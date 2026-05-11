@@ -131,6 +131,8 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   backupLocalDb: () => msc_invoke('vpe:backup-local-db'),
   reorderProject: (projectId, direction) =>
     msc_invoke('vpe:reorder-project', { projectId, direction }),
+  readProjectDotEnv: (projectId) => msc_invoke('vpe:read-project-dotenv', projectId),
+  writeProjectDotEnv: (payload) => msc_invoke('vpe:write-project-dotenv', payload),
   runForgeDiagnostics: () => msc_invoke('vpe:run-diagnostics'),
   promptVaultRead: () => msc_invoke('vpe:prompt-vault-read'),
   promptVaultWrite: (data) => msc_invoke('vpe:prompt-vault-write', data),
@@ -144,7 +146,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '2.1.0',
+  version: '2.2.0',
   hardware: '9700x Tuned',
 });
 

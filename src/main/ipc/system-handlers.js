@@ -2,7 +2,7 @@
 
 const { msc_logInfo, msc_logError } = require('../lib/logger');
 const { msc_generateSupportBundle } = require('../lib/support-bundle');
-const { msc_vpePortableBackupFromStore } = require('../db/persistent-store');
+const { msc_vpePortableBackupFromStore, msc_getStorePaths } = require('../db/persistent-store');
 
 /**
  * Best-effort removal of leftover VPE dirs/zips under OS temp (snapshots / restore scratch).
@@ -249,13 +249,13 @@ function msc_registerSystemIpc(ipcMain, c) {
     if (canceled || !filePath) return { ok: false };
 
     try {
-      const userData = app.getPath('userData');
-      const dbPath = path.join(userData, 'vpe-db', 'database.sqlite');
+      const paths = msc_getStorePaths();
+      const dbPath = paths.sqlitePath;
       const tempDir = path.join(os.tmpdir(), `vpe-snapshot-${randomUUID()}`);
       fs.mkdirSync(tempDir, { recursive: true });
 
       if (fs.existsSync(dbPath)) {
-        fs.copyFileSync(dbPath, path.join(tempDir, 'database.sqlite'));
+        fs.copyFileSync(dbPath, path.join(tempDir, 'vader.sqlite'));
       }
 
       const rootEnv = path.join(process.cwd(), '.env');
@@ -317,8 +317,8 @@ function msc_registerSystemIpc(ipcMain, c) {
       if (response === 0) return { ok: false };
 
       const filePath = filePaths[0];
-      const userData = app.getPath('userData');
-      const dbDir = path.join(userData, 'vpe-db');
+      const paths = msc_getStorePaths();
+      const dbDir = paths.storeDir;
       const tempDir = path.join(os.tmpdir(), `vpe-restore-${randomUUID()}`);
       fs.mkdirSync(tempDir, { recursive: true });
 
@@ -329,11 +329,15 @@ function msc_registerSystemIpc(ipcMain, c) {
       const unzipCmd = `powershell -Command "Expand-Archive -Path """${filePath}""" -DestinationPath """${tempDir}""" -Force"`;
       execSync(unzipCmd);
 
-      // Restore SQLite
-      const restoredDb = path.join(tempDir, 'database.sqlite');
+      // Restore SQLite (vader.sqlite preferred; database.sqlite = legacy checkpoints)
+      const restoredVader = path.join(tempDir, 'vader.sqlite');
+      const restoredLegacy = path.join(tempDir, 'database.sqlite');
+      const restoredDb = fs.existsSync(restoredVader)
+        ? restoredVader
+        : restoredLegacy;
       if (fs.existsSync(restoredDb)) {
         fs.mkdirSync(dbDir, { recursive: true });
-        fs.copyFileSync(restoredDb, path.join(dbDir, 'database.sqlite'));
+        fs.copyFileSync(restoredDb, paths.sqlitePath);
       }
 
       // Restore Envs (optional, risk of breaking local paths if restored on different machine)

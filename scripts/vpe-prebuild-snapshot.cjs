@@ -15,8 +15,10 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 const VER = pkg.version || '0.0.0';
 
 function main() {
+  const sovereignPath = path.join(ROOT, 'data', 'vader.sqlite');
+  const legacyUserDataPath = path.join(msc_getVpeUserDataDir(), 'vpe-db', 'vader.sqlite');
+  const dbPath = fs.existsSync(sovereignPath) ? sovereignPath : legacyUserDataPath;
   const userData = msc_getVpeUserDataDir();
-  const dbPath = path.join(userData, 'vpe-db', 'database.sqlite');
   const outDir = path.join(userData, 'auto-snapshots');
   fs.mkdirSync(outDir, { recursive: true });
 
@@ -29,7 +31,7 @@ function main() {
 
   try {
     if (fs.existsSync(dbPath)) {
-      fs.copyFileSync(dbPath, path.join(tempDir, 'database.sqlite'));
+      fs.copyFileSync(dbPath, path.join(tempDir, 'vader.sqlite'));
     }
 
     const rootEnv = path.join(ROOT, '.env');

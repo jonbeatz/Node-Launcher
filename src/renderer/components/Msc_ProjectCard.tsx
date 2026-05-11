@@ -31,6 +31,7 @@ import { getVpeApi, type VpeShieldProjectType } from '@/lib/vpe-bridge'
 import { msc_shieldColorHex, msc_shieldTypeTitle } from '@/lib/shield-colors'
 import { useToast } from '@/components/vader-toast'
 import { VpeHealthEqualizerIcon } from '@/components/vpe-health-equalizer-icon'
+import { Msc_ProjectEnvTab } from '@/components/vpe-project-env-tab'
 
 export type { VpeShieldProjectType }
 
@@ -89,6 +90,7 @@ function msc_formatFolderTimestamp(iso: string | null | undefined): string {
 
 function ProjectMetaAccordion({
   isCompact,
+  projectId,
   projectPath,
   folderCreatedAt,
   folderModifiedAt,
@@ -96,6 +98,7 @@ function ProjectMetaAccordion({
   runningStrip,
 }: {
   isCompact: boolean
+  projectId: string
   projectPath: string
   folderCreatedAt?: string | null
   folderModifiedAt?: string | null
@@ -115,6 +118,7 @@ function ProjectMetaAccordion({
 }) {
   const { addToast } = useToast()
   const [open, setOpen] = useState(false)
+  const [metaTab, setMetaTab] = useState<'details' | 'environment'>('details')
   const skipParentSync = useRef(true)
 
   useEffect(() => {
@@ -124,6 +128,10 @@ function ProjectMetaAccordion({
     }
     onOpenChange?.(open)
   }, [open, onOpenChange])
+
+  useEffect(() => {
+    if (!open) setMetaTab('details')
+  }, [open])
 
   const copyPath = () => {
     if (!projectPath.trim()) return
@@ -161,6 +169,51 @@ function ProjectMetaAccordion({
         className="overflow-hidden bg-[#121212]"
       >
         <div className={`space-y-2 bg-[#121212] ${pad} pb-3 pt-2 text-[#A0A0A0]`}>
+          <div
+            className="flex gap-1 border-b border-[#2a2a2a] pb-2"
+            role="tablist"
+            aria-label="Project meta sections"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={metaTab === 'details'}
+              onClick={(e) => {
+                e.stopPropagation()
+                setMetaTab('details')
+              }}
+              className={`rounded px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors vader-focus ${
+                metaTab === 'details'
+                  ? 'bg-[#2a2a2a] text-white'
+                  : 'text-[#888888] hover:text-[#d1d5db]'
+              }`}
+            >
+              Details
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={metaTab === 'environment'}
+              onClick={(e) => {
+                e.stopPropagation()
+                setMetaTab('environment')
+              }}
+              className={`rounded px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition-colors vader-focus ${
+                metaTab === 'environment'
+                  ? 'bg-[#2a2a2a] text-white'
+                  : 'text-[#888888] hover:text-[#d1d5db]'
+              }`}
+            >
+              Environment
+            </button>
+          </div>
+
+          {metaTab === 'environment' ? (
+            <Msc_ProjectEnvTab projectId={projectId} active={open && metaTab === 'environment'} />
+          ) : null}
+
+          {metaTab === 'details' ? (
+            <>
           {isCompact && runningStrip && (
             <>
               {runningStrip.isHttpConnected &&
@@ -307,6 +360,8 @@ function ProjectMetaAccordion({
               COPY
             </button>
           </div>
+            </>
+          ) : null}
         </div>
       </motion.div>
     </div>
@@ -852,6 +907,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
         </div>
         <ProjectMetaAccordion
           isCompact
+          projectId={id}
           projectPath={projectPath}
           folderCreatedAt={project_folder_created_at}
           folderModifiedAt={project_folder_modified_at}
@@ -1231,6 +1287,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
       </div>
       <ProjectMetaAccordion
         isCompact={false}
+        projectId={id}
         projectPath={projectPath}
         folderCreatedAt={project_folder_created_at}
         folderModifiedAt={project_folder_modified_at}

@@ -113,6 +113,37 @@ function msc_vpeThumbUrlFileMissing(row) {
   }
 }
 
+const VPE_DOTENV_MAX_BYTES = 512 * 1024;
+
+/** LOGIC_MOD_02 — resolve `.env` at registered project root only (no traversal). */
+function msc_resolveProjectDotEnvAbs(store, projectId) {
+  const row = store.getProject(projectId);
+  if (!row || typeof row.path !== 'string' || !String(row.path).trim()) {
+    return { ok: false, error: 'VPE: Unknown project or missing path.' };
+  }
+  let root;
+  try {
+    root = path.resolve(String(row.path).trim());
+  } catch {
+    return { ok: false, error: 'VPE: Invalid project path.' };
+  }
+  if (!fs.existsSync(root)) {
+    return { ok: false, error: 'VPE: Project folder does not exist.' };
+  }
+  try {
+    if (!fs.statSync(root).isDirectory()) {
+      return { ok: false, error: 'VPE: Project path is not a directory.' };
+    }
+  } catch (e) {
+    return { ok: false, error: e?.message ?? String(e) };
+  }
+  const envPath = path.resolve(path.join(root, '.env'));
+  if (path.relative(root, envPath) !== '.env') {
+    return { ok: false, error: 'VPE: Invalid .env location.' };
+  }
+  return { ok: true, root, envPath };
+}
+
 function msc_vpeSortedVaultImagePathsForResync(absVaultDir) {
   /** @type {import('fs').Dirent[]} */
   let entries = [];
@@ -934,6 +965,66 @@ function msc_registerProjectIpc(ipcMain, c) {
     store.setProjectFavorite(projectId, isFavorite);
     msc_emitProjectsUpdated();
     return { ok: true };
+  });
+
+  ipcMain.handle('vpe:read-project-dotenv', async (_evt, projectId) => {
+    try {
+      if (!projectId || typeof projectId !== 'string') {
+        return { ok: false, error: 'VPE: Missing project id.' };
+      }
+      const hit = msc_resolveProjectDotEnvAbs(store, projectId);
+      if (!hit.ok) return hit;
+      const { envPath } = hit;
+      if (!fs.existsSync(envPath)) {
+        return { ok: true, content: '', missingFile: true, path: envPath };
+      }
+      const st = fs.statSync(envPath);
+      if (!st.isFile()) return { ok: false, error: 'VPE: .env is not a file.' };
+      if (st.size > VPE_DOTENV_MAX_BYTES) {
+        return { ok: false, error: 'VPE: .env exceeds maximum allowed size.' };
+      }
+      const content = fs.readFileSync(envPath, 'utf8');
+      return { ok: true, content, path: envPath };
+    } catch (e) {
+      return { ok: false, error: e?.message ?? String(e) };
+    }
+  });
+
+  ipcMain.handle('vpe:write-project-dotenv', async (_evt, payload) => {
+    try {
+      if (!payload || typeof payload !== 'object') {
+        return { ok: false, error: 'VPE: Invalid payload.' };
+      }
+      const { projectId, content } = payload;
+      if (!projectId || typeof projectId !== 'string') {
+        return { ok: false, error: 'VPE: Missing project id.' };
+      }
+      if (typeof content !== 'string') {
+        return { ok: false, error: 'VPE: Missing .env body.' };
+      }
+      if (content.length > VPE_DOTENV_MAX_BYTES) {
+        return { ok: false, error: 'VPE: .env content too large.' };
+      }
+      const hit = msc_resolveProjectDotEnvAbs(store, projectId);
+      if (!hit.ok) return hit;
+      const { envPath, root } = hit;
+      fs.mkdirSync(root, { recursive: true });
+      const tmp = `${envPath}.${randomUUID()}.tmp`;
+      fs.writeFileSync(tmp, content, 'utf8');
+      try {
+        fs.renameSync(tmp, envPath);
+      } catch (e) {
+        try {
+          fs.unlinkSync(tmp);
+        } catch (_) {
+          /* */
+        }
+        throw e;
+      }
+      return { ok: true, path: envPath };
+    } catch (e) {
+      return { ok: false, error: e?.message ?? String(e) };
+    }
   });
 }
 

@@ -41,7 +41,7 @@ When you run **`npm run dev`**, the Node-Launcher shell (Electron + renderer) is
 | **Terminal** | **xterm.js + node-pty** | Interactive, per-project terminal with full ANSI support. |
 
 ### **2.5 Data Architecture**
-The logical project registry structure is defined in **.cursorrules §11** (`projects.json` schema). Canonical runtime persistence is stored under **`app.getPath('userData')/vpe-db`** (SQLite with JSON fallback/migration support).
+The logical project registry structure is defined in **.cursorrules §11** (`projects.json` schema). Canonical runtime persistence is SQLite (JSON fallback) under **`<app root>/data/`** — dev uses `app.getAppPath()/data`, packaged builds use **`path.dirname(process.execPath)/data`** (LOGIC_MOD_01); older **`userData/vpe-db`** files are copied into `data/` on first boot.
 * **IPC types (v1.9.8+):** Renderer contracts for SQLite rows and dashboard projects live in **`src/renderer/types/vpe-ipc.ts`** (**`has_documentation`** as **`number | boolean`**, aligned with **INTEGER** columns); **`src/renderer/lib/vpe-bridge.ts`** re-exports and maps rows for the UI. **LiteLLM / ngrok:** **`google-api/vpe-start-api.ps1`**, **`google-api/litellm_config.yaml`** (see **`.cursor/docs/API-SetUp-Master.md`**).
 * **Persistence**: Projects persist with absolute paths, detected package manager, and specific start scripts.
 * **Preferences**: Metadata includes port lock preferences, preferred ports, and creation/launch timestamps.

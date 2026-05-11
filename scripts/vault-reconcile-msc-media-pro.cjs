@@ -39,6 +39,8 @@ function defaultVaultRoot() {
 function parseDbArg() {
   const hit = process.argv.find((a) => a.startsWith('--db='));
   if (hit) return path.resolve(hit.slice('--db='.length));
+  const fromRepo = path.join(process.cwd(), 'data', 'vader.sqlite');
+  if (fs.existsSync(fromRepo)) return fromRepo;
   if (process.platform === 'win32') {
     return path.join(
       os.homedir(),

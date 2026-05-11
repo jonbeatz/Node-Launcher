@@ -394,6 +394,20 @@ export interface VpeApi {
   updateVaultItem?: (
     payload: VpeUpdateVaultItemPayload,
   ) => Promise<{ ok: boolean; item?: VpePromptVaultItem }>
+  /** LOGIC_MOD_02 — project root `.env` (registered path only). */
+  readProjectDotEnv?: (
+    projectId: string,
+  ) => Promise<{
+    ok: boolean
+    content?: string
+    missingFile?: boolean
+    path?: string
+    error?: string
+  }>
+  writeProjectDotEnv?: (payload: {
+    projectId: string
+    content: string
+  }) => Promise<{ ok: boolean; path?: string; error?: string }>
   subscribeRepairRunsChanged?: (callback: () => void) => () => void
 }
 

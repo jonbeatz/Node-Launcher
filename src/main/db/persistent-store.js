@@ -61,23 +61,35 @@ function msc_sqliteApplyBaseSchema(db) {
 }
 
 /**
- * Writable DB directory: `app.getPath("userData")/vpe-db` in Electron (avoids SQLite inside read-only app.asar).
- * Falls back to `__dirname` when `electron` is not available (plain Node / tests).
- * @returns {{ storeDir: string, sqlitePath: string, jsonPath: string }}
+ * LOGIC_MOD_01 — Sovereign app root for catalog SQLite (not AppData).
+ * - Dev / unpacked: `app.getAppPath()/data` (repo or app folder).
+ * - Packaged: `path.dirname(process.execPath)/data` (next to the `.exe`; avoids writing inside `app.asar`).
+ * - Node / headless: `process.cwd()/data`.
+ * @returns {string}
  */
-function msc_getStorePaths() {
-  let storeDir;
+function msc_getSovereignAppRoot() {
   try {
     const { app } = require('electron');
-    if (app && typeof app.getPath === 'function') {
-      storeDir = path.join(app.getPath('userData'), 'vpe-db');
+    if (app && typeof app.isPackaged === 'boolean' && app.isPackaged) {
+      return path.dirname(process.execPath);
+    }
+    if (app && typeof app.getAppPath === 'function') {
+      return app.getAppPath();
     }
   } catch {
     /* electron not loadable */
   }
-  if (!storeDir) {
-    storeDir = __dirname;
-  }
+  return process.cwd();
+}
+
+/**
+ * Writable DB directory: `<sovereignRoot>/data` (LOGIC_MOD_01 portability).
+ * Falls back to `process.cwd()/data` when Electron is unavailable.
+ * @returns {{ storeDir: string, sqlitePath: string, jsonPath: string }}
+ */
+function msc_getStorePaths() {
+  const root = msc_getSovereignAppRoot();
+  const storeDir = path.join(root, 'data');
   return {
     storeDir,
     sqlitePath: path.join(storeDir, 'vader.sqlite'),
@@ -85,15 +97,56 @@ function msc_getStorePaths() {
   };
 }
 
-/** Copy legacy DB files that lived next to this module (dev / pre-migration) into the userData store. */
+/** Copy legacy DB into sovereign `data/` from older layouts (userData/vpe-db, then module dir). */
 function msc_migrateLegacyDbFiles(paths) {
+  /** @type {string | null} */
+  let userDataVpeDir = null;
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') {
+      userDataVpeDir = path.join(app.getPath('userData'), 'vpe-db');
+    }
+  } catch {
+    /* no electron */
+  }
+
+  const userDataSqlite = userDataVpeDir ? path.join(userDataVpeDir, 'vader.sqlite') : null;
+  const userDataJson = userDataVpeDir ? path.join(userDataVpeDir, 'vader-engine.json') : null;
+
+  try {
+    if (
+      userDataSqlite &&
+      !fs.existsSync(paths.sqlitePath) &&
+      fs.existsSync(userDataSqlite)
+    ) {
+      fs.mkdirSync(paths.storeDir, { recursive: true });
+      fs.copyFileSync(userDataSqlite, paths.sqlitePath);
+      console.log('VPE: Migrated vader.sqlite from userData/vpe-db to sovereign data/.');
+    }
+  } catch (e) {
+    console.warn('VPE: userData SQLite migration skipped:', e?.message ?? e);
+  }
+  try {
+    if (
+      userDataJson &&
+      !fs.existsSync(paths.jsonPath) &&
+      fs.existsSync(userDataJson)
+    ) {
+      fs.mkdirSync(paths.storeDir, { recursive: true });
+      fs.copyFileSync(userDataJson, paths.jsonPath);
+      console.log('VPE: Migrated vader-engine.json from userData/vpe-db to sovereign data/.');
+    }
+  } catch (e) {
+    console.warn('VPE: userData JSON migration skipped:', e?.message ?? e);
+  }
+
   const legacySqlite = path.join(__dirname, 'vader.sqlite');
   const legacyJson = path.join(__dirname, 'vader-engine.json');
   try {
     if (!fs.existsSync(paths.sqlitePath) && fs.existsSync(legacySqlite)) {
       fs.mkdirSync(paths.storeDir, { recursive: true });
       fs.copyFileSync(legacySqlite, paths.sqlitePath);
-      console.log('VPE: Migrated vader.sqlite to userData vpe-db.');
+      console.log('VPE: Migrated vader.sqlite from src/main/db to sovereign data/.');
     }
   } catch (e) {
     console.warn('VPE: Legacy SQLite migration skipped:', e?.message ?? e);
@@ -102,7 +155,7 @@ function msc_migrateLegacyDbFiles(paths) {
     if (!fs.existsSync(paths.jsonPath) && fs.existsSync(legacyJson)) {
       fs.mkdirSync(paths.storeDir, { recursive: true });
       fs.copyFileSync(legacyJson, paths.jsonPath);
-      console.log('VPE: Migrated vader-engine.json to userData vpe-db.');
+      console.log('VPE: Migrated vader-engine.json from src/main/db to sovereign data/.');
     }
   } catch (e) {
     console.warn('VPE: Legacy JSON migration skipped:', e?.message ?? e);
@@ -1272,6 +1325,8 @@ function msc_createPersistentStore() {
   fs.mkdirSync(paths.storeDir, { recursive: true });
   msc_migrateLegacyDbFiles(paths);
 
+  console.log('[VPE] LOGIC_MOD_01 — sovereign SQLite path:', paths.sqlitePath);
+
   try {
     const BetterSqlite3 = require('better-sqlite3');
     const rawDb = new BetterSqlite3(paths.sqlitePath);
@@ -1325,6 +1380,7 @@ function msc_vpePortableBackupFromStore(store, projectRootAbs) {
 module.exports = {
   msc_createPersistentStore,
   msc_getPersistentStore,
+  msc_getSovereignAppRoot,
   msc_getStorePaths,
   msc_vpePortableBackupFromStore,
   msc_vpeSanitizeSortOrder,

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { msc_redactUserPaths } = require('./logger');
+const { msc_getStorePaths } = require('../db/persistent-store');
 
 /**
  * Deep-copy values, redacting every string leaf with `msc_redactUserPaths`.
@@ -68,6 +69,7 @@ async function msc_generateSupportBundle(opts) {
     };
   }
 
+  const storePaths = msc_getStorePaths();
   const payload = {
     generatedAt: new Date().toISOString(),
     vpeVersion: pkgVersion,
@@ -85,6 +87,8 @@ async function msc_generateSupportBundle(opts) {
     appPaths: {
       userData: app.getPath('userData'),
       logs: typeof app.getPath === 'function' ? app.getPath('logs') : '',
+      sovereignDataDir: storePaths.storeDir,
+      sovereignSqlite: storePaths.sqlitePath,
     },
     unifiedLogsLast100: unifiedLogs,
     pm2: pm2Snapshot,
