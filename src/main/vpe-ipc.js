@@ -308,77 +308,81 @@ function msc_promptVaultMasterItems() {
   const updatedAt = new Date().toISOString();
   return [
     {
-      id: 'vpe-master-vader-sync',
-      title: 'Vader Sync',
+      id: 'vpe-master-vader-dev',
+      title: 'Launcher Core',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.6.0',
-      description: 'Full production build: wipe dist, verify dev, ship the Windows installer.',
-      updatedAt,
-      bodyMd:
-        '**Command:** `npm run vader:clean-sync`\n\n' +
-        '**Full Production Build:** Wipes `dist`, runs a fresh Dev App, then makes the `.exe`.',
-    },
-    {
-      id: 'vpe-master-rapid-prototype',
-      title: 'Rapid Prototype',
-      type: 'Command',
-      versionLabel: 'MSC Media Engine v1.6.0',
-      description: 'Everyday Electron + Next stack; closes clean when you quit the window.',
+      versionLabel: 'v2.2.6',
+      description: 'Boots Renderer + Main with VPE_LAUNCHER_FORGE flags.',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:dev`\n\n' +
-        '**Speed prototyping:** Starts Next.js and Electron; both stop when you close the window.',
+        '**Usage:** Start here for daily UI/Main dev. Kills clean when the window closes.',
     },
     {
-      id: 'vpe-master-validation-forge',
-      title: 'Validation & Forge',
+      id: 'vpe-master-vader-sync',
+      title: 'Dev State Sync',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.6.0',
-      description: 'Block until dev exits, then run forge chain (snapshot → guard → build).',
+      versionLabel: 'v2.2.6',
+      description: 'Runs dev server, captures state, and checks build readiness.',
       updatedAt,
       bodyMd:
         '**Command:** `npm run vader:sync`\n\n' +
-        '**Verify then ship:** Validates the update in dev, then builds the `.exe` once the dev window is closed.',
+        '**Usage:** Use to run your dev session and automatically drop into the forge sequence (snapshot, syntax guard, build) when closed.',
     },
     {
-      id: 'vpe-master-version-bump-sync',
-      title: 'Version Bump Sync',
-      type: 'Command',
-      versionLabel: 'MSC Media Engine v1.6.0',
-      description: 'Version bump path with dist reset before dev + forge.',
-      updatedAt,
-      bodyMd:
-        '**Command:** `npm run vader:clean-sync`\n\n' +
-        '**Version bump path:** Wipes `dist`, verifies dev, and creates a fresh release build.',
-    },
-    {
-      id: 'vpe-master-scorched-earth',
+      id: 'vpe-master-nuke-install',
       title: 'Scorched Earth',
       type: 'Command',
-      versionLabel: 'MSC Media Engine v1.6.0',
-      description: 'Heavy Node purge + launcher port recovery (use from System Health when stuck).',
+      versionLabel: 'v2.2.6',
+      description: 'Force kills node, purges node_modules/.next, and clean installs.',
       updatedAt,
       bodyMd:
-        '**npm (filter):** `npm run vpe:force-clear`\n\n' +
-        '**In-app:** System Health → Scorched Earth (`vpe:scorched-earth`) for global cleanup / `0x2740` socket recovery. **Use with care.**',
+        '**Command:** `npm run vpe:nuke-install`\n\n' +
+        '**Usage:** When native modules break, lockfiles corrupt, or dev servers ghost. Kills `node.exe`, clears `dist`/`.next`, and runs `npm install`.',
     },
     {
-      id: 'vpe-master-electron-e2e',
-      title: 'Electron E2E Suite',
-      type: 'Snippet',
-      versionLabel: 'v1.2.8',
-      description: 'Builds renderer and runs Playwright smoke tests for Vault/Notes.',
+      id: 'vpe-master-vader-deploy',
+      title: 'Production Forge',
+      type: 'Command',
+      versionLabel: 'v2.2.6',
+      description: 'Executes clean-sync followed by build:win for .exe generation.',
       updatedAt,
-      bodyMd: 'npm run test:e2e:electron',
+      bodyMd:
+        '**Command:** `npm run vader:deploy`\n\n' +
+        '**Usage:** Total hygiene before packaging. Drops app data and dist, then runs electron-builder.',
     },
     {
-      id: 'vpe-master-playwright-manual',
-      title: 'Playwright Manual',
-      type: 'Snippet',
-      versionLabel: 'v1.2.8',
-      description: 'Directly triggers the E2E test runner with process-kill teardown.',
+      id: 'vpe-master-take-state-snapshot',
+      title: 'Vault Backup',
+      type: 'Command',
+      versionLabel: 'v2.2.6',
+      description: 'Zips userData DB and .env to auto-snapshots directory.',
       updatedAt,
-      bodyMd: 'npx playwright test --config=playwright.electron.config.ts',
+      bodyMd:
+        '**Command:** `npm run vpe:take-state-snapshot`\n\n' +
+        '**Usage:** Used automatically in the forge pipeline, but can be run manually to zip the SQLite catalog before risky data tasks.',
+    },
+    {
+      id: 'vpe-master-reconcile-msc',
+      title: 'Catalog Repair',
+      type: 'Command',
+      versionLabel: 'v2.2.6',
+      description: 'Reclaims lost projects and repairs misassigned repo paths.',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run vault:reconcile-msc -- --deep`\n\n' +
+        '**Usage:** When card art goes missing or a project path unlinks from its vault media. The `--deep` flag provides verbose logging and forced repair.',
+    },
+    {
+      id: 'vpe-master-cleanup-dist',
+      title: 'Build Hygiene',
+      type: 'Command',
+      versionLabel: 'v2.2.6',
+      description: 'Removes .blockmap and .yml artifacts from the dist folder.',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run vpe:cleanup-dist`\n\n' +
+        '**Usage:** Run automatically post-forge to keep `dist/` clean of electron-builder metadata so only the .exe remains.',
     },
   ];
 }
