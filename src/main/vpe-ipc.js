@@ -384,6 +384,62 @@ function msc_promptVaultMasterItems() {
         '**Command:** `npm run vpe:cleanup-dist`\n\n' +
         '**Usage:** Run automatically post-forge to keep `dist/` clean of electron-builder metadata so only the .exe remains.',
     },
+    {
+      id: 'vpe-master-plain-dev',
+      title: 'Standard Dev Boot',
+      type: 'Command',
+      versionLabel: 'v2.2.6',
+      description: 'Runs Main + Renderer without forge flags.',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run dev`\n\n' +
+        '**Usage:** Use when you need to run the engine locally but do NOT want the auto-forge pipeline to trigger on close.',
+    },
+    {
+      id: 'vpe-master-force-clear',
+      title: 'Force Clear App',
+      type: 'Command',
+      versionLabel: 'v2.2.6',
+      description: 'Kills the Vader Project Engine.exe if it is running.',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run vpe:force-clear`\n\n' +
+        '**Usage:** Use if you cannot build because Windows says the .exe is in use, or if ports 3000/9222 are locked by ghost launcher processes.',
+    },
+    {
+      id: 'vpe-master-taskkill-node',
+      title: 'Taskkill Node',
+      type: 'Snippet',
+      versionLabel: 'v2.2.6',
+      description: 'Terminates all running Node processes on Windows.',
+      updatedAt,
+      bodyMd:
+        '**Snippet:** `taskkill /F /IM node.exe /T`\n\n' +
+        '**Usage:** Use when "Port in use" errors happen because a ghost project dev server refused to die.',
+    },
+    {
+      id: 'vpe-master-rebuild-natives',
+      title: 'Rebuild SQLite Natives',
+      type: 'Snippet',
+      versionLabel: 'v2.2.6',
+      description: 'Rebuilds better-sqlite3 for the current Electron version.',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run rebuild:natives`\n\n' +
+        '*(Maps to `electron-rebuild -f -o better-sqlite3`)*\n\n' +
+        '**Usage:** Run this if the app crashes on boot complaining about `NODE_MODULE_VERSION` mismatches for SQLite.',
+    },
+    {
+      id: 'vpe-master-test-migrations',
+      title: 'Test Migrations',
+      type: 'Command',
+      versionLabel: 'v2.2.6',
+      description: 'Verifies SQLite schema is at version 17 (SOVEREIGN).',
+      updatedAt,
+      bodyMd:
+        '**Command:** `npm run test:migrations`\n\n' +
+        '**Usage:** Run after editing database schema to ensure migrations execute cleanly in-memory before running the app.',
+    },
   ];
 }
 
