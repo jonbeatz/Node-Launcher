@@ -84,7 +84,7 @@ const isDev = require('electron-is-dev');
 const MSC_PM2Manager = require('./pm2-manager');
 const MSC_TrayManager = require('./tray-manager');
 const { msc_createDatabase, msc_getDatabase } = require('./db/database');
-const { msc_vpePortableBackupFromStore } = require('./db/persistent-store');
+const { msc_vpePortableBackupFromStore, msc_vpeWalCheckpointIfSqlite } = require('./db/persistent-store');
 const MSC_ProjectRunner = require('./project-runner');
 const {
   msc_registerVpeIpc,
@@ -823,8 +823,14 @@ app.on('before-quit', () => {
 });
 
 app.on('will-quit', () => {
+  const store = msc_getDatabase();
   try {
-    const store = msc_getDatabase();
+    msc_vpeWalCheckpointIfSqlite(store);
+  } catch (_) {
+    /* */
+  }
+  try {
+    // ... proceed to portable backup
     const s = typeof store.getSettings === 'function' ? store.getSettings() : {};
     const syncOn =
       s.auto_sync_db_on_close === true ||

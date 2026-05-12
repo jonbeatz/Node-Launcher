@@ -5,14 +5,13 @@ globs: ["src/**/*.{js,jsx,ts,tsx,mjs}", "scripts/repair/**"]
 
 # Vader Repair Suite Protocol
 
-## 1. Safe Patching Lifecycle
-- **Backup First:** Before any automated code modification, a `.vader-backup` copy must be created in the target project root[cite: 10, 12, 13].
-- **AST Strategy:** Utilize `vader-fix-suspense.mjs` logic for all transformations to ensure code integrity[cite: 10, 13].
-- **Diff Requirement:** Always present a "before" and "after" diff snippet in the chat for user verification before finalizing the implementation[cite: 10, 13].
+## 1. Safe patching lifecycle
+- **Backup first:** Before automated code edits, write a **`.vader-backup`** (or script-defined backup) **next to the source file under the repo / `scripts/` tree** — same disk area as the patched file. **Do not** store repair backups inside **`media/vault`** (Sovereign Vault is for project card assets and attachments, not AST scratch).
+- **AST strategy:** Use **`scripts/repair`** / **`vader-fix-suspense.mjs`** patterns for transformations that must stay structural.
+- **Diff requirement:** Show before/after in UI or chat before applying when the flow is interactive.
 
-## 2. Next.js 15 Suspense Specifics
-- Proactively identify components utilizing `useSearchParams` or `useParams`[cite: 10, 13].
-- Resolve `missing-suspense-with-csr-bailout` errors by wrapping only the smallest necessary component tree in a `<Suspense>` boundary[cite: 10, 13].
+## 2. Next.js 15 Suspense specifics
+- Target **`useSearchParams`** / **`useParams`** CSR bailout sites; wrap the **smallest** subtree in **`<Suspense>`**.
 
-## 3. Activation Context
-- While this rule monitors source files, only suggest automated repairs when the user explicitly mentions "repair," "patch," "fix suspense," or when a build error related to Suspense boundaries is detected[cite: 16].
+## 3. Activation context
+- Suggest automated repairs when the user says repair / patch / fix suspense, or when build errors clearly match Suspense CSR bailout.

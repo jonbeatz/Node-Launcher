@@ -6,13 +6,13 @@ globs: ["src/main/**", "src/electron/**", "scripts/**"]
 # Hardware & OS Optimization Rules
 
 ## 1. Thread Management
-- For heavy tasks such as AST scanning, Puppeteer thumbnail generation, or the "Nuke" suite, offload logic to worker threads (Node.js `worker_threads`).
-- Ensure the Electron UI remains at a fluid 60fps by preventing main thread blocking during intensive I/O.
+- For heavy tasks (AST scanning, Puppeteer work, or environment recovery), offload where practical (e.g. Node **`worker_threads`**) so the Electron UI stays near **60fps**.
+- Avoid long synchronous I/O on the main thread during dashboard interactions.
 
-## 2. Windows 11 I/O & Pathing
-- **Batching:** Batch all file operations during "Nuke" actions or large-scale repairs to minimize the overhead of Windows Defender real-time scanning.
-- **Pathing:** Strictly use the Node `path` module for all operations to ensure absolute paths are Windows-compliant (e.g., `C:\Users\...`).
+## 2. Windows 11 I/O & pathing
+- **Batching:** Batch file operations during **`npm run vpe:nuke-install`**, vault reconcile, or large repairs to reduce Windows Defender overhead.
+- **Pathing:** Use the Node **`path`** module; prefer normalized absolute paths on Windows.
 
-## 3. Process Safety
-- Always utilize `tree-kill` to guarantee that sub-processes spawned by the PM2 API or the terminal are fully reaped and do not become zombies.
-- Verify process termination before attempting to delete project directories during a "Nuke" operation.
+## 3. Process safety
+- Use **`tree-kill`** (or equivalent) so PM2 / dev child processes are fully reaped.
+- **Environment nuke:** The supported sequence matches **`Project-Bible.md` §7**: stop stray **`node.exe`** (**`taskkill /F /IM node.exe /T`**), then run **`npm run vpe:nuke-install`** (includes purge + **`npm install`**). Verify termination before manual directory deletes if you bypass the script.

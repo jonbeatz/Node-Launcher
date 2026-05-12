@@ -322,7 +322,11 @@ function DashboardContent() {
   useEffect(() => {
     if (!clientReady) return
     // JEDI_MOD_24: Listen for watchdog restart events
-    const w = (window as any)
+    const w = window as unknown as {
+      vpeAPI?: {
+        subscribeWatchdogRestart: (cb: (payload: { projectId: string; attempt: number }) => void) => () => void
+      }
+    }
     if (w.vpeAPI?.subscribeWatchdogRestart) {
       return w.vpeAPI.subscribeWatchdogRestart((payload: { projectId: string; attempt: number }) => {
         const { projectId, attempt } = payload

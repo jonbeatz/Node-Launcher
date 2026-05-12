@@ -125,7 +125,7 @@
 2. **Regression:** Smoke an **old Node-Launcher / pre–2.1.0** checkout or packaged build — confirm **Iron Curtain** (`main.js`) exits cleanly (**`dialog.showErrorBox`** + **`process.exit(0)`**) and does **not** crash into vault sync / wipes. Use **`VPE_SKIP_IRON_CURTAIN=1`** only for intentional legacy debugging on this tree.
 3. **Optional:** Wire UI for **`vpe:repair-vault-links`** (already in main) if operators need a button beside maintenance purge.
 
-**Start Project / full context:** Follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** canonical order: **`.cursorrules`** → **`AGENT-BOOT.md`** §1 + §4 → **`API-SetUp-Master.md`** → **`.\google-api\vpe-start-api.ps1`** + **`ngrok http 4000`** → confirm **`[VPE STANDBY]`** / **API is Live** → **`VADER_STATION_LOG.md`**.
+**Start Project / full context:** Follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** canonical order: **`.cursorrules`** → **`AGENT-BOOT.md`** §1 + §4 → **`API-SetUp-Master.md`** → **`.\google-api\vpe-start-api.ps1`** + **`ngrok http 4000`** → confirm **`[VPE STANDBY]`** / **API is Live** → **`VADER_STATION_LOG.md`**. **Engine / Electron cold start only:** **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)**.
 
 ---
 

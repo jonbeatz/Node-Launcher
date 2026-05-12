@@ -3,28 +3,28 @@ description:
 alwaysApply: true
 ---
 
-# Vader Project Engine (VPE) — Cursor Rules (Vader Protocol v2.2.5 track)
+# Vader Project Engine (VPE) — Cursor Rules (Vader Protocol v2.2.6-SOVEREIGN)
 
 ## 1. Project Context & Identity
 - **Project Name:** Vader Project Engine (VPE)
-- **Current Version:** follow root **`package.json` `version`** (always re-read the file if disputed). **v2.2.5 — Sovereign Baseline:** **`vpe-vault-rm-guard.js`** write-protects **`fs.rmSync`** under vault roots unless **`vpe:delete-project`** or `_FORGE_TEMP_` overrides. **Iron Curtain** in **`msc_vpeDetectLocalFirstUserData()`** blocks legacy engines (**`package.json` < 2.2.5** and/or **`NODE-LAUNCHER`** path/exe signals); escape **`VPE_SKIP_IRON_CURTAIN=1`** / **`VPE_E2E_USER_DATA`**. **v2.0.0 — Vader Station Core:** modular IPC (`src/main/ipc/*`), dashboard islands (`ProjectGrid`, `StationSidebar`), path-redacting logger. **Docs:** **Great Library Consolidation** under **`.cursor/docs/`** with three master files: **`TRUTH.md`**, **`VADER_STATION_LOG.md`**, and **`REPAIR_PROTOCOLS.md`**.
+- **Current Version:** follow root **`package.json` `version`** (always re-read the file if disputed). **v2.2.6-SOVEREIGN Baseline:** **`vpe-vault-rm-guard.js`** write-protects **`fs.rmSync`** under vault roots unless **`vpe:delete-project`** or **`_FORGE_TEMP_`** overrides. **Iron Curtain** (**v2.2.6-SOVEREIGN Baseline**) in **`msc_vpeDetectLocalFirstUserData()`** / **`msc_ironCurtainVersionAudit`** blocks legacy engines (**`package.json` semver core < 2.2.5** and/or **`NODE-LAUNCHER`** path/exe signals); escape **`VPE_SKIP_IRON_CURTAIN=1`** / **`VPE_E2E_USER_DATA`**. **v2.0.0 — Vader Station Core:** modular IPC (`src/main/ipc/*`), dashboard islands (`ProjectGrid`, `StationSidebar`), path-redacting logger. **Docs:** **`.cursor/docs/`** — **`TRUTH.md`**, **`Project-Bible.md`** (§7 Command Lexicon), **`VADER_STATION_LOG.md`**, **`REPAIR_PROTOCOLS.md`**.
 - **Target Hardware:** AMD Ryzen 9700x / Gigabyte B650 (Optimized for high-performance I/O)
 - **OS Focus:** Windows 11 25H2 (Native optimizations for Defender/Antivirus paths)
 - **Branding:** My Studio Channel (MSC) / Vader Protocol
 
 ## 2. Canonical Source of Truth (Hierarchy of Authority)
 If documentation conflicts occur, follow this hierarchy strictly:
-1. `.cursor/docs/core/TRUTH.md` (The Constitution — Non-negotiable principles)
+1. `.cursor/docs/TRUTH.md` (The Constitution — Non-negotiable principles)
 2. `.cursorrules` (This file — The Legal Code)
-3. `.cursor/docs/core/VPE_ENGINE_CAPABILITIES.md` (Agent identity, hooks/prompts index, guardrails — replaces root **`SKILL.md`**)
-4. `.cursor/docs/guides/PRD.md` (Feature & Requirement Truth)
+3. `.cursor/docs/Project-Bible.md` (Architecture + **§7 Command Lexicon** — npm scripts and operator runbooks)
+4. `.cursor/docs/guides/PRD.md` (Feature & Requirement Truth, when present)
 5. `package.json` (Authority for executable scripts only)
 
-**Documentation layout (v2.0.0+ — zero drift):** **`.cursor/docs/core/`** = constitution, build protocol, boot (**`AGENT-BOOT.md`**), capabilities, design spec. **`.cursor/docs/guides/`** = START-HERE, Custom-Commands, Stability, PRD, Checkpoint. Do **not** duplicate those filenames at **`.cursor/docs/`** root; root holds only adjunct refs (**`API-SetUp-Master.md`**, **`THUMBNAIL-IPC-INVESTIGATION.md`**, **`Rebuid-Commands.md`**). **`AGENT-BOOT-CHECKLIST.md`** and **`Stability-Fix-Backlog.md`** are retired — use **`core/AGENT-BOOT.md`** and **`guides/Stability.md`**.
+**Documentation layout (v2.2.6-SOVEREIGN):** The canonical reference docs live directly under **`.cursor/docs/`**: **`TRUTH.md`** (constitution), **`Project-Bible.md`** (architecture + script lexicon), **`REPAIR_PROTOCOLS.md`** (nuke/vault guides). **`VADER_STATION_LOG.md`** lives at **repo root**. (Legacy subfolders like `core/`, `guides/`, and loose root files like `API-SetUp-Master.md` have been archived or merged into the TRUTH/Bible trio).
 
-**Session bootstrap (cold start):** `.cursor/docs/core/AGENT-BOOT.md` aggregates read order, environment checks, MCP orientation, skills, and handoff wording—it does **not** override items 1–5 above. **Start Project** (or new session / agent setup): follow **`.cursor/prompts/Start-Project.md`** — **canonical order** for full Vertex/LiteLLM context: **this file (§2–3)** → **`AGENT-BOOT.md`** §1 + §4 → **`API-SetUp-Master.md`** → **`.\google-api\vpe-start-api.ps1`** + **`ngrok http 4000`** → **`[VPE STANDBY]`** / **Uvicorn 4000** (**API is Live**) → **`VADER_STATION_LOG.md`**. See **`.cursor/docs/guides/START-HERE.md`**.
+**Session bootstrap (cold start):** For VPE codebase / Electron-only cold starts (dashboard, IPC, PM2, no API bridge), follow **`.cursor/prompts/Start-Master.md`**. If working on the LiteLLM API bridge (google-api), use **`.cursor/prompts/Start-Project.md`**.
 
-**Critical:** Before performing any build, deployment, or environment setup, read and adhere to the protocols in **`.cursor/docs/core/VPE-BUILD-PROTOCOL.md`.**
+**Critical:** Before performing any build, deployment, or environment setup, read and adhere to the scripts and protocols in **`Project-Bible.md` §7** and **`REPAIR_PROTOCOLS.md`**.
 
 **Crucial:** Always ensure the **LiteLLM API** is running by executing the **"start API"** or **Start Project** flow from repo root: **`.\google-api\vpe-start-api.ps1`** in a **Cursor integrated terminal pane** (sets **`GOOGLE_APPLICATION_CREDENTIALS`** to **`.\google-api\gcp_key.json`**, prints the **ngrok** command for a **second pane**, runs **LiteLLM** on **port 4000** from **`google-api\`**). Run **`ngrok http 4000`** as a **global** command in another integrated pane (**`google-api`** on **User PATH** — **`scripts\vpe-add-node-launcher-user-path.ps1`**). After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000** and report **"API is Live"**.
 
@@ -42,7 +42,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Terminal:** xterm.js + node-pty for interactive ANSI-color logs
 - **Zombie Prevention:** All process spawns must be managed via `tree-kill`
 - **Package Manager Detection:** Check for lock files (`yarn.lock`, `pnpm-lock.yaml`, `package-lock.json`) before defaulting to npm
-- **Puppeteer Lifecycle:** Reuse single headless browser instance; capture thumbnails only after HTTP 200 health check; WebP format; cache across restarts
+- **Puppeteer / thumbnails:** Reuse a single headless browser when capturing previews; internal vault card art uses **`_vpe_thumb.png`** (see vault rules). Thumbnail repair and vault alignment run via **`npm run vault:reconcile-msc`** / **`-- --deep`** and are **independent** of HTTP health (see **`TRUTH.md`**, **`REPAIR_PROTOCOLS.md`**).
 - **Log Drawer:** Per-project log segregation via PM2 process ID; stream into dedicated xterm.js instance; support ANSI colors, Ctrl+F search, copy, clear view
 
 ### 3.1 v2.0.0+ Modular Architecture (Vader Station Core)
@@ -53,7 +53,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **API assets:** **`ngrok.exe`**, **`vpe-start-api.ps1`**, **`litellm_config.yaml`**, **`gcp_key.json`** — **only** under **`google-api/`** (no second copy at repo root; **`scripts/vpe-verify-ngrok-path.ps1`** only verifies PATH).
 
 ## 4. Active Agency & Recovery Protocols
-- **Fix Local First:** If the local environment breaks, the agent must proactively run recovery commands defined in **`package.json`** (e.g. **`npm run dev`**, **`hardened setup`** per [Custom-Commands.md](.cursor/docs/guides/Custom-Commands.md)) rather than just listing instructions.
+- **Fix Local First:** If the local environment breaks, the agent must proactively run recovery commands defined in **`package.json`** (e.g. **`npm run dev`**) rather than just listing instructions.
 - **Smoke Checks:** After any runtime change, the agent must verify `http://localhost:3000/` and report HTTP status (report 200/404/500).
 - **Command Authority:** Never reference or run scripts not currently explicitly defined in `package.json`.
 - **Safe Cleanup:** Never run destructive `.next` cleanup while `next dev` is actively running.
@@ -119,7 +119,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Process Restoration:** On initialization, call `pm2.list()` to sync UI state with active projects
 - **Port Management:** Implement auto-increment logic (up to 10 attempts) for occupied ports; if exhausted, show toast notification
 - **Footer Net / Purge:** **Net** LED + **Purge env** reflect **3000** / **3001** / **9222** (green = **`forgeReady`** all idle; amber = **node/electron** only, incl. CDP; red = foreign); bounded (~**500ms**) port-health probe after purge; **`vpe:purge-launcher-ports`** uses **`taskkill /F /PID`** only (no **`/T`**) and skips **`process.pid`** / **`process.ppid`**
-- **Nuke Action:** Ensure `nuke` deletes `node_modules` and `.next` before executing the specific `<detectedPackageManager> install`
+- **Nuke Action:** Canonical environment reset is **`npm run vpe:nuke-install`** (see **`Project-Bible.md` §7**): attempts **`taskkill`** on **`node.exe`**, purges **`node_modules`**, **`.next`**, **`dist`**, **`package-lock.json`**, then **`npm install`**.
 - **Signature:** Every footer must include "Powered by the MSC Media Engine" with the **current** release version string (match root **`package.json`** / preload **`vpeInfo.version`**).
 
 ## 9. Error Handling & Feedback States
@@ -134,8 +134,13 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **Milestones:** Add rollback rows to `Restore-Points.md` for major architectural changes.
 - **Media Safety:** Store generated assets under project-root `media/` only; no absolute machine-specific paths in code.
 
-## 11. Data Schema (projects.json)
-Always adhere to this structure for project persistence:
+## 11. Data Schema (SQLite catalog; legacy `projects.json` shape)
+Runtime persistence is **SQLite** (`projects` table and related columns). The JSON below is the **logical** shape agents use when reasoning about a row; **authoritative columns** match `persistent-store.js` / migrations.
+
+**`path` (Sovereign):** The registry **`path`** is the **user repo root** string the UI and **`vpe:save-settings`** trust for persistence. **`msc_normalizePersistedProjectPath`** applies vault + `vpe-local-data` guards only — **no save-time gate** on folder existence or **`package.json`** (reclaimed / half-linked rows allowed). Stricter validation applies only for **spawn** / tooling paths.
+
+**Vault thumbnails:** Internal card thumbnail filename is **strictly** **`_vpe_thumb.png`** inside each project’s vault folder under **`media/vault`** (never use ad hoc basenames for the canonical engine thumb).
+
 ```json
 {
   "projects": [
@@ -154,3 +159,4 @@ Always adhere to this structure for project persistence:
     }
   ]
 }
+```

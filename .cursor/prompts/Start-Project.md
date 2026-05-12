@@ -2,6 +2,8 @@
 
 When the operator says **Start Project**, **start project**, **cold session**, or opens a **new chat** expecting full bootstrap — run this ritual. Prefer **concise** context: authority + checklist + execution, **not** a full pass of PRD/UI spec unless the task needs it.
 
+**VPE engine / Electron / dashboard work only** (no LiteLLM bridge): follow **[`Start-Master.md`](./Start-Master.md)** — phased read order, **`npm run vader:dev`**, Bible §7 commands, vault/nuke runbooks.
+
 ---
 
 ## Operator paste block (human)

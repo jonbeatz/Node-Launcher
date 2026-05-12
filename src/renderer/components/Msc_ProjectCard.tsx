@@ -419,13 +419,6 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const isError = status === 'error'
   const isBuilding = status === 'building'
 
-  /** 2xx only — LIVE readout; never tied to banner expand (silent until chevron). */
-  const _isHttpConnected =
-    isRunning &&
-    typeof health_http_code === 'number' &&
-    health_http_code >= 200 &&
-    health_http_code < 300
-
   /** JEDI_MOD_15 — collapse when stopped; resetting when card instance is reused for another `id`. */
   useEffect(() => {
     setIsStatusExpanded(false)
@@ -537,13 +530,6 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
 
   const healthLine = getHealthLine()
   const liveUptime = useVpeLiveSessionUptime(isRunning, devSessionStartedAt)
-
-  /** Warm-up: running but not yet checked — drives equalizer amber (not paperclip). */
-  const _isBootingHttp =
-    isRunning &&
-    health_reachable !== false &&
-    !health_checked_at &&
-    (health_http_code === undefined || health_http_code === null)
 
   const showVaultPaperclip = Boolean(vaultHasReferenceFiles)
   const isIdleStopped = !isRunning && !isError && !isBuilding

@@ -218,6 +218,15 @@ class SqlitePersistence {
     this._db = db;
   }
 
+  /** Next-Fix — merge WAL into main db file before quit / manual copy (WAL mode). */
+  walCheckpointFull() {
+    try {
+      this._db.pragma('wal_checkpoint(FULL)');
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   /** Tray / PM2: canonical list */
   getProjects() {
     return this.listProjectsAlphabetical();
@@ -1641,6 +1650,19 @@ function msc_verifyProjectPaths(store) {
   return { checked: rows.length, present, missing };
 }
 
+/**
+ * Next-Fix / WAL hygiene: flush `-wal` into `vader.sqlite` on graceful quit.
+ * @param {unknown} store
+ */
+function msc_vpeWalCheckpointIfSqlite(store) {
+  if (!store || typeof store.walCheckpointFull !== 'function') return;
+  try {
+    store.walCheckpointFull();
+  } catch (_) {
+    /* */
+  }
+}
+
 module.exports = {
   msc_createPersistentStore,
   msc_getPersistentStore,
@@ -1652,6 +1674,7 @@ module.exports = {
   msc_sqliteMigrateSchemaAndPorts,
   VPE_SQLITE_USER_VERSION,
   msc_verifyProjectPaths,
+  msc_vpeWalCheckpointIfSqlite,
   /** @deprecated Migrate once at boot, then archived — do not rely on cwd path */
   MSC_LEGACY_PROJECTS_JSON_PATH: LEGACY_REGISTRY,
 };
