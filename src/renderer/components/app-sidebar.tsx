@@ -20,6 +20,7 @@ import {
   type VpeTacticalProjectFilter,
 } from '@/lib/project-tactical-filter'
 import { msc_shieldColorHex } from '@/lib/shield-colors'
+import { msc_mscEngineFooterLine } from '@/lib/vpe-bridge'
 import { useSidebarAccordionState } from '@/state/useSidebar'
 import type { MaintenanceTab } from '@/components/maintenance-section'
 
@@ -50,6 +51,8 @@ export function AppSidebar({
   const [collapsed, setCollapsed] = useState(false)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
   const { projectsOpen, setProjectsOpen, vaultOpen, setVaultOpen } = useSidebarAccordionState()
+
+  const msc_engineFooterLine = msc_mscEngineFooterLine()
 
   const tc: VpeTacticalCounts = tacticalCounts ?? {
     all: 0,
@@ -371,6 +374,17 @@ export function AppSidebar({
           {!collapsed && <span className="text-sm font-medium">Settings</span>}
         </button>
       </div>
+
+      {!collapsed ? (
+        <div className="msc-sidebar-engine-line px-3 pb-2 pt-0">
+          <p
+            className="font-sans text-[9px] leading-snug text-[#666666] transition-colors duration-200 hover:text-[color:var(--msc-accent)]"
+            title={msc_engineFooterLine}
+          >
+            {msc_engineFooterLine}
+          </p>
+        </div>
+      ) : null}
     </aside>
   )
 }

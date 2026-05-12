@@ -43,8 +43,10 @@ export interface VpeProjectRow {
   vault_has_files?: boolean
   /** SQLite v13+ — 0/1 in DB; treat via `msc_rowHasDocumentationEnabled` for UI. */
   has_documentation?: VpeHasDocumentation
-  /** SQLite v14+ — dashboard manual order (lower first). */
+  /** SQLite v14+ — legacy mirror of manual order (kept in sync with `display_order`). */
   sort_order?: number | null
+  /** SQLite v17+ — dashboard sort key (tie-break: `id` in main query). */
+  display_order?: number | null
   node_modules_missing?: boolean
   /** ISO timestamps from `fs.statSync` on project `path` (main enrich). */
   project_folder_created_at?: string | null
@@ -53,6 +55,10 @@ export interface VpeProjectRow {
   dev_session_started_at?: string | null
   /** SQLite v16+ — JEDI_MOD_24: Watchdog auto-restart. */
   watchdog_enabled?: number | boolean | null
+  /** Main enrich JEDI_MOD_29 — registry `path` not found on disk (boolean or 0/1 from IPC). */
+  project_path_missing?: boolean | number | null
+  /** JEDI_MOD_136 — disk root exists and `package.json` present (HTTP health / offline semantics). */
+  vpe_repo_runnable_for_http?: boolean | number | null
 }
 
 /** Dashboard project shape (grids, list, cards). */
@@ -84,11 +90,17 @@ export interface Project {
   vault_has_files?: boolean
   /** Registry (SQLite v13+); paperclip requires enabled + vault reference files. */
   has_documentation?: VpeHasDocumentation
-  /** Registry (SQLite v14+); manual dashboard order. */
+  /** Registry (SQLite v14+); mirrors `display_order`. */
   sort_order?: number | null
+  /** Registry (SQLite v17+). */
+  display_order?: number | null
   project_folder_created_at?: string | null
   project_folder_modified_at?: string | null
   dev_session_started_at?: string | null
   /** SQLite v16+ — JEDI_MOD_24: Watchdog auto-restart. */
   watchdog_enabled?: number | boolean | null
+  /** JEDI_MOD_29 — workspace root missing on disk. */
+  project_path_missing?: boolean
+  /** JEDI_MOD_136 — false when folder or package.json missing; UI stays staging vs error. */
+  vpe_repo_runnable_for_http?: boolean
 }

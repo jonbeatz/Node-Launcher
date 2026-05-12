@@ -66,6 +66,11 @@ export type ProjectGridProps = {
   onUnregister: (projectName: string) => void
   onContextMenu: (e: React.MouseEvent, projectId: string) => void
   onOpenProjectUrl: (projectId: string) => void
+  /** JEDI_MOD_27 — optimistic neighbor reorder on full registry order before IPC settles. */
+  onRegistryReorderNeighbor?: (
+    projectId: string,
+    direction: 'up' | 'down',
+  ) => void | Promise<void>
 }
 
 /** v2.0.0 — dashboard project display: filters, view mode, tactical nav, quick actions, grid/list. */
@@ -113,6 +118,7 @@ export function ProjectGrid({
   onUnregister,
   onContextMenu,
   onOpenProjectUrl,
+  onRegistryReorderNeighbor,
 }: ProjectGridProps) {
   return (
     <div
@@ -315,6 +321,7 @@ export function ProjectGrid({
                   onOpenInBrowser={() =>
                     void onOpenProjectUrl(project.id)
                   }
+                  onRegistryReorderNeighbor={onRegistryReorderNeighbor}
                   devInstallInProgress={Boolean(
                     devInstallUiByProject[project.id],
                   )}
@@ -329,6 +336,8 @@ export function ProjectGrid({
                     msc_rowHasDocumentationEnabled(project.has_documentation)
                   }
                   isSelected={selectedProjectId === project.id}
+                  projectPathMissing={project.project_path_missing === true}
+                  repoRunnableForHttp={project.vpe_repo_runnable_for_http !== false}
                 />
               ))}
             </AnimatePresence>

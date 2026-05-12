@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { getVpeApi } from '@/lib/vpe-bridge'
+import { getVpeApi, msc_mscEngineFooterLine } from '@/lib/vpe-bridge'
 
 type NetLedState = 'unknown' | 'forge' | 'dev' | 'conflict'
 
@@ -34,6 +34,8 @@ export function Footer() {
     const t = window.setInterval(() => void refresh(), 4000)
     return () => window.clearInterval(t)
   }, [refresh])
+
+  const msc_engineFooterLine = msc_mscEngineFooterLine()
 
   const handlePurge = async () => {
     const api = getVpeApi()
@@ -92,8 +94,11 @@ export function Footer() {
           {purging ? 'Purging…' : 'Purge env'}
         </button>
       </div>
-      <span className="font-sans text-[11px] text-[#A0A0A0]">
-        Powered by the MSC Media Engine | v2.2.0
+      <span
+        className="msc-footer-engine-line font-sans text-[11px] text-[#A0A0A0] transition-colors duration-200 hover:text-[color:var(--msc-accent)]"
+        title={msc_engineFooterLine}
+      >
+        {msc_engineFooterLine}
       </span>
     </footer>
   )

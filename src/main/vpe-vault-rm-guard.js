@@ -2,7 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
-const { msc_projectVaultRootDir } = require('./vpe-vault-paths');
+const { msc_projectVaultRootDir, msc_projectVaultRootDirSovereign } = require('./vpe-vault-paths');
 
 /** @returns {Set<string>} */
 function msc_vaultGuardRootAbsSet() {
@@ -10,6 +10,11 @@ function msc_vaultGuardRootAbsSet() {
   const roots = new Set();
   try {
     roots.add(path.resolve(msc_projectVaultRootDir()));
+  } catch (_) {
+    /* */
+  }
+  try {
+    roots.add(path.resolve(msc_projectVaultRootDirSovereign()));
   } catch (_) {
     /* */
   }
@@ -60,6 +65,13 @@ function msc_installVaultDeletionRmGuard() {
     if (global.__vpeVaultHardDeleteActive === true) {
       return orig(p, options);
     }
+    
+    // JEDI_MOD_123: Identity Exemption
+    if (path.basename(p).startsWith('_FORGE_TEMP_') || path.basename(p).startsWith('_vpe_thumb')) {
+      console.log('[SECURITY] Identity Exemption: Allowing thumbnail/forge overwrite for', p);
+      return orig(p, options);
+    }
+    
     let target;
     try {
       target = path.resolve(p);
@@ -75,6 +87,38 @@ function msc_installVaultDeletionRmGuard() {
       throw err;
     }
     return orig(p, options);
+  };
+
+  const origUnlink = fs.unlinkSync.bind(fs);
+  fs.unlinkSync = function vpeGuardedUnlinkSync(p) {
+    if (String(process.env.VPE_VAULT_DELETION_LOCKED || '').trim() !== '1') {
+      return origUnlink(p);
+    }
+    if (global.__vpeVaultHardDeleteActive === true) {
+      return origUnlink(p);
+    }
+
+    // JEDI_MOD_123: Identity Exemption
+    if (path.basename(p).startsWith('_FORGE_TEMP_') || path.basename(p).startsWith('_vpe_thumb')) {
+      console.log('[SECURITY] Identity Exemption: Allowing thumbnail/forge overwrite for', p);
+      return origUnlink(p);
+    }
+
+    let target;
+    try {
+      target = path.resolve(p);
+    } catch (_) {
+      return origUnlink(p);
+    }
+    const roots = msc_vaultGuardRootAbsSet();
+    if (msc_absIsUnderAnyVaultRoot(target, roots)) {
+      const err = new Error(
+        'VPE: Vault file deletion is locked — fs.unlinkSync under media/vault is allowed only during delete-project.',
+      );
+      err.code = 'VPE_VAULT_UNLINK_LOCKED';
+      throw err;
+    }
+    return origUnlink(p);
   };
 }
 

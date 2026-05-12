@@ -17,25 +17,39 @@ import {
   ChevronRight,
   ExternalLink,
   ArrowDownToLine,
-  Trash2,
-  Search,
-  ChevronDown,
-  Filter,
 } from 'lucide-react'
-import { getVpeApi, msc_formatUnknownIPCError } from '@/lib/vpe-bridge'
+import { getVpeApi, msc_formatUnknownIPCError, msc_mscEngineFooterLine, type SaveSettingsPayload } from '@/lib/vpe-bridge'
 import {
   msc_getTerminalFontSize,
   msc_getTerminalScrollback,
 } from '@/lib/terminal-prefs'
+import { TerminalView } from '@/components/TerminalView'
+import type { LogEntry } from '@/store/logStore'
+import {
+  msc_appendLogCapped,
+  msc_appendLogsCapped,
+  msc_effectiveLineCap,
+  msc_filterLogsForSearch,
+} from '@/store/logStore'
+import { useToast } from '@/components/vader-toast'
 
-interface Project {
+interface LogDrawerProjectTab {
   id: string
   name: string
   status: 'running' | 'stopped' | 'error' | 'building'
+  path?: string
+  port?: number
+  start_script?: string
+  build_script?: string
+  thumbnail_url?: string | null
+  project_type?: string | null
+  is_archived?: boolean
+  notes?: string | null
+  project_path_missing?: boolean
 }
 
 interface LogDrawerProps {
-  projects?: Project[]
+  projects?: LogDrawerProjectTab[]
   activeProject?: string
   onProjectSelect?: (projectId: string) => void
   onClose?: () => void
@@ -43,42 +57,6 @@ interface LogDrawerProps {
   expanded?: boolean
   onExpandedChange?: (expanded: boolean) => void
   onCloseTab?: (projectId: string) => void
-}
-
-interface LogEntry {
-  id: string
-  type: 'system' | 'warning' | 'error' | 'command' | 'output'
-  time: string
-  label?: string
-  message: string
-}
-
-/** Strip CSI/OSC and lone ESC; removes SGR fragments like `[32m` so logs don't show "dark boxes." */
-function msc_stripAnsiDisplay(input: string): string {
-  if (!input) return input
-  let s = input
-    .replace(/\u001b\[[\?]?[0-9;]*[A-Za-z]/g, '')
-    .replace(/\u001b\][\d;]*(?:;[^\u0007\u001b]*)?\u0007/g, '')
-    .replace(/\u001b\][\d;]*(?:;[^\u001b\\]*)?\\/g, '')
-    .replace(/[\u001b\u009b\u0090]/g, '')
-  s = s.replace(/\[[0-9;]*m/g, '')
-  s = s.replace(/#< CLIXML[\s\S]*?<\/Objs>/gi, '')
-  s = s.replace(/<Objs[^>]*>[\s\S]*?<\/Objs>/gi, '')
-  return s
-}
-
-const VPE_TERMINAL_BUFFER_LIMIT = 1000
-
-function msc_appendLogCapped(prev: LogEntry[], entry: LogEntry, cap: number = VPE_TERMINAL_BUFFER_LIMIT): LogEntry[] {
-  const next = [...prev, entry]
-  if (next.length <= cap) return next
-  return next.slice(-cap)
-}
-
-function msc_appendLogsCapped(prev: LogEntry[], entries: LogEntry[], cap: number = VPE_TERMINAL_BUFFER_LIMIT): LogEntry[] {
-  const next = [...prev, ...entries]
-  if (next.length <= cap) return next
-  return next.slice(-cap)
 }
 
 function mscBootstrapLogs(): LogEntry[] {
@@ -177,6 +155,8 @@ export function LogDrawer({
   const [isSticky, setIsSticky] = useState(true)
   const [showJumpButton, setShowJumpButton] = useState(false)
   const [errorOnly, setErrorOnly] = useState(false)
+  const isStickyRef = useRef(true)
+  const prevLogLenRef = useRef(0)
   /** Docked (non-floating) overlay: keep mounted briefly after collapse for slide-out. */
   const [dockedLayerVisible, setDockedLayerVisible] = useState(
     () => Boolean(expandedProp && !isDetached),
@@ -193,6 +173,7 @@ export function LogDrawer({
   void termPrefsRev
   const logFontPx = msc_getTerminalFontSize()
   const scrollCap = msc_getTerminalScrollback()
+  const lineCap = msc_effectiveLineCap(scrollCap)
 
   /** Map IPC log line → drawer row */
   const mscMapVpeLog = useCallback((payload: {
@@ -242,6 +223,59 @@ export function LogDrawer({
     [projects, mscMapVpeLog],
   )
 
+  const { addToast } = useToast()
+
+  const handleRelinkActiveProject = useCallback(async () => {
+    if (selectedProject === '__vpe_all__') return
+    const proj = projects.find((p) => p.id === selectedProject)
+    if (!proj?.project_path_missing) return
+    const api = getVpeApi()
+    if (!api?.openDirectory || !api.saveSettings) {
+      addToast('Relink unavailable', 'error', 'Run inside Electron with VPE preload.')
+      return
+    }
+    try {
+      const dir = await api.openDirectory()
+      if (!dir) return
+      const payload: SaveSettingsPayload = {
+        id: proj.id,
+        name: proj.name,
+        path: dir,
+        port: typeof proj.port === 'number' && Number.isFinite(proj.port) ? proj.port : 3000,
+        start_script: proj.start_script,
+        build_script: proj.build_script,
+        thumbnail_url: proj.thumbnail_url ?? null,
+        project_type: proj.project_type ?? 'auto',
+        is_archived: proj.is_archived,
+        notes: proj.notes ?? null,
+      }
+      await api.saveSettings(payload)
+      addToast('Project path relinked', 'success', dir)
+    } catch (e: unknown) {
+      addToast('Relink failed', 'error', e instanceof Error ? e.message : msc_formatUnknownIPCError(e))
+    }
+  }, [selectedProject, projects, addToast])
+
+  const mscPathMissingBanner = useMemo(() => {
+    if (selectedProject === '__vpe_all__') return null
+    const proj = projects.find((p) => p.id === selectedProject)
+    if (!proj?.project_path_missing) return null
+    return (
+      <div className="msc-log-path-missing-banner shrink-0 border-b border-[#e02b20]/35 bg-[#121212] px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.1em] text-[#f59e0b]">
+          Path missing — registry folder not on disk
+        </p>
+        <button
+          type="button"
+          onClick={() => void handleRelinkActiveProject()}
+          className="h-8 shrink-0 rounded border border-[#333333] bg-[#1c1c1c] px-3 font-sans text-[10px] font-medium uppercase tracking-wide text-[#eaeaea] transition-colors hover:border-[color:var(--msc-accent)]/45 hover:text-[color:var(--msc-accent)] vader-focus"
+        >
+          Relink folder…
+        </button>
+      </div>
+    )
+  }, [selectedProject, projects, handleRelinkActiveProject])
+
   /** Load persisted SQLite tail when switching tabs (Electron only). */
   useEffect(() => {
     const api = getVpeApi()
@@ -254,7 +288,7 @@ export function LogDrawer({
       }
       let cancelled = false
       api
-        .getUnifiedLogs(400)
+        .getUnifiedLogs(lineCap)
         .then((rows) => {
           if (cancelled) return
           if (!rows?.length) {
@@ -271,7 +305,7 @@ export function LogDrawer({
                   message: row.message,
                 }),
               )
-              .slice(-scrollCap),
+              .slice(-lineCap),
           )
         })
         .catch(() => {})
@@ -293,13 +327,13 @@ export function LogDrawer({
             message: row.message,
           }),
         )
-        setLogs(mapped.slice(-scrollCap))
+        setLogs(mapped.slice(-lineCap))
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog, scrollCap])
+  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog, lineCap])
 
   /** Real-time IPC stream filtered to active drawer tab */
   useEffect(() => {
@@ -316,16 +350,16 @@ export function LogDrawer({
               level: payload.level,
               message: payload.message,
             }),
-            scrollCap,
+            lineCap,
           ),
         )
         return
       }
       if (payload.projectId !== selectedProject) return
-      setLogs((prev) => msc_appendLogCapped(prev, mscMapVpeLog(payload), scrollCap))
+      setLogs((prev) => msc_appendLogCapped(prev, mscMapVpeLog(payload), lineCap))
     })
     return unsub
-  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog, scrollCap])
+  }, [selectedProject, projects, mscMapVpeLog, mscMapVpeUnifiedLog, lineCap])
   const [commandInput, setCommandInput] = useState('')
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
@@ -339,51 +373,59 @@ export function LogDrawer({
 
   useEffect(() => {
     setSelectedProject(activeProject)
+    setIsSticky(true)
+    isStickyRef.current = true
+    setShowJumpButton(false)
   }, [activeProject])
 
-  const filteredLogs = useMemo(() => {
-    let result = logs
-    if (errorOnly) {
-      result = result.filter((l) => l.type === 'error' || l.type === 'warning')
-    }
-    if (!searchTerm.trim()) return result
-    const low = searchTerm.toLowerCase()
-    return result.filter(
-      (l) =>
-        l.message.toLowerCase().includes(low) ||
-        (l.label && l.label.toLowerCase().includes(low)),
-    )
-  }, [logs, searchTerm, errorOnly])
+  const filteredLogs = useMemo(
+    () => msc_filterLogsForSearch(logs, searchTerm, errorOnly),
+    [logs, searchTerm, errorOnly],
+  )
 
   const handleScroll = useCallback(() => {
     if (!terminalRef.current) return
     const { scrollTop, scrollHeight, clientHeight } = terminalRef.current
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 10
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 12
+    isStickyRef.current = isAtBottom
     setIsSticky(isAtBottom)
     if (isAtBottom) {
       setShowJumpButton(false)
     }
   }, [])
 
+  useLayoutEffect(() => {
+    const el = terminalRef.current
+    if (!el) return
+    if (isSticky) {
+      el.scrollTop = el.scrollHeight
+    }
+  }, [logs, filteredLogs.length, isSticky])
+
   useEffect(() => {
-    if (isSticky && terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
-      setShowJumpButton(false)
-    } else if (!isSticky && logs.length > 0) {
+    const n = logs.length
+    if (n > prevLogLenRef.current && !isStickyRef.current) {
       setShowJumpButton(true)
     }
-  }, [filteredLogs, isSticky, logs.length])
+    if (n < prevLogLenRef.current) {
+      setShowJumpButton(false)
+    }
+    prevLogLenRef.current = n
+  }, [logs.length])
 
   const jumpToBottom = () => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight
       setIsSticky(true)
+      isStickyRef.current = true
       setShowJumpButton(false)
     }
   }
 
   const clearLogs = () => {
     setLogs([])
+    prevLogLenRef.current = 0
+    setShowJumpButton(false)
   }
 
   useEffect(() => {
@@ -472,6 +514,9 @@ export function LogDrawer({
   const handleProjectSelect = (projectId: string) => {
     setSelectedProject(projectId)
     onProjectSelect?.(projectId)
+    setIsSticky(true)
+    isStickyRef.current = true
+    setShowJumpButton(false)
   }
 
   const handleCloseTab = (e: React.MouseEvent, projectId: string) => {
@@ -501,6 +546,8 @@ export function LogDrawer({
 
     if (trimmedCommand === '/flush' || trimmedCommand === 'clear') {
       setLogs([])
+      prevLogLenRef.current = 0
+      setShowJumpButton(false)
       return
     }
 
@@ -522,14 +569,14 @@ export function LogDrawer({
           time: getCurrentTime(),
           message: line
         }))
-        setLogs(msc_appendLogsCapped(newLogs, entries, scrollCap))
+        setLogs(msc_appendLogsCapped(newLogs, entries, lineCap))
       } else {
         setLogs(msc_appendLogCapped(newLogs, {
           id: `${Date.now()}`,
           type: 'error' as const,
           time: getCurrentTime(),
           message: 'Engine API unavailable.'
-        }, scrollCap))
+        }, lineCap))
       }
     } else {
       const response = COMMAND_RESPONSES[trimmedCommand]
@@ -538,7 +585,7 @@ export function LogDrawer({
           ...r,
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
         }))
-        setLogs(msc_appendLogsCapped(newLogs, fullEntries, scrollCap))
+        setLogs(msc_appendLogsCapped(newLogs, fullEntries, lineCap))
       } else {
         setLogs(
           msc_appendLogCapped(
@@ -550,7 +597,7 @@ export function LogDrawer({
               label: '',
               message: `Command not recognized. Type 'help' for available commands.`,
             },
-            scrollCap,
+            lineCap,
           ),
         )
       }
@@ -583,17 +630,6 @@ export function LogDrawer({
           setCommandInput(commandHistory[newIndex])
         }
       }
-    }
-  }
-
-  const getLogColor = (type: string) => {
-    switch (type) {
-      case 'system': return 'text-[#00cc66]'
-      case 'error': return 'text-[#e02b20]'
-      case 'warning': return 'text-[#3daef2]'
-      case 'command': return 'text-[#00cc66]'
-      case 'output': return 'text-[#A0A0A0]'
-      default: return 'text-[#A0A0A0]'
     }
   }
 
@@ -670,91 +706,24 @@ export function LogDrawer({
         </div>
 
         {/* Floating Terminal Area */}
-        <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative">
-          {/* Vader Toolbar */}
-          <div className="flex items-center gap-2 bg-[#1c1c1c] border-b border-[#333333] px-3 py-1.5 shrink-0">
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-[#555555]" size={14} />
-              <input
-                type="text"
-                placeholder="Filter logs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[#121212] border border-[#333333] rounded px-8 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[var(--msc-accent)]"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[#555555] hover:text-white"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-            <div className="text-[10px] text-[#555555] whitespace-nowrap">
-              {filteredLogs.length}/{logs.length} lines
-            </div>
-            <button
-              onClick={() => setErrorOnly(!errorOnly)}
-              className={`p-1.5 rounded transition-all ${
-                errorOnly ? 'bg-[#e02b20]/20 text-[#e02b20]' : 'text-[#A0A0A0] hover:text-white'
-              }`}
-              title="Show Errors/Warnings Only"
-            >
-              <Filter size={14} />
-            </button>
-            <button
-              onClick={clearLogs}
-              className="p-1.5 rounded text-[#A0A0A0] hover:text-white hover:bg-[#e02b20]/20 transition-all"
-              title="Clear Logs"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-
-          <div className="flex-1 relative min-h-0">
-            <div 
-              ref={terminalRef}
-              onScroll={handleScroll}
-              className="absolute inset-0 z-10 vpe-system-log-viewport overflow-x-hidden overflow-y-auto overscroll-y-contain min-w-0 pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
-              style={{ opacity: 1 }}
-              onClick={() => inputRef.current?.focus()}
-            >
-              <div className="relative z-30 space-y-0.5 min-w-0 overflow-x-hidden" style={{ fontSize: logFontPx }}>
-                {filteredLogs.map((log) => {
-                  const msg = msc_stripAnsiDisplay(log.message)
-                  const hasMatch = searchTerm && (
-                    msg.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (log.label && log.label.toLowerCase().includes(searchTerm.toLowerCase()))
-                  )
-
-                  return (
-                    <div key={log.id} className={`flex leading-relaxed min-w-0 ${hasMatch ? 'bg-[var(--msc-accent)]/10' : ''}`}>
-                      {log.time && (
-                        <span className="text-[#444444] mr-2 select-none shrink-0">[{log.time}]</span>
-                      )}
-                      {log.label && (
-                        <span className={`${getLogColor(log.type)} mr-1 shrink-0`}>{log.label}</span>
-                      )}
-                      <span className={log.type === 'command' ? 'text-white' : getLogColor(log.type)}>
-                        {msg}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {showJumpButton && (
-              <button
-                onClick={jumpToBottom}
-                className="absolute bottom-4 right-8 z-40 flex items-center gap-1.5 rounded-full bg-[#22c55e] px-3 py-1.5 text-[11px] font-bold text-black shadow-lg hover:bg-[#3fcf72] transition-all animate-bounce"
-              >
-                <ChevronDown size={14} />
-                New Logs
-              </button>
-            )}
-          </div>
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {mscPathMissingBanner}
+          <TerminalView
+            logs={logs}
+            filteredLogs={filteredLogs}
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            errorOnly={errorOnly}
+            onToggleErrorOnly={() => setErrorOnly((x) => !x)}
+            onClear={clearLogs}
+            terminalRef={terminalRef}
+            onTerminalScroll={handleScroll}
+            showJumpButton={showJumpButton}
+            onJumpToBottom={jumpToBottom}
+            logFontPx={logFontPx}
+            scrollViewportClassName="inset-0"
+            onTerminalBodyClick={() => inputRef.current?.focus()}
+          />
         </div>
 
         {/* Floating Command Input */}
@@ -776,7 +745,7 @@ export function LogDrawer({
         {/* Floating Status Bar */}
         <div className="px-4 py-2 border-t border-[#333333] bg-[#161616] flex items-center justify-between shrink-0 rounded-b">
           <span className="text-[11px] text-[#A0A0A0]">
-            PID: 48291 | RUNTIME: 824H
+            PID: 48291 | RUNTIME: 824H · {msc_mscEngineFooterLine()}
           </span>
           <span className="text-[10px] text-[#555555]">DETACHED</span>
         </div>
@@ -927,92 +896,25 @@ export function LogDrawer({
             </div>
           </div>
 
-          {/* Vader Toolbar */}
-          <div className="flex items-center gap-2 bg-[#1c1c1c] border-b border-[#333333] px-3 py-1.5 shrink-0">
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-[#555555]" size={14} />
-              <input
-                type="text"
-                placeholder="Filter logs..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[#121212] border border-[#333333] rounded px-8 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[var(--msc-accent)]"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[#555555] hover:text-white"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-            <div className="text-[10px] text-[#555555] whitespace-nowrap">
-              {filteredLogs.length}/{logs.length} lines
-            </div>
-            <button
-              onClick={() => setErrorOnly(!errorOnly)}
-              className={`p-1.5 rounded transition-all ${
-                errorOnly ? 'bg-[#e02b20]/20 text-[#e02b20]' : 'text-[#A0A0A0] hover:text-white'
-              }`}
-              title="Show Errors/Warnings Only"
-            >
-              <Filter size={14} />
-            </button>
-            <button
-              onClick={clearLogs}
-              className="p-1.5 rounded text-[#A0A0A0] hover:text-white hover:bg-[#e02b20]/20 transition-all"
-              title="Clear Logs"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-
-          {/* Terminal Area — left-1 clears resize gutter; log lines z-30 above scrollbar (z-10) */}
-          <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative">
-            <div className="flex-1 relative min-h-0">
-              <div 
-                ref={terminalRef}
-                onScroll={handleScroll}
-                className="absolute inset-y-0 right-0 left-1 z-10 vpe-system-log-viewport overflow-x-hidden overflow-y-auto overscroll-y-contain min-w-0 pl-10 pr-4 py-4 vpe-terminal-scrollbar max-h-full"
-                style={{ opacity: 1 }}
-                onClick={() => inputRef.current?.focus()}
-              >
-                <div className="relative z-30 space-y-0.5 min-w-0 overflow-x-hidden" style={{ fontSize: logFontPx }}>
-                  {filteredLogs.map((log) => {
-                    const msg = msc_stripAnsiDisplay(log.message)
-                    const hasMatch = searchTerm && (
-                      msg.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      (log.label && log.label.toLowerCase().includes(searchTerm.toLowerCase()))
-                    )
-
-                    return (
-                      <div key={log.id} className={`flex leading-relaxed min-w-0 ${hasMatch ? 'bg-[var(--msc-accent)]/10' : ''}`}>
-                        {log.time && (
-                          <span className="text-[#444444] mr-2 select-none shrink-0">[{log.time}]</span>
-                        )}
-                        {log.label && (
-                          <span className={`${getLogColor(log.type)} mr-1 shrink-0`}>{log.label}</span>
-                        )}
-                        <span className={log.type === 'command' ? 'text-white' : getLogColor(log.type)}>
-                          {msg}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {showJumpButton && (
-                <button
-                  onClick={jumpToBottom}
-                  className="absolute bottom-4 right-8 z-40 flex items-center gap-1.5 rounded-full bg-[#22c55e] px-3 py-1.5 text-[11px] font-bold text-black shadow-lg hover:bg-[#3fcf72] transition-all animate-bounce"
-                >
-                  <ChevronDown size={14} />
-                  New Logs
-                </button>
-              )}
-            </div>
+          {/* Terminal + Vader toolbar (JEDI_MOD_25) */}
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            {mscPathMissingBanner}
+            <TerminalView
+              logs={logs}
+              filteredLogs={filteredLogs}
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              errorOnly={errorOnly}
+              onToggleErrorOnly={() => setErrorOnly((x) => !x)}
+              onClear={clearLogs}
+              terminalRef={terminalRef}
+              onTerminalScroll={handleScroll}
+              showJumpButton={showJumpButton}
+              onJumpToBottom={jumpToBottom}
+              logFontPx={logFontPx}
+              scrollViewportClassName="inset-y-0 right-0 left-1"
+              onTerminalBodyClick={() => inputRef.current?.focus()}
+            />
           </div>
 
           {/* Interactive Command Input */}
@@ -1034,7 +936,7 @@ export function LogDrawer({
           {/* Bottom Status Bar */}
           <div className="px-4 py-2 border-t border-[#333333] bg-[#161616] flex items-center justify-between shrink-0">
             <span className="text-[11px] text-[#A0A0A0]">
-              SYSTEM READY
+              SYSTEM READY · {msc_mscEngineFooterLine()}
             </span>
             <GripVertical size={12} className="text-[#555555]" />
           </div>

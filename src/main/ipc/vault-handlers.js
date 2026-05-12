@@ -116,16 +116,17 @@ function msc_registerVaultIpc(ipcMain, c) {
     const src = result.filePaths[0];
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    let outPath;
+    let outPathObject;
     try {
-      outPath = await msc_writeVaultInternalThumbnail(src, displayName, row?.id);
+      outPathObject = await msc_writeVaultInternalThumbnail(src, displayName, row?.id);
     } catch (err) {
       const m =
         err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
       throw new Error(m);
     }
 
-    const hrefBase = pathToFileURL(outPath).href;
+    const outPath = outPathObject && outPathObject.file ? outPathObject.file : outPathObject;
+    const hrefBase = outPathObject && outPathObject.url ? outPathObject.url : pathToFileURL(outPath).href;
 
     if (row) {
       const pt =

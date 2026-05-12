@@ -39,17 +39,10 @@ const VpeUiLayoutContext = createContext<VpeUiLayoutValue | null>(null)
 
 export function VpeUiLayoutProvider({ children }: { children: ReactNode }) {
   const [viewMode, setViewModeState] = useState<VpeShellViewMode>('cinema')
-  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     setViewModeState(readShellViewFromStorage())
-    setHydrated(true)
   }, [])
-
-  useEffect(() => {
-    if (!hydrated) return
-    console.log('[VPE STANDBY]')
-  }, [hydrated])
 
   const setViewMode = useCallback((m: VpeShellViewMode) => {
     setViewModeState((prev) => {
@@ -59,7 +52,6 @@ export function VpeUiLayoutProvider({ children }: { children: ReactNode }) {
       } catch {
         /* */
       }
-      console.log('[VPE VIEW SYNC]', m)
       return m
     })
   }, [])

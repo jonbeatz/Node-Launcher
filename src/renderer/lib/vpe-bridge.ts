@@ -209,10 +209,14 @@ export interface VpeApi {
       pkg_manager: 'npm' | 'pnpm' | 'yarn'
       start_script: string
       build_script: string
+      is_nextjs?: boolean
+      node_modules_missing?: boolean
     }
     project_type?: VpeShieldProjectType
     suggestedPort: number
     reservedPort: number
+    /** JEDI_MOD_132 — non-blocking reclaim hints when folder or package.json is missing */
+    reclaimWarnings?: string[]
   }>
   toggleStatus: (
     projectId: string,
@@ -252,6 +256,8 @@ export interface VpeApi {
     thumbnail_url_for_renderer?: string | null
     /** v1.8.4 — human-readable diff for contextual save toasts */
     changeSummary?: string
+    /** JEDI_MOD_132 — reclaim hints when repo folder or package.json is not ready */
+    reclaimWarnings?: string[]
   }>
   getAppSettings?: () => Promise<VpeAppSettings>
   updateAppSettings?: (
@@ -274,7 +280,16 @@ export interface VpeApi {
     repaired: number
     skipped: number
     errors: { id: string; message: string }[]
+    pathCheck?: {
+      checked: number
+      present: number
+      missing: { id: string; name: string; path: string }[]
+    }
   }>
+  /** JEDI_MOD_29 — compact display_order / sort_order to 1…n (SQLite v17-style). */
+  reindexProjectDisplayOrder?: () => Promise<
+    { ok: true; count: number } | { ok: false; error: string }
+  >
   openDirectory: () => Promise<string | null>
   vaultAddFile?: (
     projectId: string,
@@ -335,11 +350,15 @@ export interface VpeApi {
   takeStateSnapshot?: () => Promise<{ ok: boolean; path?: string; error?: string }>
   /** Portable vault: copy active catalog DB into `vpe-backups` under repo / portable root. */
   backupLocalDb?: () => Promise<{ ok: boolean; path?: string; error?: string }>
-  /** Manual registry order: swap `sort_order` with neighbor, optional portable auto-sync. */
+  /** Manual registry order: swap neighbor rows (`display_order` / `sort_order`); optional portable auto-sync. */
   reorderProject?: (
     projectId: string,
     direction: 'up' | 'down',
   ) => Promise<{ ok: boolean; error?: string }>
+  /** JEDI_MOD_27 — persist full dashboard order (bulk `display_order` + mirrored `sort_order`). */
+  updateProjectOrder?: (
+    order: { id: string; display_order: number }[],
+  ) => Promise<{ ok: boolean; error?: string; updated?: number }>
   restoreStateSnapshot?: () => Promise<{ ok: boolean; error?: string }>
   executeTerminalCommand?: (command: string, activeProjectId?: string) => Promise<{ ok: boolean; output: string }>
   openExplorer?: (folderPath: string) => Promise<{ ok: boolean; error?: string }>
@@ -407,23 +426,38 @@ export interface VpeApi {
     missingFile?: boolean
     path?: string
     error?: string
+    suppressToast?: boolean
   }>
   writeProjectDotEnv?: (payload: {
     projectId: string
     content: string
-  }) => Promise<{ ok: boolean; path?: string; error?: string }>
+  }) => Promise<{ ok: boolean; path?: string; error?: string; suppressToast?: boolean }>
   subscribeRepairRunsChanged?: (callback: () => void) => () => void
 }
 
 declare global {
   interface Window {
     vpeAPI?: VpeApi
+    /** Preload `contextBridge` — `version` from `app.getVersion()` / `npm_package_version`. */
+    vpeInfo?: { version?: string; platform?: string; hardware?: string }
   }
 }
 
 export function getVpeApi(): VpeApi | null {
   if (typeof window === 'undefined') return null
   return window.vpeAPI ?? null
+}
+
+/** JEDI_MOD_26 — preload `window.vpeInfo.version` (Electron `app.getVersion()`). */
+export function msc_getVpeShippedVersion(): string {
+  if (typeof window === 'undefined') return '0.0.0'
+  const v = window.vpeInfo?.version
+  return v != null && String(v).trim() !== '' ? String(v).trim() : '0.0.0'
+}
+
+/** MSC footer line; middle dot matches Vader Protocol status chrome. */
+export function msc_mscEngineFooterLine(): string {
+  return `Powered by the MSC Media Engine · v${msc_getVpeShippedVersion()}`
 }
 
 /** Registry / vault enumeration can stall on huge D:-drive vaults — cap wait via renderer-side race (main handler remains unchanged). */
@@ -520,6 +554,15 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   has_documentation?: boolean
   project_folder_created_at?: string | null
   project_folder_modified_at?: string | null
+  /** SQLite v16 — persisted per project; 0/1 from DB → strict boolean for UI. */
+  watchdog_enabled?: boolean
+  /** JEDI_MOD_29 — registry folder absent on disk (main enrich). */
+  project_path_missing?: boolean
+  /** JEDI_MOD_136 — main enrich: runnable HTTP target (folder + package.json). */
+  vpe_repo_runnable_for_http?: boolean
+  /** SQLite v14+ / v17+ — registry ordering (mirrored in DB). */
+  sort_order?: number | null
+  display_order?: number | null
 } {
   const pm =
     row.pkg_manager === 'yarn' || row.pkg_manager === 'pnpm'
@@ -567,9 +610,21 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
         : String(row.notes),
     vault_has_files: row.vault_has_files === true,
     has_documentation: msc_rowHasDocumentationEnabled(row.has_documentation),
-    watchdog_enabled:
-      row.watchdog_enabled === true || row.watchdog_enabled === 1,
+    /** Legacy rows: `null`/`undefined` → on; only explicit `0` / numeric zero disables. */
+    watchdog_enabled: row.watchdog_enabled !== 0,
+    project_path_missing:
+      row.project_path_missing === true || row.project_path_missing === 1,
+    vpe_repo_runnable_for_http:
+      row.vpe_repo_runnable_for_http === true || row.vpe_repo_runnable_for_http === 1,
     project_folder_created_at: row.project_folder_created_at ?? null,
     project_folder_modified_at: row.project_folder_modified_at ?? null,
+    sort_order:
+      row.sort_order === undefined || row.sort_order === null
+        ? null
+        : Number(row.sort_order),
+    display_order:
+      row.display_order === undefined || row.display_order === null
+        ? null
+        : Number(row.display_order),
   }
 }

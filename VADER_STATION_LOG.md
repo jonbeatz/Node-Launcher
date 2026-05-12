@@ -1,6 +1,77 @@
 # Vader Station Log
 
-**Purpose:** Single place for operators and agents running **Start Project** to grab a **short** narrative of infra + recent product notes. Prefer **[`.cursor/docs/guides/Checkpoint.md`](.cursor/docs/guides/Checkpoint.md)** for full branch/build history.
+**Purpose:** Single place for operators and agents running **Start Project** to grab a **short** narrative of infra + recent product notes. Prefer **[`.cursor/docs/guides/Checkpoint.md`](.cursor/docs/guides/Checkpoint.md)** for full branch/build history (if that guide exists on your branch).
+
+---
+
+## Session — 2026-05-12 (v2.2.6-SOVEREIGN · Refactor & harmonizer seal)
+
+**Git:** Documented in **`.cursor/docs/Project-Bible.md` §8**; commit message used for this wave: `Refactored Original Code Update`.
+
+**What was wrong**
+- Reclaimed / half-linked projects: Environment tab threw **“Project folder does not exist”**; cards went **Offline (no TCP/HTTP)** and error CTAs while processes were in a liminal “started” state; HTTP safety kill could fire when there was no real dev server to probe.
+
+**What fixed it**
+- **JEDI_MOD_136 (Environment harmonizer):** `msc_resolveProjectDotEnvAbs` + IPC read/write behavior; `msc_shouldHarmonizeHttpProbe` in `project-runner.js`; `vpe_repo_runnable_for_http` enrichment + card/list **staging** copy; `.env` tab respects `suppressToast`.
+- **JEDI_MOD_138 (Debrief / cleanup):** Trimmed boot migration `console.log` noise (`vpe-ipc.js`, `system-handlers.js`, `persistent-store.js`, `vpe-ui-layout-context.tsx`); shipped **`2.2.6-SOVEREIGN`** in `package.json` / UI footer; **`path-guard.js`** `@file` note for **repo vs vault** path rules.
+
+**Restore point:** Remote branch **`restore/vpe-2.2.6-sovereign-baseline`** (same commit as the refactor) for a clean rollback target.
+
+---
+
+**MOD 33 — The Ghost Iron Curtain:**
+- **Version Firewall:** Implemented a startup audit in `main.js` that compares the current engine version against the required v2.2.5 baseline for `vpe-local-data`. 
+- **Legacy Blocking:** Any engine < v2.2.5 is now physically blocked from mounting the sovereign data directory to prevent registry/vault corruption.
+- **Schema Defense:** Added `msc_persistentStoreVersionAudit` to `persistent-store.js` to block schema-level access if the code logic is older than the current database state (e.g. v17 display_order).
+- **Enhanced Guardrails:** Extended `vpe-vault-rm-guard.js` to protect against `fs.unlinkSync` on vault files, ensuring total write-protection of the `./media` and project roots unless an intentional "Delete Project" is active.
+- **Path Guard:** `msc_validateProjectPath` now explicitly rejects attempts to register projects inside `vpe-local-data` or the Vault directory.
+- **Security Logs:** Added `[SECURITY]` startup verification logs.
+
+---
+
+## Session handoff — 2026-05-12 (Sovereign Seal)
+
+**Git:** Branch aligned to `v2.2.5` (JEDI_MOD_117).
+
+**Status:**
+- **Iron Curtain:** ACTIVE (Guarding Vault v2.2.5)
+- **Forge Bypass:** ACTIVE (`_FORGE_TEMP_` exemption enabled in `vpe-vault-rm-guard.js`)
+- **Sovereign Nuke:** EXECUTED (Clean environment established via `vpe:nuke-install`)
+
+**Notes:** The VPE has been successfully upgraded to the Sovereign Baseline. The "Great Library" documentation has been consolidated into three master files (`TRUTH.md`, `VADER_STATION_LOG.md`, `REPAIR_PROTOCOLS.md`) and all ghosts/artifacts purged. The build pipeline (`vader:deploy`) is ready.
+
+---
+
+## v2.2.5 — The Master Alignment & Workspace Purge
+
+**Objective:** Upgrade to v2.2.5, consolidate all documentation, clean the `.cursor` directory, and optimize the project structure into a "Sovereign Baseline."
+
+- **Documentation Consolidation:** Merged all redundant information into three master files (`TRUTH.md`, `VADER_STATION_LOG.md`, `REPAIR_PROTOCOLS.md`) and purged temporary `.md` files.
+- **Handshake Lock:** Preserved both `vpeAPI` and `mscLegacyAPI` in `preload.js` to support all UI components.
+- **Identity Mapping:** Re-verified PM2 process naming uses the working `projectName` logic.
+- **System Optimization:** Implemented `_FORGE_TEMP_` prefix exemption in `vpe-vault-rm-guard.js`, ensured clean telemetry payload, and solidified `msc_projectVaultRootDir()` logic.
+- **Workspace Hygiene:** Purged artifacts and ensured correct directory structures.
+
+---
+
+## v2.2.1 — Maintenance UI, catalog order hardening, terminal & version sync
+
+
+**Ship:** **`package.json` `2.2.5`** · preload **`vpeInfo.version`** · footer + **`/settings`** use **`msc_mscEngineFooterLine()`** (same string as main dashboard).
+
+**MOD 25 — Terminal optimization:**
+- **1000-line buffer** and **hybrid sticky scroll** in the log terminal so long sessions stay readable without losing context at the tail.
+
+**MOD 26 — Dynamic versioning:**
+- **`window.vpeInfo.version`** from preload: **`app.getVersion()`** when packaged, else **`npm_package_version`** — single source for footer, terminal chrome, and internal tools.
+
+**MOD 27 — Persistent dashboard order:**
+- **SQLite v17 migration** alignment: **`display_order`** / mirrored **`sort_order`**, **`ORDER BY display_order ASC, id ASC`** for catalog reads.
+- **Reorder arrows** on cards + **`reorderProject`** / **`updateProjectOrder`** IPC; optional **Reset Order** compacts order to **1…n** after fragmentation.
+
+**MOD 29 — Sovereign repair UI:**
+- **System Maintenance** surface (`#1c1c1c`): **Verify & Repair Paths** (`vpe:repair-vault-links` — registry path audit + vault thumbnail repair), **Reset Order**.
+- **Amber missing-path** treatment on grid, list, and cards; **Relink** path via log drawer / settings when **`project_path_missing`** is set after **`msc_verifyProjectPaths`**.
 
 ---
 

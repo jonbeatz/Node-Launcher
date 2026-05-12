@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { msc_launcherRendererPort } = require('../launcher-port');
 const { msc_logWarn } = require('../lib/logger');
+const { msc_registryProjectRootExists } = require('../path-guard');
 const {
   MSC_VPE_APP_SETTINGS_DEFAULTS,
   msc_normalizeAppSettingsRow,
@@ -12,8 +13,8 @@ const {
 /** One-time migrate source; cwd file is archived to media/_vpe_archive after boot. */
 const LEGACY_REGISTRY = path.join(process.cwd(), 'projects.json');
 
-/** Final `PRAGMA user_version` after `msc_sqliteMigrateSchemaAndPorts` (v2.1.x: `sort_order`, `auto_sync_db_on_close`). */
-const VPE_SQLITE_USER_VERSION = 16;
+/** Final `PRAGMA user_version` after `msc_sqliteMigrateSchemaAndPorts` (v2.2.x: `display_order` for dashboard order). */
+const VPE_SQLITE_USER_VERSION = 17;
 
 /**
  * Initial DDL before incremental migrations (see `msc_sqliteMigrateSchemaAndPorts`).
@@ -193,6 +194,7 @@ function rowFromTuple(tuple) {
     dev_session_started_at: null,
     has_documentation: 1,
     sort_order: 0,
+    display_order: 0,
     watchdog_enabled: 1,
   };
 }
@@ -224,7 +226,7 @@ class SqlitePersistence {
   listProjectsAlphabetical() {
     return this._db
       .prepare(
-        `SELECT * FROM projects ORDER BY sort_order ASC, name COLLATE NOCASE`,
+        `SELECT * FROM projects ORDER BY display_order ASC, id ASC`,
       )
       .all();
   }
@@ -256,6 +258,9 @@ class SqlitePersistence {
       .run(isFavorite ? 1 : 0, projectId);
   }
 
+  /**
+   * JEDI_MOD_133 — Persists payload as given; `path` is normalized in IPC only, not re-validated here.
+   */
   updateProject(payload) {
     const found = this._db.prepare(`SELECT * FROM projects WHERE id = ?`).get(payload.id);
     if (!found) throw new Error('VPE: Project not found');
@@ -327,11 +332,18 @@ class SqlitePersistence {
         : null;
     const watchdogEnabled =
       payload.watchdog_enabled === false || payload.watchdog_enabled === 0 ? 0 : 1;
+    const mx = this._db
+      .prepare(
+        `SELECT COALESCE(MAX(sort_order), 0) AS ms, COALESCE(MAX(display_order), 0) AS md FROM projects`,
+      )
+      .get();
+    const nextOrder =
+      Math.max(Number(mx?.ms) || 0, Number(mx?.md) || 0, 0) + 1;
     this._db
       .prepare(
         `
-      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived, notes, watchdog_enabled)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived, notes, watchdog_enabled, sort_order, display_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -348,6 +360,8 @@ class SqlitePersistence {
         isArc,
         notesIns,
         watchdogEnabled,
+        nextOrder,
+        nextOrder,
       );
   }
 
@@ -538,9 +552,14 @@ class SqlitePersistence {
     const row = this._db.prepare(`SELECT COUNT(*) AS n FROM projects`).get();
     const n = row && typeof row.n === 'number' ? row.n : 0;
     if (n <= 1) return false;
-    const dRow = this._db.prepare(`SELECT COUNT(DISTINCT sort_order) AS d FROM projects`).get();
+    const dRow = this._db
+      .prepare(
+        `SELECT COUNT(DISTINCT sort_order) AS d, COUNT(DISTINCT display_order) AS dd FROM projects`,
+      )
+      .get();
     const d = dRow && typeof dRow.d === 'number' ? dRow.d : 0;
-    return d < n;
+    const dd = dRow && typeof dRow.dd === 'number' ? dRow.dd : 0;
+    return d < n || dd < n;
   }
 
   sanitizeSortOrderAlphabetical() {
@@ -548,9 +567,12 @@ class SqlitePersistence {
       .prepare(`SELECT id FROM projects ORDER BY name COLLATE NOCASE`)
       .all();
     const tx = this._db.transaction(() => {
-      const u = this._db.prepare(`UPDATE projects SET sort_order = ? WHERE id = ?`);
+      const u = this._db.prepare(
+        `UPDATE projects SET sort_order = ?, display_order = ? WHERE id = ?`,
+      );
       for (let i = 0; i < rows.length; i += 1) {
-        u.run(i + 1, rows[i].id);
+        const ord = i + 1;
+        u.run(ord, ord, rows[i].id);
       }
     });
     tx();
@@ -574,12 +596,72 @@ class SqlitePersistence {
     const sb = Number(b.sort_order);
     const va = Number.isFinite(sa) ? sa : 0;
     const vb = Number.isFinite(sb) ? sb : 0;
+    const da = Number(a.display_order);
+    const db = Number(b.display_order);
+    const vda = Number.isFinite(da) ? da : 0;
+    const vdb = Number.isFinite(db) ? db : 0;
     const tx = this._db.transaction(() => {
-      this._db.prepare(`UPDATE projects SET sort_order = ? WHERE id = ?`).run(vb, a.id);
-      this._db.prepare(`UPDATE projects SET sort_order = ? WHERE id = ?`).run(va, b.id);
+      this._db
+        .prepare(`UPDATE projects SET sort_order = ?, display_order = ? WHERE id = ?`)
+        .run(vb, vdb, a.id);
+      this._db
+        .prepare(`UPDATE projects SET sort_order = ?, display_order = ? WHERE id = ?`)
+        .run(va, vda, b.id);
     });
     tx();
     return { ok: true };
+  }
+
+  /**
+   * JEDI_MOD_27 — bulk set dashboard order (`display_order` + mirrored `sort_order`).
+   * @param {Array<{ id: string, display_order: number }>} updates
+   * @returns {{ ok: true, updated: number } | { ok: false, error: string }}
+   */
+  updateProjectsDisplayOrder(updates) {
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return { ok: false, error: 'empty_updates' };
+    }
+    let updated = 0;
+    const tx = this._db.transaction(() => {
+      const u = this._db.prepare(
+        `UPDATE projects SET display_order = ?, sort_order = ? WHERE id = ?`,
+      );
+      for (const item of updates) {
+        if (!item || typeof item !== 'object') continue;
+        const id = item.id != null ? String(item.id) : '';
+        if (!id) continue;
+        const ord = Number(item.display_order);
+        const v = Number.isFinite(ord) ? Math.floor(ord) : 0;
+        const info = u.run(v, v, id);
+        if (info.changes > 0) updated += 1;
+      }
+    });
+    tx();
+    if (updated === 0 && updates.length > 0) {
+      return { ok: false, error: 'no_matching_ids' };
+    }
+    return { ok: true, updated };
+  }
+
+  /**
+   * JEDI_MOD_29 — compact `display_order` / `sort_order` to 1…n in current catalog order (v17-style).
+   * @returns {{ ok: true, count: number }}
+   */
+  reindexProjectsDisplayOrder() {
+    const rows = this._db
+      .prepare(`SELECT id FROM projects ORDER BY display_order ASC, id ASC`)
+      .all();
+    const tx = this._db.transaction(() => {
+      const u = this._db.prepare(
+        `UPDATE projects SET display_order = ?, sort_order = ? WHERE id = ?`,
+      );
+      for (let i = 0; i < rows.length; i += 1) {
+        const ord = i + 1;
+        u.run(ord, ord, rows[i].id);
+      }
+    });
+    tx();
+    return { ok: true, count: rows.length };
   }
 }
 
@@ -666,6 +748,11 @@ class JsonPersistence {
         p.sort_order = 0;
         changed = true;
       }
+      if (p.display_order === undefined) {
+        const so = Number(p.sort_order);
+        p.display_order = Number.isFinite(so) ? so : 0;
+        changed = true;
+      }
       if (p.has_documentation === undefined) {
         p.has_documentation = 1;
         changed = true;
@@ -739,6 +826,7 @@ class JsonPersistence {
         build_script: (p.buildScript || 'build').toString(),
         pkg_manager: (p.detectedPackageManager || 'npm').toString(),
         sort_order: 0,
+        display_order: 0,
         health_http_code: null,
         health_checked_at: null,
         health_reachable: null,
@@ -773,12 +861,12 @@ class JsonPersistence {
 
   listProjectsAlphabetical() {
     return Object.values(this._data.projects).sort((a, b) => {
-      const sa = Number(a.sort_order);
-      const sb = Number(b.sort_order);
-      const oa = Number.isFinite(sa) ? sa : 0;
-      const ob = Number.isFinite(sb) ? sb : 0;
-      if (oa !== ob) return oa - ob;
-      return String(a.name).localeCompare(String(b.name));
+      const da = Number(a.display_order);
+      const db = Number(b.display_order);
+      const oda = Number.isFinite(da) ? da : 0;
+      const odb = Number.isFinite(db) ? db : 0;
+      if (oda !== odb) return oda - odb;
+      return String(a.id).localeCompare(String(b.id));
     });
   }
 
@@ -804,6 +892,9 @@ class JsonPersistence {
     }
   }
 
+  /**
+   * JEDI_MOD_133 — Persists payload as given; `path` is normalized in IPC only, not re-validated here.
+   */
   updateProject(payload) {
     const p = this._data.projects[payload.id];
     if (!p) throw new Error('VPE: Project not found');
@@ -845,13 +936,24 @@ class JsonPersistence {
         ? String(payload.notes)
         : null;
     const soRaw = Number(payload.sort_order);
-    const sortOrder = Number.isFinite(soRaw) ? Math.floor(soRaw) : 0;
+    let sortOrder = Number.isFinite(soRaw) && soRaw > 0 ? Math.floor(soRaw) : 0;
+    if (sortOrder <= 0) {
+      const list = Object.values(this._data.projects);
+      const maxSo = list.reduce((acc, p) => {
+        if (!p) return acc;
+        const s = Number.isFinite(Number(p.sort_order)) ? Number(p.sort_order) : 0;
+        const d = Number.isFinite(Number(p.display_order)) ? Number(p.display_order) : 0;
+        return Math.max(acc, s, d);
+      }, 0);
+      sortOrder = maxSo + 1;
+    }
     this._data.projects[payload.id] = {
       ...payload,
       project_type: pt,
       is_archived: Boolean(payload.is_archived),
       notes: notesIni,
       sort_order: sortOrder,
+      display_order: sortOrder,
       health_http_code: null,
       health_checked_at: null,
       health_reachable: null,
@@ -971,13 +1073,19 @@ class JsonPersistence {
   needsSortOrderSanitize() {
     const list = Object.values(this._data.projects);
     if (list.length <= 1) return false;
-    const distinct = new Set(
+    const distinctSort = new Set(
       list.map((p) => {
-        const n = Number(p.sort_order);
+        const n = Number(p?.sort_order);
         return Number.isFinite(n) ? n : 0;
       }),
     );
-    return distinct.size < list.length;
+    const distinctDisp = new Set(
+      list.map((p) => {
+        const n = Number(p?.display_order);
+        return Number.isFinite(n) ? n : 0;
+      }),
+    );
+    return distinctSort.size < list.length || distinctDisp.size < list.length;
   }
 
   sanitizeSortOrderAlphabetical() {
@@ -986,7 +1094,11 @@ class JsonPersistence {
     );
     for (let i = 0; i < rows.length; i += 1) {
       const p = this._data.projects[rows[i].id];
-      if (p) p.sort_order = i + 1;
+      if (p) {
+        const ord = i + 1;
+        p.sort_order = ord;
+        p.display_order = ord;
+      }
     }
     this.save();
   }
@@ -1012,10 +1124,56 @@ class JsonPersistence {
     const sb = Number(pb.sort_order);
     const va = Number.isFinite(sa) ? sa : 0;
     const vb = Number.isFinite(sb) ? sb : 0;
+    const da = Number(pa.display_order);
+    const db = Number(pb.display_order);
+    const vda = Number.isFinite(da) ? da : va;
+    const vdb = Number.isFinite(db) ? db : vb;
     pa.sort_order = vb;
+    pa.display_order = vdb;
     pb.sort_order = va;
+    pb.display_order = vda;
     this.save();
     return { ok: true };
+  }
+
+  /**
+   * @param {Array<{ id: string, display_order: number }>} updates
+   * @returns {{ ok: true, updated: number } | { ok: false, error: string }}
+   */
+  updateProjectsDisplayOrder(updates) {
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return { ok: false, error: 'empty_updates' };
+    }
+    let updated = 0;
+    for (const item of updates) {
+      if (!item || typeof item !== 'object') continue;
+      const id = item.id != null ? String(item.id) : '';
+      if (!id) continue;
+      const p = this._data.projects[id];
+      if (!p) continue;
+      const ord = Number(item.display_order);
+      const v = Number.isFinite(ord) ? Math.floor(ord) : 0;
+      p.display_order = v;
+      p.sort_order = v;
+      updated += 1;
+    }
+    if (updated === 0) return { ok: false, error: 'no_matching_ids' };
+    this.save();
+    return { ok: true, updated };
+  }
+
+  /** @returns {{ ok: true, count: number }} */
+  reindexProjectsDisplayOrder() {
+    const ordered = this.listProjectsAlphabetical();
+    for (let i = 0; i < ordered.length; i += 1) {
+      const p = this._data.projects[ordered[i].id];
+      if (!p) continue;
+      const ord = i + 1;
+      p.display_order = ord;
+      p.sort_order = ord;
+    }
+    this.save();
+    return { ok: true, count: ordered.length };
   }
 
   /**
@@ -1270,6 +1428,30 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
     ver = 16;
   }
 
+  if (ver < 17) {
+    let names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('display_order')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN display_order INTEGER NOT NULL DEFAULT 0`);
+      names = msc_sqliteTableColumnNames(db, 'projects');
+    }
+    if (names.includes('display_order')) {
+      const list = db
+        .prepare(`SELECT id FROM projects ORDER BY sort_order ASC, name COLLATE NOCASE, id ASC`)
+        .all();
+      const tx = db.transaction(() => {
+        const u = db.prepare(
+          `UPDATE projects SET display_order = ?, sort_order = ? WHERE id = ?`,
+        );
+        for (let k = 0; k < list.length; k += 1) {
+          const ord = k + 1;
+          u.run(ord, ord, list[k].id);
+        }
+      });
+      tx();
+    }
+    ver = 17;
+  }
+
   db.pragma(`user_version = ${ver}`);
 }
 
@@ -1341,14 +1523,36 @@ function msc_seedSqlite(database) {
 
 let storeSingleton = null;
 
+const BetterSqlite3 = require('better-sqlite3');
+
+/** JEDI_MOD_33 — check version alignment (app vs DB/lock). */
+function msc_persistentStoreVersionAudit(db, targetVer) {
+  if (process.env.VPE_E2E_USER_DATA) return;
+  if (String(process.env.VPE_SKIP_IRON_CURTAIN || '').trim() === '1') return;
+  
+  const currentUv = Number(db.pragma('user_version', { simple: true })) || 0;
+  // If the DB is already at v17 (v2.2.x schema) but our code logic is significantly ahead or behind, 
+  // or if we detect a mismatch that could corrupt display_order, block older engines.
+  // Note: main.js already blocks engine version < 2.2.1; this is a schema-level defense.
+  if (currentUv >= 17 && targetVer < 17) {
+     const msg = `CRITICAL: DATA CORRUPTION RISK. The current database schema (v${currentUv}) is from a newer VPE version (v2.2.1+). This engine (target v${targetVer}) is too old to safely manage display_order. Aborting.`;
+     const { dialog, app } = require('electron');
+     try {
+       dialog.showErrorBox('Vader Project Engine - Security Lock', msg);
+     } catch (_) {}
+     try {
+       app.exit(1);
+     } catch (_) {}
+     process.exit(1);
+  }
+}
+
 function msc_createPersistentStore() {
   if (storeSingleton) return storeSingleton;
 
   const paths = msc_getStorePaths();
   fs.mkdirSync(paths.storeDir, { recursive: true });
   msc_migrateLegacyDbFiles(paths);
-
-  console.log('[VPE] LOGIC_MOD_01 — sovereign SQLite path:', paths.sqlitePath);
 
   try {
     const BetterSqlite3 = require('better-sqlite3');
@@ -1360,6 +1564,13 @@ function msc_createPersistentStore() {
 
     msc_sqliteMigrateSchemaAndPorts(rawDb);
     msc_seedSqlite(rawDb);
+
+    msc_persistentStoreVersionAudit(rawDb, VPE_SQLITE_USER_VERSION);
+
+    const uv = Number(rawDb.pragma('user_version', { simple: true })) || 0;
+    console.log(
+      `[VPE] SQLite PRAGMA user_version=${uv} (catalog migrations target ${VPE_SQLITE_USER_VERSION})`,
+    );
     storeSingleton = new SqlitePersistence(rawDb);
     console.log('VPE persistence: SQLite (better-sqlite3)');
   } catch (err) {
@@ -1371,6 +1582,9 @@ function msc_createPersistentStore() {
     j.load();
     j.seedIfEmpty();
     storeSingleton = j;
+    console.log(
+      `[VPE] JSON persistence (SQLite unavailable); logical catalog user_version=${VPE_SQLITE_USER_VERSION}`,
+    );
   }
 
   return storeSingleton;
@@ -1400,6 +1614,33 @@ function msc_vpePortableBackupFromStore(store, projectRootAbs) {
   }
 }
 
+/**
+ * JEDI_MOD_29 — verify each project registry `path` (workspace root; operator “cmd_cwd”) exists on disk.
+ * @param {{ listProjectsAlphabetical?: () => Array<{ id?: unknown, name?: unknown, path?: unknown }> }} store
+ * @returns {{ checked: number, present: number, missing: Array<{ id: string, name: string, path: string }> }}
+ */
+function msc_verifyProjectPaths(store) {
+  if (!store || typeof store.listProjectsAlphabetical !== 'function') {
+    return { checked: 0, present: 0, missing: [] };
+  }
+  const rows = store.listProjectsAlphabetical();
+  const missing = [];
+  let present = 0;
+  for (const row of rows) {
+    if (!row) continue;
+    const id = row.id != null ? String(row.id) : '';
+    const name = row.name != null ? String(row.name) : id || 'unknown';
+    const p = row.path != null ? String(row.path) : '';
+    if (!p.trim()) {
+      missing.push({ id: id || '?', name, path: p });
+      continue;
+    }
+    if (msc_registryProjectRootExists(p)) present += 1;
+    else missing.push({ id: id || '?', name, path: p });
+  }
+  return { checked: rows.length, present, missing };
+}
+
 module.exports = {
   msc_createPersistentStore,
   msc_getPersistentStore,
@@ -1410,6 +1651,7 @@ module.exports = {
   msc_sqliteApplyBaseSchema,
   msc_sqliteMigrateSchemaAndPorts,
   VPE_SQLITE_USER_VERSION,
+  msc_verifyProjectPaths,
   /** @deprecated Migrate once at boot, then archived — do not rely on cwd path */
   MSC_LEGACY_PROJECTS_JSON_PATH: LEGACY_REGISTRY,
 };

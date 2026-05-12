@@ -27,43 +27,39 @@ function msc_ironSemverLt(a, b) {
   return false;
 }
 
+/** JEDI_MOD_33 — check version alignment (app vs DB/lock). */
+function msc_ironCurtainVersionAudit(appVer) {
+  if (process.env.VPE_E2E_USER_DATA) return;
+  if (String(process.env.VPE_SKIP_IRON_CURTAIN || '').trim() === '1') return;
+
+    const legacyVersion = msc_ironSemverLt(appVer, '2.2.5');
+    if (legacyVersion) {
+      const msg =
+        'CRITICAL: LEGACY ENGINE DETECTED. Access to Vault v2.2.5+ has been locked to prevent data corruption. Please use the VPE Sovereign Build.';
+      console.error('[SECURITY] Iron Curtain Active: Blocking legacy v' + appVer);
+    try {
+      dialog.showErrorBox('Vader Project Engine', msg);
+    } catch (_) {}
+    try {
+      app.exit(0);
+    } catch (_) {}
+    process.exit(0);
+  }
+}
+
 /**
  * Local-first `userData`: when running from a Node-Launcher checkout or with `--portable`,
  * keep SQLite/cache under `process.cwd()/vpe-local-data` so legacy trees on D: do not share
  * `%LocalAppData%/VaderProjectEngine` with other installs.
  */
 function msc_vpeDetectLocalFirstUserData() {
-  /** Iron Curtain — before rm-guard, vault lock, and heavy main init (legacy engine / caps path). */
-  if (!process.env.VPE_E2E_USER_DATA && String(process.env.VPE_SKIP_IRON_CURTAIN || '').trim() !== '1') {
-    const cwdSeg = process.cwd().split(/[/\\]+/).some((seg) => seg === 'NODE-LAUNCHER');
-    const execBase = path.basename(process.execPath || '').toUpperCase();
-    const legacyExe = execBase.includes('NODE-LAUNCHER');
+  const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+  let appVer = '0.0.0';
+  try {
+    appVer = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '0.0.0').trim();
+  } catch (_) {}
 
-    let appVer = '0.0.0';
-    try {
-      const pkgPath = path.join(__dirname, '..', '..', 'package.json');
-      appVer = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '0.0.0').trim();
-    } catch (_) {
-      /* */
-    }
-    const legacyVersion = msc_ironSemverLt(appVer, '2.1.0');
-
-    if (cwdSeg || legacyExe || legacyVersion) {
-      const msg =
-        'CRITICAL: LEGACY ENGINE DETECTED. To prevent data corruption on your D: Drive Vault, this version has been disabled. Please use the VPE Sovereign Build.';
-      try {
-        dialog.showErrorBox('Vader Project Engine', msg);
-      } catch (_) {
-        /* */
-      }
-      try {
-        app.exit(0);
-      } catch (_) {
-        /* */
-      }
-      process.exit(0);
-    }
-  }
+  msc_ironCurtainVersionAudit(appVer);
 
   if (process.env.VPE_E2E_USER_DATA) return;
   if (process.env.VPE_PORTABLE_USER_DATA_ROOT) return;
@@ -75,11 +71,12 @@ function msc_vpeDetectLocalFirstUserData() {
     process.env.VPE_LOCAL_USERDATA_ROOT = path.resolve(path.join(cwd, 'vpe-local-data'));
     console.log('[VPE] Local-first userData profile:', process.env.VPE_LOCAL_USERDATA_ROOT);
   }
-  
+
   // JEDI_MOD_23: Portable Sync Lock — Force project root for all data
   const vaderDataPath = path.join(process.cwd(), 'vpe-local-data');
   app.setPath('userData', vaderDataPath);
-  console.log("Vader Data Path:", app.getPath('userData'));
+  console.log('[SECURITY] Iron Curtain Active: Guarding Vault v2.2.5');
+  console.log('Vader Data Path:', app.getPath('userData'));
 }
 msc_vpeDetectLocalFirstUserData();
 

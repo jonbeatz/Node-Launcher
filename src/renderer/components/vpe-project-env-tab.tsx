@@ -141,6 +141,12 @@ export function Msc_ProjectEnvTab({ projectId, active }: Props) {
     try {
       const res = await api.readProjectDotEnv(projectId)
       if (!res?.ok) {
+        if (res?.suppressToast) {
+          setLines([])
+          setBaseline('')
+          setDiskPath(null)
+          return
+        }
         addToast('Environment', 'error', res?.error ?? 'Could not read .env', undefined, 4000)
         setLines([])
         setBaseline('')
@@ -200,7 +206,9 @@ export function Msc_ProjectEnvTab({ projectId, active }: Props) {
     try {
       const res = await api.writeProjectDotEnv({ projectId, content: serialized })
       if (!res?.ok) {
-        addToast('Save failed', 'error', res?.error ?? 'Write rejected', undefined, 4000)
+        if (!res?.suppressToast) {
+          addToast('Save failed', 'error', res?.error ?? 'Write rejected', undefined, 4000)
+        }
         return
       }
       setBaseline(serialized)

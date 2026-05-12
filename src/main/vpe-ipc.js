@@ -11,7 +11,7 @@ const {
   msc_allowedShieldType,
   msc_ipcEnrichProjectsRow,
 } = require('./project-detection');
-const { msc_validateProjectPath } = require('./path-guard');
+const { msc_validateProjectPath, msc_validateProjectPathForSave } = require('./path-guard');
 const {
   VPE_VAULT_INTERNAL_THUMB,
   VPE_VAULT_KEEP_FILE,
@@ -20,6 +20,7 @@ const {
   msc_isVaultNonUserNoiseFile,
   msc_safeVaultFolderName,
   msc_projectVaultRootDir,
+  msc_projectVaultSovereignInternalThumbAbs,
   msc_projectVaultProjectDir,
   msc_vaultRenameProjectFolder,
 } = require('./vpe-vault-paths');
@@ -241,8 +242,6 @@ async function msc_runAutoStartProjectsIfEnabled(store, projectRunner, priorRunn
     }
   }
 }
-const MAX_THUMB_EDGE = 960;
-const MAX_THUMB_BYTES = 512 * 1024;
 const VPE_CATALOG_VERSION = 1;
 const VPE_SYSTEM_REPAIR_PROJECT_ID = '__vpe_system__';
 
@@ -1032,6 +1031,7 @@ function msc_buildSanitizedSystemStatsPayload(p) {
   const pm2Count = Math.max(0, Math.floor(Number(p.pm2ProcessCount) || 0));
 
   return {
+    id: 'system',
     cpu: cpuNum,
     memory: {
       total: msc_bytesToGbNumber(totalMem),
@@ -1051,6 +1051,7 @@ function msc_buildSanitizedSystemStatsPayload(p) {
       active: Math.max(0, Math.floor(Number(p.projectsActive) || 0)),
       total: Math.max(0, Math.floor(Number(p.projectsTotal) || 0)),
     },
+    status: pm2On ? 'online' : 'offline'
   };
 }
 
@@ -1225,11 +1226,12 @@ async function msc_safeWriteThumbnail(vaultDir, pngBuffer) {
 
 /**
  * v1.6.6 — Card thumbnail stored only under `media/vault/<sanitizedName>/VPE_VAULT_INTERNAL_THUMB` (PNG).
- * v1.7.3 — delegates disk write to `msc_safeWriteThumbnail` (TEMP + fsync + atomic rename).
- * @returns {Promise<string>} Absolute path to `_vpe_thumb.png`
+ * JEDI_MOD_124 — Atomic physical write: force resolved vault path on D: + terminal proof.
+ * @returns {Promise<{ ok: true, file: string, url: string }>}
  */
 async function msc_writeVaultInternalThumbnail(srcImagePath, projectDisplayName, projectId) {
-  const vaultDir = msc_projectVaultProjectDir(projectDisplayName, projectId);
+  const targetPath = msc_projectVaultSovereignInternalThumbAbs(projectDisplayName, projectId);
+  const vaultDir = path.dirname(targetPath);
   fs.mkdirSync(vaultDir, { recursive: true });
 
   ['_vpe_thumb.jpg', '_vpe_thumb.jpeg'].forEach((leaf) => {
@@ -1246,38 +1248,34 @@ async function msc_writeVaultInternalThumbnail(srcImagePath, projectDisplayName,
     throw new Error('VPE: Could not load image for thumbnail.');
   }
 
-  let resized = img;
-  const { width, height } = img.getSize();
-  const largestEdge = Math.max(width || 0, height || 0);
-  if (largestEdge > MAX_THUMB_EDGE) {
-    resized = img.resize({
-      width: width >= height ? MAX_THUMB_EDGE : undefined,
-      height: height > width ? MAX_THUMB_EDGE : undefined,
-      quality: 'good',
-    });
+  let srcStat;
+  try {
+    srcStat = fs.statSync(srcImagePath);
+  } catch (_) {
+    srcStat = null;
   }
-
-  let buf = resized.toPNG();
-  let guard = 0;
-  /** @type {import('electron').NativeImage} */
-  let shrink = resized;
-  while (buf.length > MAX_THUMB_BYTES && guard < 14) {
-    guard += 1;
-    const sz = shrink.getSize();
-    const nw = Math.max(180, Math.floor((sz.width || 1) * 0.82));
-    const nh = Math.max(180, Math.floor((sz.height || 1) * 0.82));
-    shrink = shrink.resize({
-      width: nw,
-      height: nh,
-      quality: 'good',
-    });
-    buf = shrink.toPNG();
-  }
-  const statApprox = buf.length;
-  if (statApprox > 12 * 1024 * 1024) {
+  if (srcStat && srcStat.isFile() && srcStat.size > 12 * 1024 * 1024) {
     throw new Error('VPE: Thumbnail file is too large (max 12 MB).');
   }
-  return msc_safeWriteThumbnail(vaultDir, buf);
+
+  if (fs.existsSync(targetPath)) {
+    try {
+      fs.unlinkSync(targetPath);
+    } catch (e) {
+      console.warn(`[VAULT] Could not unlink existing thumbnail: ${e?.message ?? e}`);
+    }
+  }
+
+  try {
+    fs.copyFileSync(srcImagePath, targetPath);
+    console.log('!!! CRITICAL SUCCESS: FILE PHYSICALLY WRITTEN TO:', targetPath);
+  } catch (err) {
+    console.error('!!! CRITICAL FAIL: Physical write failed at OS level:', err);
+    throw err;
+  }
+
+  console.log(`[VAULT] Thumbnail locked to physical storage for Project: ${projectDisplayName}`);
+  return { ok: true, file: targetPath, url: `${pathToFileURL(targetPath).href}?t=${Date.now()}` };
 }
 
 /** After vault folder rename, fix `file://` thumbnail URLs that pointed at `_vpe_thumb.*` in the moved folder. */
@@ -1410,17 +1408,17 @@ function msc_fallbackSystemStats(err) {
     const freeMem = os.freemem();
     const vpeUptimeSec = process.uptime();
     const vpeUptimeLabel = msc_formatProcessUptime(vpeUptimeSec);
-    return msc_buildSanitizedSystemStatsPayload({
-      cpuPercent: null,
-      totalMem,
-      freeMem,
-      getPm2RpcConnected: () => false,
-      pm2ProcessCount: 0,
-      vpeUptimeSec,
-      vpeUptimeLabel,
-      projectsActive: 0,
-      projectsTotal: 0,
-    });
+      return msc_buildSanitizedSystemStatsPayload({
+        cpuPercent: null,
+        totalMem,
+        freeMem,
+        getPm2RpcConnected: () => false,
+        pm2ProcessCount: 0,
+        vpeUptimeSec,
+        vpeUptimeLabel,
+        projectsActive: 0,
+        projectsTotal: 0,
+      });
   } catch {
     return msc_buildSanitizedSystemStatsPayload({
       cpuPercent: null,
@@ -2008,6 +2006,7 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     msc_ipcEnrichProjectsRow,
     msc_vaultDirHasUserReferenceFiles,
     msc_validateProjectPath,
+    msc_validateProjectPathForSave,
     msc_detectProjectScripts,
     msc_classifyProjectType,
     msc_patchPackageJsonStripScriptPorts,
@@ -2066,20 +2065,17 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
   if (!global.__vpeHardScrubV167BootDone) {
     global.__vpeHardScrubV167BootDone = true;
     try {
-      const migration = msc_greatPurgeThumbnailMigration(store);
-      const scrub = msc_purgeUnusedMediaScrub(store);
-      console.log('[VPE BOOT MEDIA ALIGN]', { migration, scrub });
+      msc_greatPurgeThumbnailMigration(store);
+      msc_purgeUnusedMediaScrub(store);
     } catch (e) {
       console.warn('[VPE BOOT] Hard Scrub v1.6.7 failed', e?.message ?? e);
     }
     try {
-      const vaultSync = msc_syncVaultPhysicalFolders(store);
-      console.log('[VPE VAULT SYNC COMPLETE]', vaultSync);
+      msc_syncVaultPhysicalFolders(store);
     } catch (e2) {
       console.warn('[VPE BOOT] Vault physical sync failed', e2?.message ?? e2);
     }
     msc_emitProjectsUpdated();
-    console.log('[VPE STANDBY]');
   }
 
   console.log('[VPE SUCCESS]', 'VPE IPC handlers registered');

@@ -51,6 +51,7 @@ const expectedProjectCols = [
   'dev_session_started_at',
   'has_documentation',
   'sort_order',
+  'display_order',
 ];
 for (const c of expectedProjectCols) {
   assert(projectCols.includes(c), `projects missing column: ${c}`);

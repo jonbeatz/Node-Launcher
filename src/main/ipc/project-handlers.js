@@ -5,7 +5,8 @@ process.env.VPE_VAULT_DELETION_LOCKED = String(process.env.VPE_VAULT_DELETION_LO
 
 const fs = require('fs');
 const path = require('path');
-const { msc_vpePortableBackupFromStore } = require('../db/persistent-store');
+const { msc_normalizePersistedProjectPath } = require('../path-guard');
+const { msc_vpePortableBackupFromStore, msc_verifyProjectPaths } = require('../db/persistent-store');
 const { pathToFileURL, fileURLToPath } = require('node:url');
 const { nativeImage } = require('electron');
 const {
@@ -115,33 +116,46 @@ function msc_vpeThumbUrlFileMissing(row) {
 
 const VPE_DOTENV_MAX_BYTES = 512 * 1024;
 
-/** LOGIC_MOD_02 — resolve `.env` at registered project root only (no traversal). */
+/**
+ * JEDI_MOD_136 — reclaimed / unlinked registry rows: missing disk root must not throw through `.env` IPC.
+ * Returns a virtual `envPath` under the persisted path (read returns empty; write is blocked without toast).
+ */
 function msc_resolveProjectDotEnvAbs(store, projectId) {
-  const row = store.getProject(projectId);
-  if (!row || typeof row.path !== 'string' || !String(row.path).trim()) {
-    return { ok: false, error: 'VPE: Unknown project or missing path.' };
-  }
-  let root;
   try {
-    root = path.resolve(String(row.path).trim());
-  } catch {
-    return { ok: false, error: 'VPE: Invalid project path.' };
-  }
-  if (!fs.existsSync(root)) {
-    return { ok: false, error: 'VPE: Project folder does not exist.' };
-  }
-  try {
-    if (!fs.statSync(root).isDirectory()) {
-      return { ok: false, error: 'VPE: Project path is not a directory.' };
+    const row = store.getProject(projectId);
+    if (!row || typeof row.path !== 'string' || !String(row.path).trim()) {
+      return { ok: false, error: 'VPE: Unknown project or missing path.' };
     }
+    let root;
+    try {
+      root = path.resolve(String(row.path).trim());
+    } catch {
+      return { ok: false, error: 'VPE: Invalid project path.' };
+    }
+    if (!fs.existsSync(root)) {
+      const envPath = path.resolve(path.join(root, '.env'));
+      return {
+        ok: true,
+        root,
+        envPath,
+        harmonizedMissingRoot: true,
+      };
+    }
+    try {
+      if (!fs.statSync(root).isDirectory()) {
+        return { ok: false, error: 'VPE: Project path is not a directory.' };
+      }
+    } catch (e) {
+      return { ok: false, error: e?.message ?? String(e) };
+    }
+    const envPath = path.resolve(path.join(root, '.env'));
+    if (path.relative(root, envPath) !== '.env') {
+      return { ok: false, error: 'VPE: Invalid .env location.' };
+    }
+    return { ok: true, root, envPath };
   } catch (e) {
     return { ok: false, error: e?.message ?? String(e) };
   }
-  const envPath = path.resolve(path.join(root, '.env'));
-  if (path.relative(root, envPath) !== '.env') {
-    return { ok: false, error: 'VPE: Invalid .env location.' };
-  }
-  return { ok: true, root, envPath };
 }
 
 function msc_vpeSortedVaultImagePathsForResync(absVaultDir) {
@@ -210,6 +224,7 @@ function msc_registerProjectIpc(ipcMain, c) {
     msc_ipcEnrichProjectsRow,
     msc_vaultDirHasUserReferenceFiles,
     msc_validateProjectPath,
+    msc_validateProjectPathForSave,
     msc_detectProjectScripts,
     msc_classifyProjectType,
     msc_patchPackageJsonStripScriptPorts,
@@ -280,7 +295,7 @@ function msc_registerProjectIpc(ipcMain, c) {
     return { ok: true, settings: next, changeSummary };
   });
 
-  // `listProjectsAlphabetical` orders by `sort_order` (SQLite v14+) then name — backups include manual order.
+  // `listProjectsAlphabetical` orders by `display_order` (SQLite v17+) then `id` — backups include manual order.
   ipcMain.handle('vpe:getProjects', () =>
     store.listProjectsAlphabetical().map((row) => {
       const enriched = msc_ipcEnrichProjectsRow(row);
@@ -320,6 +335,47 @@ function msc_registerProjectIpc(ipcMain, c) {
       }
     } catch (e) {
       console.warn('[VPE] reorder auto-sync', e?.message ?? e);
+    }
+    msc_emitProjectsUpdated();
+    return { ok: true };
+  });
+
+  ipcMain.handle('vpe:update-project-order', (_evt, payload) => {
+    if (!Array.isArray(payload)) {
+      return { ok: false, error: 'invalid_payload' };
+    }
+    const updates = [];
+    for (const item of payload) {
+      if (!item || typeof item !== 'object') continue;
+      const id = item.id != null ? String(item.id) : '';
+      if (!id) continue;
+      const display_order = Number(item.display_order);
+      if (!Number.isFinite(display_order)) continue;
+      updates.push({ id, display_order: Math.floor(display_order) });
+    }
+    if (!updates.length) {
+      return { ok: false, error: 'empty_updates' };
+    }
+    if (typeof store.updateProjectsDisplayOrder !== 'function') {
+      return { ok: false, error: 'unsupported_store' };
+    }
+    const result = store.updateProjectsDisplayOrder(updates);
+    if (!result.ok) return result;
+    try {
+      const settings = typeof store.getSettings === 'function' ? store.getSettings() : {};
+      const syncOn =
+        settings.auto_sync_db_on_close === true ||
+        settings.auto_sync_db_on_close === 1 ||
+        String(settings.auto_sync_db_on_close).toLowerCase() === 'true';
+      if (syncOn) {
+        const cwd = typeof process.cwd === 'function' ? process.cwd() : '.';
+        const b = msc_vpePortableBackupFromStore(store, cwd);
+        if (!b.ok) {
+          console.warn('[VPE] update-project-order auto-sync backup failed:', b.error);
+        }
+      }
+    } catch (e) {
+      console.warn('[VPE] update-project-order auto-sync', e?.message ?? e);
     }
     msc_emitProjectsUpdated();
     return { ok: true };
@@ -379,7 +435,7 @@ function msc_registerProjectIpc(ipcMain, c) {
     const row = store.getProject(projectId);
     if (!row) throw new Error('VPE: Project not found');
 
-    const root = msc_validateProjectPath(row.path);
+    const root = msc_normalizePersistedProjectPath(row.path);
     const det = msc_detectProjectScripts(root);
     const newPort = await msc_findAvailablePort(msc_managedPortFloor(), projectId, det.is_nextjs);
 
@@ -402,10 +458,11 @@ function msc_registerProjectIpc(ipcMain, c) {
     return { ok: true, port: newPort, start_script: det.start_script };
   });
 
-  /** Temporary recovery: rebuild `_vpe_thumb.png` + DB `file:` links from images left in each vault folder. */
+  /** Vault thumbnail recovery + JEDI_MOD_29 registry path audit (`path` workspace roots). */
   ipcMain.handle('vpe:repair-vault-links', async () => {
+    const pathCheck = msc_verifyProjectPaths(store);
     if (typeof store.listProjectsAlphabetical !== 'function') {
-      return { ok: true, repaired: 0, skipped: 0, errors: [] };
+      return { ok: true, repaired: 0, skipped: 0, errors: [], pathCheck };
     }
     const rows = store.listProjectsAlphabetical();
     let repaired = 0;
@@ -473,14 +530,36 @@ function msc_registerProjectIpc(ipcMain, c) {
       }
     }
     msc_emitProjectsUpdated();
-    return { ok: true, repaired, skipped, errors };
+    return { ok: true, repaired, skipped, errors, pathCheck };
+  });
+
+  ipcMain.handle('vpe:reindex-project-display-order', () => {
+    if (typeof store.reindexProjectsDisplayOrder !== 'function') {
+      return { ok: false, error: 'unsupported_store' };
+    }
+    const r = store.reindexProjectsDisplayOrder();
+    msc_emitProjectsUpdated();
+    return r;
   });
 
   ipcMain.handle('vpe:inspect-project', async (_event, projectPath) => {
-    const root = msc_validateProjectPath(projectPath);
-    const det = msc_detectProjectScripts(root);
-    const project_type = msc_classifyProjectType(root);
-    const suggestedPort = await msc_findAvailablePort(msc_managedPortFloor(), null, det.is_nextjs);
+    const saveVal = msc_validateProjectPathForSave(projectPath);
+    const root = saveVal.path;
+    const det = saveVal.hasFullNodeProject
+      ? msc_detectProjectScripts(root)
+      : {
+          pkg_manager: 'npm',
+          start_script: 'dev',
+          build_script: 'build',
+          is_nextjs: false,
+          node_modules_missing: true,
+        };
+    const project_type = saveVal.hasFullNodeProject ? msc_classifyProjectType(root) : 'unknown';
+    const suggestedPort = await msc_findAvailablePort(
+      msc_managedPortFloor(),
+      null,
+      Boolean(det.is_nextjs),
+    );
     return {
       ok: true,
       path: root,
@@ -488,6 +567,7 @@ function msc_registerProjectIpc(ipcMain, c) {
       project_type,
       suggestedPort,
       reservedPort: MSC_VPE_RENDERER_PORT,
+      reclaimWarnings: saveVal.reclaimWarnings,
     };
   });
 
@@ -544,10 +624,23 @@ function msc_registerProjectIpc(ipcMain, c) {
     } = payload;
     if (!id) throw new Error('VPE: Missing project id');
 
-    const root = msc_validateProjectPath(projectPath);
-    const det = msc_detectProjectScripts(root);
-    const start = (start_script || det.start_script || 'dev').toString();
-    const build = (build_script || det.build_script || 'build').toString();
+    const existingRow = typeof store.getProject === 'function' ? store.getProject(id) : null;
+
+    /** JEDI_MOD_133 — sovereign save: persist path/thumbnail/name with no disk or package.json gate (vault guard only). */
+    const root = msc_normalizePersistedProjectPath(projectPath);
+    const start = (start_script || existingRow?.start_script || 'dev').toString();
+    const build = (build_script || existingRow?.build_script || 'build').toString();
+    const pkg_manager =
+      existingRow && existingRow.pkg_manager != null && String(existingRow.pkg_manager).trim()
+        ? String(existingRow.pkg_manager).trim()
+        : 'npm';
+    const det = {
+      start_script: start,
+      build_script: build,
+      pkg_manager,
+      is_nextjs: false,
+      node_modules_missing: true,
+    };
 
     let project_type = undefined;
     if (Object.prototype.hasOwnProperty.call(payload, 'project_type')) {
@@ -575,7 +668,6 @@ function msc_registerProjectIpc(ipcMain, c) {
       notes = n == null ? null : String(n);
     }
 
-    const existingRow = typeof store.getProject === 'function' ? store.getProject(id) : null;
     const hasThumbPayload = Object.prototype.hasOwnProperty.call(payload, 'thumbnail_url');
     let savedThumbnail = hasThumbPayload ? thumbnail_url : existingRow?.thumbnail_url ?? null;
 
@@ -637,6 +729,7 @@ function msc_registerProjectIpc(ipcMain, c) {
       detection: det,
       thumbnail_url_for_renderer,
       changeSummary,
+      reclaimWarnings: [],
     };
   });
 
@@ -924,7 +1017,7 @@ function msc_registerProjectIpc(ipcMain, c) {
 
   ipcMain.handle('vpe:open-directory', async () => {
     const result = await dialog.showOpenDialog({
-      title: 'Select project folder',
+      title: 'Select project root (folder that contains package.json — not the vault)',
       properties: ['openDirectory'],
     });
     if (result.canceled || !Array.isArray(result.filePaths) || !result.filePaths[0]) {
@@ -974,7 +1067,10 @@ function msc_registerProjectIpc(ipcMain, c) {
       }
       const hit = msc_resolveProjectDotEnvAbs(store, projectId);
       if (!hit.ok) return hit;
-      const { envPath } = hit;
+      const { envPath, harmonizedMissingRoot } = hit;
+      if (harmonizedMissingRoot) {
+        return { ok: true, content: '', missingFile: true, path: envPath };
+      }
       if (!fs.existsSync(envPath)) {
         return { ok: true, content: '', missingFile: true, path: envPath };
       }
@@ -1007,7 +1103,14 @@ function msc_registerProjectIpc(ipcMain, c) {
       }
       const hit = msc_resolveProjectDotEnvAbs(store, projectId);
       if (!hit.ok) return hit;
-      const { envPath, root } = hit;
+      const { envPath, root, harmonizedMissingRoot } = hit;
+      if (harmonizedMissingRoot) {
+        return {
+          ok: false,
+          error: 'VPE: Project folder is not on disk yet.',
+          suppressToast: true,
+        };
+      }
       fs.mkdirSync(root, { recursive: true });
       const tmp = `${envPath}.${randomUUID()}.tmp`;
       fs.writeFileSync(tmp, content, 'utf8');

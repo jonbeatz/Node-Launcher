@@ -464,9 +464,6 @@ function msc_registerSystemIpc(ipcMain, c) {
       const scrub = msc_purgeUnusedMediaScrub(store);
       const vaultSync = msc_syncVaultPhysicalFolders(store);
       msc_emitProjectsUpdated();
-      console.log('[VPE MEDIA ALIGN]', { migration, scrub });
-      console.log('[VPE VAULT SYNC COMPLETE]', vaultSync);
-      console.log('[VPE STANDBY]');
       return { ok: true, migration, scrub, vaultSync };
     } catch (err) {
       const m =

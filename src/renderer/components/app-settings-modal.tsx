@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { X, FolderOpen, Download, Upload, Trash2, LifeBuoy, Save, Link2 } from 'lucide-react'
+import { X, FolderOpen, Download, Upload, Trash2, LifeBuoy, Save } from 'lucide-react'
 import { useToast } from '@/components/vader-toast'
 import { getVpeApi, type VpeAppSettings } from '@/lib/vpe-bridge'
 import { useVpeUiLayout } from '@/context/vpe-ui-layout-context'
@@ -22,6 +22,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { VpeSettingsVaultHeading } from '@/components/vpe-settings-vault-heading'
+import { MscSystemMaintenanceTools } from '@/components/msc-system-maintenance-tools'
 
 const msc_settingsAccordionTriggerClass =
   'px-10 py-6 items-center gap-3 hover:no-underline [&[data-state=open]>svg]:text-[#888888]'
@@ -90,27 +91,6 @@ export function AppSettingsModal({
       } else if (res.error) {
         addToast('Support bundle failed', 'error', res.error)
       }
-    } finally {
-      setDbBusy(false)
-    }
-  }
-
-  const handleRepairVaultLinks = async () => {
-    const api = getVpeApi()
-    if (!api?.repairVaultLinks) return
-    setDbBusy(true)
-    try {
-      const res = await api.repairVaultLinks()
-      if (res.ok) {
-        const errN = Array.isArray(res.errors) ? res.errors.length : 0
-        addToast(
-          'Vault links scan complete',
-          errN > 0 ? 'error' : 'success',
-          `Repaired ${res.repaired}, skipped ${res.skipped}${errN ? `, ${errN} error(s)` : ''}`,
-        )
-      }
-    } catch (e) {
-      addToast('Repair vault links failed', 'error', e instanceof Error ? e.message : String(e))
     } finally {
       setDbBusy(false)
     }
@@ -772,6 +752,20 @@ export function AppSettingsModal({
               </AccordionContent>
             </AccordionItem>
 
+            <AccordionItem value="system-maintenance" className="border-b border-[rgba(156,163,175,0.12)]">
+              <AccordionTrigger type="button" className={msc_settingsAccordionTriggerClass}>
+                <VpeSettingsVaultHeading
+                  title="System Maintenance"
+                  subtitle="Registry path health, vault thumbnail repair, and display order compaction."
+                />
+              </AccordionTrigger>
+              <AccordionContent className="px-10">
+                <div className="space-y-4 pt-1 pb-2">
+                  <MscSystemMaintenanceTools disabled={dbBusy} />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             <AccordionItem value="database-state" className="border-b-0">
               <AccordionTrigger type="button" className={msc_settingsAccordionTriggerClass}>
                 <VpeSettingsVaultHeading
@@ -848,16 +842,6 @@ export function AppSettingsModal({
                 >
                   <LifeBuoy size={14} className="shrink-0" />
                   GENERATE SUPPORT BUNDLE
-                </button>
-                <button
-                  type="button"
-                  disabled={dbBusy}
-                  onClick={() => void handleRepairVaultLinks()}
-                  title="Rebuild _vpe_thumb.png and fix broken thumbnail rows from images left in each vault folder"
-                  className="h-9 rounded bg-[#252525] border border-[#333333] text-xs text-[#A0A0A0] hover:text-white hover:border-[#4fde82] active:border-[#4fde82] transition-all vader-focus flex items-center justify-center gap-2 disabled:opacity-50 sm:col-span-2"
-                >
-                  <Link2 size={14} className="shrink-0" />
-                  REPAIR VAULT THUMBNAIL LINKS
                 </button>
               </div>
             </div>

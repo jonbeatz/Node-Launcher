@@ -23,6 +23,8 @@ import {
   Paperclip,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Copy,
 } from 'lucide-react'
 
@@ -309,6 +311,15 @@ interface Msc_ProjectCardOwnProps {
   isSelected?: boolean
   /** ISO dev session start from persistence (v1.8.2); drives live uptime. */
   devSessionStartedAt?: string | null
+  /** JEDI_MOD_29 — registry workspace folder missing on disk. */
+  projectPathMissing?: boolean
+  /** JEDI_MOD_136 — false when no package.json on disk; health line stays staging vs offline. */
+  repoRunnableForHttp?: boolean
+  /** JEDI_MOD_27 — parent handles optimistic swap + `reorderProject` IPC when set. */
+  onRegistryReorderNeighbor?: (
+    projectId: string,
+    direction: 'up' | 'down',
+  ) => void | Promise<void>
 }
 
 export type Msc_ProjectCardProps = Msc_ProjectCardOwnProps &
@@ -364,6 +375,9 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
     onCardInteraction,
     isSelected = false,
     devSessionStartedAt = null,
+    onRegistryReorderNeighbor,
+    projectPathMissing = false,
+    repoRunnableForHttp = true,
     initial,
     animate,
     exit,
@@ -406,7 +420,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const isBuilding = status === 'building'
 
   /** 2xx only — LIVE readout; never tied to banner expand (silent until chevron). */
-  const isHttpConnected =
+  const _isHttpConnected =
     isRunning &&
     typeof health_http_code === 'number' &&
     health_http_code >= 200 &&
@@ -430,6 +444,10 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
         installingActive: true,
       }
     }
+    if (projectPathMissing) {
+      if (isRunning) return { label: 'STOP', icon: Square, action: onStop, active: true }
+      return { label: 'RELINK', icon: Settings, action: () => onSettings?.() }
+    }
     if (isBuilding) return { label: 'BUILDING...', icon: Hammer, disabled: true }
     if (!hasBuilt) {
       if (node_modules_missing) return { label: 'INSTALL & START', icon: Play, action: onInstallAndStart }
@@ -445,6 +463,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const getStatusLabel = () => {
     if (watchdogRestartInProgress) return 'RESTARTING...'
     if (devInstallInProgress && isRunning) return 'INSTALLING'
+    if (projectPathMissing && !isRunning && !isBuilding) return 'PATH MISSING'
     if (isRunning) return 'RUNNING'
     if (isError) return 'ERROR'
     if (isBuilding) return 'BUILDING'
@@ -457,6 +476,29 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
     showErrorCta?: boolean
   } | null => {
     if (!isRunning) return null
+    if (repoRunnableForHttp === false) {
+      if (typeof health_http_code === 'number' && health_http_code >= 200 && health_http_code < 300) {
+        return { label: `Active — HTTP ${health_http_code}`, cls: 'text-[#4fde82]' }
+      }
+      if (typeof health_http_code === 'number' && health_http_code >= 500) {
+        return {
+          label: `Degraded — HTTP ${health_http_code}`,
+          cls: 'text-[#e02b20]',
+          showErrorCta: true,
+        }
+      }
+      if (typeof health_http_code === 'number') {
+        return {
+          label: `HTTP ${health_http_code}`,
+          cls: 'text-[#ffcc00]',
+          showErrorCta: health_http_code >= 400,
+        }
+      }
+      return {
+        label: 'Staging — idle until project path is linked',
+        cls: 'text-[#ffcc00]',
+      }
+    }
     if (!health_checked_at && (health_http_code === undefined || health_http_code === null)) {
       return {
         label: 'Booting… (waiting for HTTP)',
@@ -497,7 +539,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const liveUptime = useVpeLiveSessionUptime(isRunning, devSessionStartedAt)
 
   /** Warm-up: running but not yet checked — drives equalizer amber (not paperclip). */
-  const isBootingHttp =
+  const _isBootingHttp =
     isRunning &&
     health_reachable !== false &&
     !health_checked_at &&
@@ -521,14 +563,18 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const msc_actionTilePy1 = `${msc_actionDarkTile} py-1`
 
   const msc_reorderArrowTile =
-    'inline-flex h-6 w-6 items-center justify-center rounded-md border border-[#2a2a2a]/50 bg-[#121212]/80 backdrop-blur-sm text-[#eaeaea] transition-colors vader-focus hover:bg-[#2a2a2a]/90 disabled:opacity-40 disabled:pointer-events-none'
+    'inline-flex h-6 w-6 items-center justify-center rounded-md border border-[#2a2a2a]/50 bg-[#121212]/80 backdrop-blur-sm text-[#eaeaea] transition-[color,background-color,border-color,box-shadow] duration-200 vader-focus hover:border-[color:color-mix(in_srgb,var(--msc-accent)_55%,#2a2a2a)] hover:bg-[#1a1f1c] hover:text-[color:var(--msc-accent)] hover:shadow-[0_0_14px_color-mix(in_srgb,var(--msc-accent)_22%,transparent)] disabled:opacity-40 disabled:pointer-events-none'
 
   const handleReorder = async (dir: 'up' | 'down') => {
     if (reorderBusy) return
-    const api = getVpeApi()
-    if (!api?.reorderProject) return
     setReorderBusy(true)
     try {
+      if (onRegistryReorderNeighbor) {
+        await onRegistryReorderNeighbor(id, dir)
+        return
+      }
+      const api = getVpeApi()
+      if (!api?.reorderProject) return
       const r = await api.reorderProject(id, dir)
       if (!r?.ok && r?.error && r.error !== 'no_neighbor') {
         addToast('Reorder failed', 'error', r.error)
@@ -541,7 +587,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   }
 
   const msc_reorderArrowStack = (
-    <div className="absolute left-2 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-0.5 opacity-60 transition-opacity duration-200 ease-in-out group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
+    <div className="msc-reorder-arrow-stack absolute left-2 top-1/2 z-30 flex -translate-y-1/2 flex-row gap-0.5 opacity-60 transition-opacity duration-200 ease-in-out group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
       <button
         type="button"
         disabled={reorderBusy}
@@ -550,10 +596,10 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           void handleReorder('up')
         }}
         className={msc_reorderArrowTile}
-        title="Move project up"
-        aria-label="Move project up"
+        title="Earlier in catalog order"
+        aria-label="Move project earlier in catalog order"
       >
-        <ChevronUp size={12} strokeWidth={2.5} />
+        <ChevronLeft size={12} strokeWidth={2.5} />
       </button>
       <button
         type="button"
@@ -563,10 +609,10 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           void handleReorder('down')
         }}
         className={msc_reorderArrowTile}
-        title="Move project down"
-        aria-label="Move project down"
+        title="Later in catalog order"
+        aria-label="Move project later in catalog order"
       >
-        <ChevronDown size={12} strokeWidth={2.5} />
+        <ChevronRight size={12} strokeWidth={2.5} />
       </button>
     </div>
   )
@@ -625,7 +671,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           isError
             ? `${msc_obsidianGlassShellCls} vpe-card-obsidian-glass--error`
             : msc_obsidianGlassShellCls
-        } ${motionExtraClassName ? ` ${motionExtraClassName}` : ''}`}
+        }${projectPathMissing && !isError ? ' ring-1 ring-[#b45309]/50' : ''} ${motionExtraClassName ? ` ${motionExtraClassName}` : ''}`}
       >
         <div className={`flex flex-col rounded-t-[4px] ${cardChromeHeaderSelected}`}>
         <div className="relative w-full shrink-0 border-b border-[#333333] bg-[#0a0a0a]">
@@ -684,17 +730,36 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
               </span>
             </div>
           ) : null}
+          {projectPathMissing ? (
+            <div
+              role="status"
+              className="flex items-center gap-1.5 border-t border-[#7f1d1d]/35 bg-[#1a1212] px-2.5 py-1"
+            >
+              <AlertTriangle size={11} className="shrink-0 text-[#f97316]" aria-hidden />
+              <span className="font-sans text-[9px] font-medium uppercase tracking-[0.1em] text-[#fdba74]">
+                Path missing · Terminal: Relink
+              </span>
+            </div>
+          ) : null}
         </div>
 
         <div className="min-w-0 bg-[#242424]/90">
         <div className="flex min-w-0 items-center justify-between gap-2.5 border-b border-[#2a2a2a] px-3 py-1.5">
-          <div className="flex min-w-0 flex-1 items-center min-h-6 pr-0.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 min-h-6 pr-0.5">
             <h3
               className="vpe-card-title min-w-0 truncate text-xs leading-snug text-white"
               title={name}
             >
               {name}
             </h3>
+            {projectPathMissing ? (
+              <span
+                className="shrink-0 rounded border border-[#78350f]/80 bg-[#292018] px-1 py-0.5 font-sans text-[8px] font-semibold uppercase tracking-[0.06em] text-[#fdba74]"
+                title="Registry workspace path not found"
+              >
+                Missing
+              </span>
+            ) : null}
           </div>
           <div className="inline-flex shrink-0 items-center gap-1.5 self-center">
             <button
@@ -902,7 +967,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           </button>
           <button
             type="button"
-            disabled={!isRunning || !onOpenInBrowser}
+            disabled={!projectPath.trim() || !onOpenInBrowser}
             onClick={(e) => {
               e.stopPropagation()
               if (isRunning && onOpenInBrowser) onOpenInBrowser()
@@ -911,9 +976,11 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
               isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
             }`}
             title={
-              isRunning
-                ? `Open ${runUrl} in browser`
-                : 'Start the project to open in browser'
+              !projectPath.trim()
+                ? 'Set a repo path in settings'
+                : isRunning
+                  ? `Open ${runUrl} in browser`
+                  : 'Start the project to open in browser'
             }
           >
             <ExternalLink size={11} className="shrink-0" />
@@ -951,7 +1018,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           isError
             ? `${msc_obsidianGlassShellCls} vpe-card-obsidian-glass--error`
             : msc_obsidianGlassShellCls
-        }
+        }${projectPathMissing && !isError ? ' ring-1 ring-[#b45309]/50' : ''}
         ${motionExtraClassName ? ` ${motionExtraClassName}` : ''}
       `}
     >
@@ -1013,6 +1080,17 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             </span>
           </div>
         ) : null}
+        {projectPathMissing ? (
+          <div
+            role="status"
+            className="flex items-center gap-2 border-t border-[#7f1d1d]/35 bg-[#1a1212] px-3 py-1.5"
+          >
+            <AlertTriangle size={12} className="shrink-0 text-[#f97316]" aria-hidden />
+            <span className="font-sans text-[10px] font-medium uppercase tracking-[0.1em] text-[#fdba74]">
+              Path missing on disk · logs: Relink
+            </span>
+          </div>
+        ) : null}
 
       </div>
 
@@ -1027,6 +1105,14 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
                 {name}
               </h3>
               {isError && <AlertTriangle size={14} className="text-[#ff4444] shrink-0" />}
+              {projectPathMissing && !isError && (
+                <span
+                  className="shrink-0 rounded border border-[#78350f]/80 bg-[#292018] px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-[0.08em] text-[#fdba74]"
+                  title="Registry workspace path not found"
+                >
+                  Missing
+                </span>
+              )}
             </div>
             <div className="inline-flex shrink-0 items-center gap-1 self-center">
               <button
@@ -1236,7 +1322,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
 
         <button
           type="button"
-          disabled={!isRunning || !onOpenInBrowser}
+          disabled={!projectPath.trim() || !onOpenInBrowser}
           onClick={(e) => {
             e.stopPropagation()
             if (isRunning && onOpenInBrowser) onOpenInBrowser()
@@ -1245,9 +1331,11 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
           }`}
           title={
-            isRunning
-              ? `Open ${runUrl} in browser`
-              : 'Start the project to open in browser'
+            !projectPath.trim()
+              ? 'Set a repo path in settings'
+              : isRunning
+                ? `Open ${runUrl} in browser`
+                : 'Start the project to open in browser'
           }
         >
           <ExternalLink size={13} className="shrink-0" />

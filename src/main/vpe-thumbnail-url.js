@@ -11,7 +11,7 @@ const path = require('path');
 const { pathToFileURL, fileURLToPath } = require('node:url');
 const {
   VPE_VAULT_INTERNAL_THUMB,
-  msc_projectVaultProjectDir,
+  msc_projectVaultSovereignInternalThumbAbs,
 } = require('./vpe-vault-paths');
 
 function msc_normalizeResolvedPath(p) {
@@ -35,7 +35,7 @@ function msc_bumpVaultThumbPulse(projectId, ts = Date.now()) {
 function msc_internalVaultThumbAbsForRow(row) {
   if (!row?.name) return '';
   return msc_normalizeResolvedPath(
-    path.join(msc_projectVaultProjectDir(String(row.name), row.id), VPE_VAULT_INTERNAL_THUMB),
+    msc_projectVaultSovereignInternalThumbAbs(String(row.name), row.id),
   );
 }
 

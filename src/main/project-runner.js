@@ -4,7 +4,10 @@ const fs = require('fs');
 const net = require('net');
 const path = require('path');
 const treeKill = require('tree-kill');
-const { msc_validateProjectPath } = require('./path-guard');
+const {
+  msc_normalizePersistedProjectPath,
+  msc_registryProjectRootExists,
+} = require('./path-guard');
 const { msc_ipcEnrichProjectsRow } = require('./project-detection');
 const { msc_probeHttpHealth } = require('./health-probe');
 const { msc_launcherRendererPort } = require('./launcher-port');
@@ -16,6 +19,22 @@ const MSC_STARTUP_GRACE_MS = 20000;
 const MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS = 6;
 /** v1.2.3 — first HTTP health probe after auto `install && dev` pipeline (npm install can run long). */
 const MSC_HEALTH_FIRST_INSTALL_MS = 10000;
+
+/**
+ * JEDI_MOD_136 — no real dev tree on disk: HTTP probes must not flip cards to ERROR / safety-kill the shell.
+ * @param {Record<string, unknown>} row
+ */
+function msc_shouldHarmonizeHttpProbe(row) {
+  const p = String(row?.path ?? '').trim();
+  if (!p) return true;
+  if (!msc_registryProjectRootExists(p)) return true;
+  try {
+    const root = msc_normalizePersistedProjectPath(p);
+    return !fs.existsSync(path.join(root, 'package.json'));
+  } catch {
+    return true;
+  }
+}
 
 /**
  * @param {string} projectRoot
@@ -147,11 +166,16 @@ class MSC_ProjectRunner extends EventEmitter {
       const elapsedSinceStart =
         Date.now() - (rActive?.healthStartedAt || Date.now());
       const pastStartupGrace = elapsedSinceStart >= MSC_STARTUP_GRACE_MS;
+      const harmonizeHttp = msc_shouldHarmonizeHttpProbe(row);
       // HTTP response (any code): always persist so redirects/503 show truthfully.
       if (reachedServer) {
         this.store.setProjectHealth(projectId, code, ts, true);
       } else if (pastStartupGrace) {
-        this.store.setProjectHealth(projectId, null, ts, false);
+        if (harmonizeHttp) {
+          this.store.setProjectHealth(projectId, null, ts, null);
+        } else {
+          this.store.setProjectHealth(projectId, null, ts, false);
+        }
       }
       // Before grace ends, TCP/connect failures-only: leave DB health cleared → UI stays “Booting…”
       const failedProbe = !reachedServer;
@@ -165,7 +189,7 @@ class MSC_ProjectRunner extends EventEmitter {
       let lvl = 'info';
       if (!reachedServer) {
         msg = `[vpe] health probe: no TCP/HTTP response on ${row.port} (offline or still compiling)`;
-        lvl = pastStartupGrace ? 'warn' : 'info';
+        lvl = pastStartupGrace && !harmonizeHttp ? 'warn' : 'info';
       } else if (code != null && code >= 500) {
         msg = `[vpe] health probe: HTTP ${code} (server error)`;
         lvl = 'warn';
@@ -185,7 +209,8 @@ class MSC_ProjectRunner extends EventEmitter {
         if (
           elapsed >= MSC_STARTUP_GRACE_MS &&
           failCount >= MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS &&
-          activeRec.dev.pid
+          activeRec.dev.pid &&
+          !msc_shouldHarmonizeHttpProbe(row)
         ) {
           this._persistAndBroadcastLog(
             projectId,
@@ -265,7 +290,8 @@ class MSC_ProjectRunner extends EventEmitter {
   }
 
   _spawnScript(row, script, mode) {
-    const cwd = msc_validateProjectPath(row.path);
+    /** JEDI_MOD_135 — use persisted path as cwd; no package.json / existence gate (shell shows errors if invalid). */
+    const cwd = msc_normalizePersistedProjectPath(row.path);
     const pm = row.pkg_manager || 'npm';
     const cmd =
       process.platform === 'win32'
@@ -292,7 +318,7 @@ class MSC_ProjectRunner extends EventEmitter {
 
   /** `npm install && npm run <script>` (or yarn/pnpm). */
   _spawnInstallThenDevPipeline(row, installBootstrapRec) {
-    const cwd = msc_validateProjectPath(row.path);
+    const cwd = msc_normalizePersistedProjectPath(row.path);
     const configuredPort = Number(row.port);
     const env = this._projectChildEnv(row, configuredPort);
     const command = msc_shellInstallThenDev(row);
@@ -395,8 +421,8 @@ class MSC_ProjectRunner extends EventEmitter {
   }
 
   async _runDevPreflight(row) {
-    // Validates path/root and package.json before process spawn.
-    const projectRoot = msc_validateProjectPath(row.path);
+    /** JEDI_MOD_135 — port + script hints only; cwd is not validated for disk/package.json here. */
+    const projectRoot = msc_normalizePersistedProjectPath(row.path);
     const port = this._assertPortConfigured(row.port);
     this._assertScriptPortCompatibility(projectRoot, row, port);
     let inUse = await this._isPortInUse(port);
@@ -461,7 +487,7 @@ class MSC_ProjectRunner extends EventEmitter {
 
     await this._runDevPreflight(row);
 
-    const projectRoot = msc_validateProjectPath(row.path);
+    const projectRoot = msc_normalizePersistedProjectPath(row.path);
     const boot = msc_analyzeDependencyBootstrap(projectRoot);
     let installBootstrap = false;
 

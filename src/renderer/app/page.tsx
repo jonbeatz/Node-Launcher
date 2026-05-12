@@ -226,6 +226,42 @@ function DashboardContent() {
     }
   }, [addToast])
 
+  const handleRegistryReorderNeighbor = useCallback(
+    async (projectId: string, direction: 'up' | 'down') => {
+      const api = getVpeApi()
+      if (!api?.reorderProject) return
+      setProjects((prev) => {
+        const gi = prev.findIndex((p) => p.id === projectId)
+        if (gi < 0) return prev
+        const j = direction === 'up' ? gi - 1 : gi + 1
+        if (j < 0 || j >= prev.length) return prev
+        const next = [...prev]
+        const tmp = next[gi]
+        next[gi] = next[j]
+        next[j] = tmp
+        return next
+      })
+      try {
+        const r = await api.reorderProject(projectId, direction)
+        if (!r?.ok) {
+          if (r?.error === 'no_neighbor') {
+            await refreshProjects()
+            return
+          }
+          throw new Error(r?.error || 'Reorder failed')
+        }
+      } catch (err: unknown) {
+        await refreshProjects()
+        addToast(
+          'Reorder failed',
+          'error',
+          err instanceof Error ? err.message : msc_formatUnknownIPCError(err),
+        )
+      }
+    },
+    [addToast, refreshProjects],
+  )
+
   useEffect(() => {
     setClientReady(true)
   }, [])
@@ -285,7 +321,6 @@ function DashboardContent() {
 
   useEffect(() => {
     if (!clientReady) return
-    const api = getVpeApi()
     // JEDI_MOD_24: Listen for watchdog restart events
     const w = (window as any)
     if (w.vpeAPI?.subscribeWatchdogRestart) {
@@ -1008,6 +1043,15 @@ function DashboardContent() {
       id: p.id,
       name: p.name,
       status: p.status,
+      path: p.path,
+      port: p.port,
+      start_script: p.start_script,
+      build_script: p.build_script,
+      thumbnail_url: p.thumbnail_url ?? null,
+      project_type: p.project_type ?? null,
+      is_archived: p.is_archived,
+      notes: p.notes ?? null,
+      project_path_missing: p.project_path_missing === true,
     }))
     return [
       { id: '__vpe_all__', name: 'SYSTEM', status: 'running' as const },
@@ -1169,6 +1213,7 @@ function DashboardContent() {
                   onUnregister={handleUnregister}
                   onContextMenu={handleContextMenu}
                   onOpenProjectUrl={handleOpenProjectUrl}
+                  onRegistryReorderNeighbor={handleRegistryReorderNeighbor}
                 />
               )}
             </div>

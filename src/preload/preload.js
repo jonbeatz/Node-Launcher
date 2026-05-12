@@ -1,4 +1,19 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, app } = require('electron');
+
+/** JEDI_MOD_26 — shipped semver from Electron (packaged) or npm env (dev tooling). */
+function msc_readShippedAppVersion() {
+  try {
+    if (app && typeof app.getVersion === 'function') {
+      const v = app.getVersion();
+      if (v != null && String(v).trim() !== '') return String(v).trim();
+    }
+  } catch {
+    /* app may be unavailable in some harnesses */
+  }
+  const env = process.env.npm_package_version;
+  if (env != null && String(env).trim() !== '') return String(env).trim();
+  return '0.0.0';
+}
 
 /** v1.6.0 — preload bridge (IPC formatting + ghost watcher subscribe). */
 function msc_formatCaughtForPreload(reason) {
@@ -52,6 +67,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   addProject: (payload) => msc_invoke('vpe:add-project', payload),
   autoFixProjectPort: (projectId) => msc_invoke('vpe:auto-fix-port', projectId),
   repairVaultLinks: () => msc_invoke('vpe:repair-vault-links'),
+  reindexProjectDisplayOrder: () => msc_invoke('vpe:reindex-project-display-order'),
   deleteProject: (projectId) => msc_invoke('vpe:delete-project', projectId),
   openDirectory: () => msc_invoke('vpe:open-directory'),
   inspectProject: (projectPath) => msc_invoke('vpe:inspect-project', projectPath),
@@ -138,6 +154,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
   backupLocalDb: () => msc_invoke('vpe:backup-local-db'),
   reorderProject: (projectId, direction) =>
     msc_invoke('vpe:reorder-project', { projectId, direction }),
+  updateProjectOrder: (order) => msc_invoke('vpe:update-project-order', order),
   readProjectDotEnv: (projectId) => msc_invoke('vpe:read-project-dotenv', projectId),
   writeProjectDotEnv: (payload) => msc_invoke('vpe:write-project-dotenv', payload),
   runForgeDiagnostics: () => msc_invoke('vpe:run-diagnostics'),
@@ -153,7 +170,7 @@ contextBridge.exposeInMainWorld('vpeAPI', {
 
 contextBridge.exposeInMainWorld('vpeInfo', {
   platform: process.platform,
-  version: '2.2.0',
+  version: msc_readShippedAppVersion(),
   hardware: '9700x Tuned',
 });
 

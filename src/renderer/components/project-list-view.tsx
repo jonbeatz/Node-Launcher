@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { getVpeApi } from '@/lib/vpe-bridge'
 import { useToast } from '@/components/vader-toast'
 import { msc_shieldColorHex } from '@/lib/shield-colors'
 import {
@@ -18,6 +17,7 @@ import {
   ExternalLink,
   Loader2,
   Paperclip,
+  AlertTriangle,
 } from 'lucide-react'
 import { VpeHealthEqualizerIcon } from '@/components/vpe-health-equalizer-icon'
 import { msc_rowHasDocumentationEnabled } from '@/lib/vpe-bridge'
@@ -50,6 +50,19 @@ function msc_listEqualizerTone(
 function msc_healthCell(project: Project): { text: string; className: string } {
   if (project.status !== 'running') {
     return { text: '—', className: 'text-[#555555]' }
+  }
+  if (project.vpe_repo_runnable_for_http === false) {
+    const code = project.health_http_code
+    if (typeof code === 'number' && code >= 200 && code < 300) {
+      return { text: `${code}`, className: 'text-[#4fde82]' }
+    }
+    if (typeof code === 'number' && code >= 500) {
+      return { text: `${code}`, className: 'text-[#e02b20]' }
+    }
+    if (typeof code === 'number') {
+      return { text: `${code}`, className: 'text-[#ffcc00]' }
+    }
+    return { text: 'Idle', className: 'text-[#ffcc00]' }
   }
   if (
     !project.health_checked_at &&
@@ -134,7 +147,6 @@ export function ProjectListView({
   explorerTargetId,
 }: ProjectListViewProps) {
   const slim = listVariant === 'slim'
-  const { addToast } = useToast()
   const [sortField, setSortField] = useState<SortField>('order')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   /** List perf bubble: portal + fixed; JEDI_MOD_06 — snap to project name text end (+25px), vertical center of text. */
@@ -343,6 +355,7 @@ export function ProjectListView({
               const hasBuilt = project.hasBuilt !== false
               const isDevInstalling = Boolean(devInstallByProjectId[project.id] && isRunning)
               const isWatchdogRestarting = Boolean(watchdogRestartByProjectId[project.id])
+              const pathMissing = project.project_path_missing === true
               const zebra = index % 2 === 0 ? 'bg-[#121212]' : 'bg-[#1c1c1c]'
               const rowBg = isExplorerTarget ? 'bg-[#2a2a2a]' : zebra
               const httpCell = msc_healthCell(project)
@@ -350,13 +363,15 @@ export function ProjectListView({
                 ? 'RESTARTING'
                 : isDevInstalling
                   ? 'INSTALLING'
-                  : project.status === 'running'
-                    ? 'RUNNING'
-                    : project.status === 'error'
-                      ? 'ERROR'
-                      : project.status === 'building'
-                        ? 'BUILDING'
-                        : 'STOPPED'
+                  : pathMissing && !isRunning && !isBuilding
+                    ? 'PATH MISSING'
+                    : project.status === 'running'
+                      ? 'RUNNING'
+                      : project.status === 'error'
+                        ? 'ERROR'
+                        : project.status === 'building'
+                          ? 'BUILDING'
+                          : 'STOPPED'
 
               return (
                 <tr 
@@ -371,7 +386,13 @@ export function ProjectListView({
                   className={`
                     ${rowBg} transition-colors ${slim ? 'h-9' : 'h-12'}
                     ${isExplorerTarget ? 'hover:bg-[#333333]' : 'hover:bg-[#252525]'}
-                    ${isError ? 'border-l-2 border-l-[#e02b20]' : 'border-l-2 border-l-transparent hover:border-l-[#4fde82]'}
+                    ${
+                      isError
+                        ? 'border-l-2 border-l-[#e02b20]'
+                        : pathMissing
+                          ? 'border-l-2 border-l-[#b45309]'
+                          : 'border-l-2 border-l-transparent hover:border-l-[#4fde82]'
+                    }
                     ${isExplorerTarget && !isError ? 'outline outline-1 outline-slate-500/45 -outline-offset-1' : ''}
                     ${isStopped ? 'opacity-60' : ''}
                   `}
@@ -391,7 +412,14 @@ export function ProjectListView({
                       : '—'}
                   </td>
                   <td className="px-3 text-center">
-                    {isRunning || isWatchdogRestarting ? (
+                    {pathMissing && !isRunning && !isBuilding ? (
+                      <span
+                        className="inline-flex items-center justify-center text-[#f59e0b]"
+                        title="Registry workspace path not found"
+                      >
+                        <AlertTriangle size={14} aria-hidden />
+                      </span>
+                    ) : isRunning || isWatchdogRestarting ? (
                       <div
                         className={`inline-flex items-center justify-center mx-auto opacity-90 ${
                           isWatchdogRestarting
@@ -432,7 +460,9 @@ export function ProjectListView({
                         )}
                       <button
                         onClick={() => onSettings(project.id)}
-                        className={`vpe-card-title min-w-0 text-left text-[13px] transition-colors hover:text-[#4fde82] ${isError ? 'text-[#e02b20]' : 'text-white'}`}
+                        className={`vpe-card-title min-w-0 text-left text-[13px] transition-colors hover:text-[#4fde82] ${
+                          isError ? 'text-[#e02b20]' : pathMissing ? 'text-[#f59e0b]' : 'text-white'
+                        }`}
                         type="button"
                       >
                         <span
@@ -494,6 +524,15 @@ export function ProjectListView({
                         >
                           <Loader2 size={slim ? 12 : 14} className="animate-spin" />
                         </button>
+                      ) : pathMissing && !isRunning ? (
+                        <button
+                          type="button"
+                          onClick={() => onSettings(project.id)}
+                          title="Registry folder missing — open settings to relink path"
+                          className={`${slim ? 'w-6 h-6' : 'w-7 h-7'} rounded flex items-center justify-center bg-[#3f1f12] text-[#fdba74] border border-[#78350f]/80 transition-colors hover:bg-[#5c2a15] hover:border-[#b45309]`}
+                        >
+                          <AlertTriangle size={slim ? 12 : 14} aria-hidden />
+                        </button>
                       ) : !hasBuilt ? (
                         <button
                           onClick={() => onBuild?.(project.id)}
@@ -535,14 +574,16 @@ export function ProjectListView({
                       {onOpenInBrowser && (
                         <button
                           type="button"
-                          disabled={!isRunning}
+                          disabled={!String(project.path || '').trim() || !onOpenInBrowser}
                           onClick={() => {
                             if (isRunning) onOpenInBrowser(project.id)
                           }}
                           title={
-                            isRunning
-                              ? `Open http://localhost:${project.port} in browser`
-                              : 'Start the project to open in browser'
+                            !String(project.path || '').trim()
+                              ? 'Set a repo path in settings'
+                              : isRunning
+                                ? `Open http://localhost:${project.port} in browser`
+                                : 'Start the project to open in browser'
                           }
                           className={`${slim ? 'h-6 px-1.5' : 'h-7 px-2'} rounded flex items-center justify-center gap-1 bg-[#181818] text-[9px] font-medium uppercase tracking-wide text-[#E8E8E8] transition-colors hover:bg-[#333333] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#181818]`}
                         >

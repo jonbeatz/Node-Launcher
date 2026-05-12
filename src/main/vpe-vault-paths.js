@@ -59,6 +59,34 @@ function msc_projectVaultRootDir() {
   return path.join(process.cwd(), 'media', 'vault');
 }
 
+/**
+ * JEDI_MOD_125 — Canonical vault root for internal thumbnails + `vpe-vault:` (aligns with Node-Launcher-v2 on Windows).
+ * Still overridable via `VPE_VAULT_ROOT`.
+ */
+function msc_projectVaultRootDirSovereign() {
+  const env = process.env.VPE_VAULT_ROOT;
+  if (env && String(env).trim()) {
+    return path.resolve(String(env).trim());
+  }
+  if (process.platform === 'win32') {
+    return path.resolve('d:/Cursor_Projectz/Node-Launcher-v2/media/vault');
+  }
+  return path.join(process.cwd(), 'media', 'vault');
+}
+
+/**
+ * Absolute `_vpe_thumb.png` under sovereign root + display-name folder (same layout as atomic thumb writes).
+ * @param {string} projectName Registry display name
+ * @param {string | null | undefined} [_projectId] Reserved for parity with vault layout helpers
+ */
+function msc_projectVaultSovereignInternalThumbAbs(projectName, _projectId) {
+  void _projectId;
+  const leaf = msc_safeVaultFolderName(projectName);
+  return path.normalize(
+    path.resolve(path.join(msc_projectVaultRootDirSovereign(), leaf, VPE_VAULT_INTERNAL_THUMB)),
+  );
+}
+
 function msc_legacyUserDataVaultProjectDir(projectName) {
   const leaf = msc_safeVaultFolderName(projectName);
   try {
@@ -181,6 +209,8 @@ module.exports = {
   msc_isVaultNonUserNoiseFile,
   msc_safeVaultFolderName,
   msc_projectVaultRootDir,
+  msc_projectVaultRootDirSovereign,
+  msc_projectVaultSovereignInternalThumbAbs,
   msc_isSafeVaultIdSegment,
   msc_projectVaultProjectDir,
   msc_vaultRenameProjectFolder,

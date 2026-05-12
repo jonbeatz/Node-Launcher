@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Archive,
   Camera,
@@ -44,6 +44,32 @@ import { VpeSettingsVaultHeading } from '@/components/vpe-settings-vault-heading
 
 const msc_projectSettingsAccordionTriggerClass =
   'px-10 py-6 items-center gap-3 hover:no-underline [&[data-state=open]>svg]:text-[#888888]'
+
+/** Mirror main `msc_safeVaultFolderName` for read-only vault path hint in UI only. */
+function mscSafeVaultFolderNameForHint(name: string): string {
+  const raw = String(name || 'project')
+    .replace(/[<>:"/\\|?*\x00-\x1f]+/g, '_')
+    .trim()
+  const s = raw.replace(/^\.+/, '').replace(/\.+$/, '') || 'project'
+  return s.slice(0, 120)
+}
+
+/** Sovereign vault leaf (thumbnails / `_vpe_thumb.png`) — not the npm repo root. */
+function mscSovereignVaultCardPathHint(projectDisplayName: string): string {
+  const leaf = mscSafeVaultFolderNameForHint(projectDisplayName)
+  if (typeof navigator !== 'undefined' && /win/i.test(navigator.platform || '')) {
+    return `d:\\Cursor_Projectz\\Node-Launcher-v2\\media\\vault\\${leaf}`
+  }
+  return `media/vault/${leaf} (sovereign root; Windows uses Node-Launcher-v2 path above)`
+}
+
+/** JEDI_MOD_125 — bust img cache on first preview load (vpe-vault / file / http). */
+function msc_thumbPreviewUrlWithBust(url: string): string {
+  const s = String(url || '').trim()
+  if (!s) return s
+  const sep = s.includes('?') ? '&' : '?'
+  return `${s}${sep}_im_prev=${Date.now()}`
+}
 
 export interface ProjectSettingsPayload {
   name: string
@@ -137,7 +163,11 @@ export function ProjectSettingsModal({
   const [modalFadeIn, setModalFadeIn] = useState(false)
   const { addToast } = useToast()
   const [name, setName] = useState(projectName)
+  const vaultCardPathHint = useMemo(() => mscSovereignVaultCardPathHint(name), [name])
   const [path, setPath] = useState(projectPath)
+  /** JEDI_MOD_131 — validate repo root separately from vault (IPC uses same rules as Save). */
+  const [repoPathProbe, setRepoPathProbe] = useState<'idle' | 'checking' | 'ok' | 'warn' | 'err'>('idle')
+  const [repoPathHint, setRepoPathHint] = useState('')
   const [port, setPort] = useState(projectPort.toString())
   const [script, setScript] = useState(startScript)
   const [build, setBuild] = useState(buildScript)
@@ -218,6 +248,8 @@ export function ProjectSettingsModal({
     setJournalDraft('')
     setEditingJournalId(null)
     setJournalEditText('')
+    setRepoPathProbe('idle')
+    setRepoPathHint('')
     void refreshVault()
   }, [
     isOpen,
@@ -252,6 +284,55 @@ export function ProjectSettingsModal({
   }, [isOpen, vpeUiReady])
 
   useEffect(() => {
+    if (!isOpen || !vpeUiReady) return
+    let cancelled = false
+    const trimmed = path.trim()
+    if (!trimmed) {
+      setRepoPathProbe('idle')
+      setRepoPathHint('')
+      return
+    }
+    setRepoPathProbe('checking')
+    setRepoPathHint('')
+    const tid = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const api = window.vpeAPI
+          if (!api?.inspectProject) {
+            if (!cancelled) {
+              setRepoPathProbe('idle')
+              setRepoPathHint('')
+            }
+            return
+          }
+          const r = await api.inspectProject(trimmed)
+          if (cancelled) return
+          const warns = (r.reclaimWarnings ?? []).filter(
+            (x): x is string => typeof x === 'string' && x.trim() !== '',
+          )
+          if (warns.length > 0) {
+            setRepoPathProbe('warn')
+            setRepoPathHint(warns.join(' '))
+            return
+          }
+          setRepoPathProbe('ok')
+          setRepoPathHint(
+            'Repo root OK: folder exists and contains package.json. This is not the vault folder above (vault is thumbnails only).',
+          )
+        } catch (e) {
+          if (cancelled) return
+          setRepoPathProbe('err')
+          setRepoPathHint(msc_formatUnknownIPCError(e))
+        }
+      })()
+    }, 420)
+    return () => {
+      cancelled = true
+      window.clearTimeout(tid)
+    }
+  }, [path, isOpen, vpeUiReady])
+
+  useEffect(() => {
     thumbnailUrlRef.current = thumbnailUrl
   }, [thumbnailUrl])
 
@@ -269,7 +350,7 @@ export function ProjectSettingsModal({
       setThumbDisplaySrc(null)
       return
     }
-    setThumbDisplaySrc(thumbnailUrl)
+    setThumbDisplaySrc(msc_thumbPreviewUrlWithBust(thumbnailUrl))
   }, [thumbnailUrl])
 
   useEffect(() => {
@@ -353,13 +434,19 @@ export function ProjectSettingsModal({
             : null
         if (nextThumb) {
           setThumbnailUrl(nextThumb)
-          setThumbDisplaySrc(nextThumb)
+          setThumbDisplaySrc(msc_thumbPreviewUrlWithBust(nextThumb))
         }
         const summary =
           res && typeof res === 'object' && 'changeSummary' in res && res.changeSummary != null
             ? String(res.changeSummary)
             : 'Project settings written'
         addToast('Settings saved', 'success', summary)
+        const reclaim = (res.reclaimWarnings ?? []).filter(
+          (x): x is string => typeof x === 'string' && x.trim() !== '',
+        )
+        if (reclaim.length > 0) {
+          addToast('Repo path notice', 'warning', reclaim.join(' '))
+        }
       } else {
         addToast('Settings saved', 'info', 'Open in Electron to persist changes to the registry.')
       }
@@ -381,7 +468,14 @@ export function ProjectSettingsModal({
     }
     try {
       const selected = await window.vpeAPI.openDirectory()
-      if (selected) setPath(selected)
+      if (selected) {
+        setPath(selected)
+        addToast(
+          'Project folder selected',
+          'info',
+          'This path must be the code repo (folder with package.json). Thumbnails stay in the vault path above — do not pick media/vault here.',
+        )
+      }
     } catch (err: unknown) {
       addToast('Folder pick failed', 'error', msc_formatUnknownIPCError(err))
     }
@@ -580,7 +674,7 @@ export function ProjectSettingsModal({
               <AccordionTrigger type="button" className={msc_projectSettingsAccordionTriggerClass}>
                 <VpeSettingsVaultHeading
                   title="Project Info"
-                  subtitle="Display name, thumbnail, and on-disk path for this catalog entry."
+                  subtitle="Display name, thumbnail, sovereign vault card folder, and repo root (package.json)."
                 />
               </AccordionTrigger>
               <AccordionContent className="px-10">
@@ -600,6 +694,10 @@ export function ProjectSettingsModal({
           {/* Thumbnail — top hierarchy (v1.6.2) */}
           <section>
             <h3 className="text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">THUMBNAIL</h3>
+            <p className="text-[11px] text-[#666666] leading-relaxed mb-3">
+              Card image is served from the media vault (<span className="text-[#A0A0A0]">_vpe_thumb.png</span>
+              ); Upload replaces that file. START uses the repo path below, not the vault.
+            </p>
             <div className="flex items-center gap-4">
               <div className="relative w-[200px] aspect-[4/3] rounded bg-[#121212] border border-[#333333] flex items-center justify-center overflow-hidden shrink-0">
                 {thumbnailUrl && !thumbPreviewHardError && thumbDisplaySrc ? (
@@ -668,28 +766,71 @@ export function ProjectSettingsModal({
           </section>
 
           <section>
-            <h3 className="text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">PROJECT PATH</h3>
+            <h3 className="text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">
+              VAULT CARD FOLDER (READ-ONLY)
+            </h3>
+            <p className="text-[11px] text-[#666666] leading-relaxed mb-2">
+              Thumbnails and vault attachments live under this folder on disk. It is{' '}
+              <span className="text-[#A0A0A0]">not</span> your Node repo — Save never treats this path as the
+              project root; use <span className="text-[#A0A0A0]">Repo root</span> below for{' '}
+              <span className="text-[#A0A0A0]">package.json</span>.
+            </p>
+            <div className="rounded border border-[#2a2a2a] bg-[#0a0a0a] px-3 py-2 font-mono text-[11px] text-[#9ca3af] break-all">
+              {vaultCardPathHint}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-[10px] text-[#555555] uppercase tracking-[0.1em] mb-3">
+              REPO ROOT — RELINK (project folder with package.json)
+            </h3>
             <div className="space-y-3">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={path}
                   onChange={(e) => setPath(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded bg-[#0a0a0a] border border-[#333333] text-[13px] text-white focus:outline-none focus:border-[#4fde82] transition-colors"
+                  aria-invalid={repoPathProbe === 'err'}
+                  className={cn(
+                    'flex-1 px-3 py-2 rounded bg-[#0a0a0a] border text-[13px] text-white focus:outline-none transition-colors',
+                    repoPathProbe === 'err'
+                      ? 'border-[#e02b20] focus:border-[#e02b20]'
+                      : repoPathProbe === 'ok'
+                        ? 'border-[#2d5a3d] focus:border-[#4fde82]'
+                        : repoPathProbe === 'warn'
+                          ? 'border-[#b45309] focus:border-[#fbbf24]'
+                          : 'border-[#333333] focus:border-[#4fde82]',
+                  )}
                 />
                 <button
                   onClick={handlePickFolder}
                   className="px-3 py-2 rounded bg-[#0a0a0a] border border-[#333333] text-[#A0A0A0] hover:text-white hover:border-[#4fde82] transition-all vader-focus"
-                  title="Browse for folder that contains package.json"
+                  title="Browse: pick the folder that contains package.json (your real codebase — not media/vault)"
                   type="button"
                 >
                   <FolderOpen size={16} />
                 </button>
               </div>
-              <p className="text-[11px] text-[#666666] leading-relaxed">
-                Use the exact folder that contains <span className="text-[#A0A0A0]">package.json</span>.
-                If Save fails, browse with the folder icon—typos or a non-existent path will be rejected.
-              </p>
+              {repoPathProbe === 'checking' ? (
+                <p className="text-[11px] text-[#888888] flex items-center gap-2">
+                  <Loader2 className="size-3.5 animate-spin shrink-0" aria-hidden />
+                  Checking repo root…
+                </p>
+              ) : repoPathProbe === 'ok' ? (
+                <p className="text-[11px] text-[#6ee7b7] leading-relaxed">{repoPathHint}</p>
+              ) : repoPathProbe === 'warn' ? (
+                <p className="text-[11px] text-[#fcd34d] leading-relaxed">{repoPathHint}</p>
+              ) : repoPathProbe === 'err' ? (
+                <p className="text-[11px] text-[#fca5a5] leading-relaxed">{repoPathHint}</p>
+              ) : (
+                <p className="text-[11px] text-[#666666] leading-relaxed">
+                  Relink: point this field at your <span className="text-[#A0A0A0]">actual repository</span> — the
+                  directory that will contain <span className="text-[#A0A0A0]">package.json</span> when linked.{' '}
+                  <span className="text-[#A0A0A0]">SAVE</span> is allowed while you fix the path (JEDI_MOD_132);{' '}
+                  <span className="text-[#A0A0A0]">START</span> stays blocked until the folder exists and has
+                  package.json. The vault block above is unrelated.
+                </p>
+              )}
             </div>
           </section>
                 </div>
@@ -1219,6 +1360,7 @@ export function ProjectSettingsModal({
             <button
               onClick={handleSave}
               disabled={saving || !projectId}
+              title="JEDI_MOD_133: Save never waits on repo path probe — persists name, path string, and thumbnail. START still uses strict checks elsewhere."
               className="h-9 px-6 rounded bg-[#4fde82] hover:bg-[#3fcf72] text-sm font-medium text-black transition-colors vader-focus disabled:opacity-50"
               type="button"
             >

@@ -162,7 +162,7 @@ class MSC_PM2Manager {
    */
   /**
    * Support bundle: non-destructive `pm2.list` snapshot (paths redacted upstream).
-   * @returns {Promise<{ ok: boolean; error?: string; processes: Record<string, unknown>[] }>}
+   * @returns {Promise<{ ok: boolean, error?: string, processes: object[] }>}
    */
   async msc_listProcessesForSupport() {
     const connected = await this.msc_ensureConnected();
@@ -373,7 +373,7 @@ class MSC_PM2Manager {
     return new Promise((resolve, reject) => {
       pm2.start(
         {
-          name: String(row.id),
+          name: row.name ? msc_safeVaultFolderName(row.name) : String(row.id),
           cwd: validatedPath,
           script: scriptBin,
           args: ['run', script],
