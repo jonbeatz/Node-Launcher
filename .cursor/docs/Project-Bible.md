@@ -69,6 +69,7 @@ Single reference for **maintenance, vault, and build** flows. Authoritative list
 | **`npm run build:win`** | Package only | Assumes tree is already verified; runs **`build:main`** (renderer prebuild + electron-builder). |
 | **`npm run typecheck`** | Renderer TS | `tsc --noEmit` on `src/renderer`. |
 | **`npm run rebuild:natives`** | Native modules | **`electron-rebuild -f -o better-sqlite3`** when the SQLite binary mismatches Node/Electron. |
+| **`npm run test:migrations`** | SQLite schema check | Verifies SQLite schema is at the correct version (v17 SOVEREIGN) before boot. |
 
 ### 4. Integration notes
 
