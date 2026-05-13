@@ -1,0 +1,346 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5]:
+    - complementary [ref=e6]:
+      - button "Collapse sidebar" [ref=e8] [cursor=pointer]:
+        - img [ref=e9]
+      - navigation [ref=e11]:
+        - generic [ref=e12]:
+          - button "Dashboard" [ref=e14] [cursor=pointer]:
+            - img [ref=e15]
+            - generic [ref=e20]: Dashboard
+          - generic [ref=e22]:
+            - generic [ref=e23]: Registry
+            - button "Add New Project" [ref=e24] [cursor=pointer]:
+              - img [ref=e25]
+              - generic [ref=e26]: Add New Project
+          - button "Repair Logs" [ref=e29] [cursor=pointer]:
+            - img [ref=e30]
+            - generic [ref=e33]: Repair Logs
+      - button "STOP ALL" [ref=e36] [cursor=pointer]:
+        - img [ref=e37]
+        - generic [ref=e39]: STOP ALL
+      - button "Settings" [ref=e42] [cursor=pointer]:
+        - img [ref=e43]
+        - generic [ref=e46]: Settings
+    - generic [ref=e47]:
+      - banner [ref=e48]:
+        - generic [ref=e49]:
+          - generic [ref=e50]: VPE
+          - generic [ref=e52]: Projects > MSC Media Pro
+        - generic [ref=e53]:
+          - textbox "Search projects..." [ref=e54]
+          - button "Search projects (Ctrl+F)" [ref=e55] [cursor=pointer]:
+            - img [ref=e56]
+          - button "System health" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+          - button "Global settings" [ref=e62] [cursor=pointer]:
+            - img [ref=e63]
+      - generic [ref=e67]:
+        - generic [ref=e68]:
+          - img [ref=e69]
+          - generic [ref=e71]: SYSTEM HEALTH
+        - generic [ref=e72]:
+          - generic [ref=e73]:
+            - generic [ref=e74]: VPE Uptime
+            - generic [ref=e75]: —
+          - generic [ref=e76]:
+            - generic [ref=e77]: PM2 Daemon
+            - generic [ref=e80]: Offline
+          - generic [ref=e81]:
+            - generic [ref=e82]: Projects
+            - generic [ref=e83]: 0 of 0 active
+          - generic [ref=e84]:
+            - generic [ref=e85]: System Resources
+            - generic [ref=e86]: "CPU: — | RAM: 0.00 GB free (0% used)"
+          - generic [ref=e87]:
+            - img [ref=e88]
+            - generic [ref=e90]: No actionable warnings — metrics poll every 3s
+          - button "RUN QUICK CHECK" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+            - text: RUN QUICK CHECK
+          - paragraph [ref=e97]: Powered by the MSC Media Engine
+      - generic [ref=e98]:
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - generic [ref=e101]:
+              - button "ALL" [ref=e102] [cursor=pointer]
+              - button "RUNNING" [ref=e103] [cursor=pointer]
+              - button "STOPPED" [ref=e104] [cursor=pointer]
+              - button "ERRORS" [ref=e105] [cursor=pointer]
+            - generic [ref=e106]: 6 PROJECTS
+            - generic [ref=e107]:
+              - button [ref=e108] [cursor=pointer]:
+                - img [ref=e109]
+              - button [ref=e114] [cursor=pointer]:
+                - img [ref=e115]
+          - generic [ref=e116]:
+            - button "Start All Projects" [ref=e117] [cursor=pointer]:
+              - img [ref=e118]
+            - button "Stop All Projects" [ref=e120] [cursor=pointer]:
+              - img [ref=e121]
+            - button "Refresh All Statuses" [ref=e123] [cursor=pointer]:
+              - img [ref=e124]
+            - button "Open VPE Directory" [ref=e129] [cursor=pointer]:
+              - img [ref=e130]
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - generic [ref=e137]: THUMBNAIL
+                - generic:
+                  - generic "Ryzen 9700x tuned profile" [ref=e138]: 9700x Tuned
+                  - generic [ref=e139]:
+                    - button "Project Settings" [ref=e140] [cursor=pointer]:
+                      - img [ref=e141]
+                    - button "Remove from Registry" [ref=e144] [cursor=pointer]:
+                      - img [ref=e145]
+              - generic [ref=e148]:
+                - heading "MSC_PRIMARY_GATE" [level=3] [ref=e150]
+                - generic [ref=e153]: RUNNING
+                - generic [ref=e154]:
+                  - generic [ref=e155]: PORT8080
+                  - generic [ref=e156]: UPTIME142H
+                - generic [ref=e157]:
+                  - generic [ref=e158]:
+                    - generic [ref=e159]: Started on
+                    - generic "http://localhost:8080" [ref=e160]
+                    - generic "GET / on project port after start" [ref=e161]: Booting… (waiting for HTTP)
+                  - button "Open" [ref=e162] [cursor=pointer]:
+                    - img [ref=e163]
+                    - text: Open
+              - generic [ref=e167]:
+                - button "STOP" [ref=e168] [cursor=pointer]:
+                  - img [ref=e169]
+                  - generic [ref=e171]: STOP
+                - button "LOGS" [ref=e172] [cursor=pointer]:
+                  - img [ref=e173]
+                  - generic [ref=e175]: LOGS
+                - button "REPAIR" [ref=e176] [cursor=pointer]:
+                  - img [ref=e177]
+                  - generic [ref=e179]: REPAIR
+                - button "NUKE" [ref=e180] [cursor=pointer]:
+                  - img [ref=e181]
+                  - generic [ref=e184]: NUKE
+            - generic [ref=e185]:
+              - generic [ref=e186]:
+                - generic [ref=e188]: THUMBNAIL
+                - generic:
+                  - generic "Ryzen 9700x tuned profile" [ref=e189]: 9700x Tuned
+                  - generic [ref=e190]:
+                    - button "Project Settings" [ref=e191] [cursor=pointer]:
+                      - img [ref=e192]
+                    - button "Remove from Registry" [ref=e195] [cursor=pointer]:
+                      - img [ref=e196]
+              - generic [ref=e199]:
+                - heading "MEDIA_PRO_RENDER_V4" [level=3] [ref=e201]
+                - generic [ref=e204]: RUNNING
+                - generic [ref=e205]:
+                  - generic [ref=e206]: PORT9000
+                  - generic [ref=e207]: UPTIME824H
+                - generic [ref=e208]:
+                  - generic [ref=e209]:
+                    - generic [ref=e210]: Started on
+                    - generic "http://localhost:9000" [ref=e211]
+                    - generic "GET / on project port after start" [ref=e212]: Booting… (waiting for HTTP)
+                  - button "Open" [ref=e213] [cursor=pointer]:
+                    - img [ref=e214]
+                    - text: Open
+              - generic [ref=e218]:
+                - button "STOP" [ref=e219] [cursor=pointer]:
+                  - img [ref=e220]
+                  - generic [ref=e222]: STOP
+                - button "LOGS" [ref=e223] [cursor=pointer]:
+                  - img [ref=e224]
+                  - generic [ref=e226]: LOGS
+                - button "REPAIR" [ref=e227] [cursor=pointer]:
+                  - img [ref=e228]
+                  - generic [ref=e230]: REPAIR
+                - button "NUKE" [ref=e231] [cursor=pointer]:
+                  - img [ref=e232]
+                  - generic [ref=e235]: NUKE
+            - generic [ref=e236]:
+              - generic [ref=e237]:
+                - generic [ref=e239]: THUMBNAIL
+                - generic:
+                  - generic "Ryzen 9700x tuned profile" [ref=e240]: 9700x Tuned
+                  - generic [ref=e241]:
+                    - button "Project Settings" [ref=e242] [cursor=pointer]:
+                      - img [ref=e243]
+                    - button "Remove from Registry" [ref=e246] [cursor=pointer]:
+                      - img [ref=e247]
+              - generic [ref=e250]:
+                - heading "VADER_BACKUP_NODE" [level=3] [ref=e252]
+                - generic [ref=e255]: STOPPED
+                - generic [ref=e256]:
+                  - generic [ref=e257]: PORT4443
+                  - generic [ref=e258]: UPTIME--
+              - generic [ref=e259]:
+                - button "START" [ref=e260] [cursor=pointer]:
+                  - img [ref=e261]
+                  - generic [ref=e263]: START
+                - button "LOGS" [ref=e264] [cursor=pointer]:
+                  - img [ref=e265]
+                  - generic [ref=e267]: LOGS
+                - button "REPAIR" [ref=e268] [cursor=pointer]:
+                  - img [ref=e269]
+                  - generic [ref=e271]: REPAIR
+                - button "NUKE" [ref=e272] [cursor=pointer]:
+                  - img [ref=e273]
+                  - generic [ref=e276]: NUKE
+            - generic [ref=e277]:
+              - generic [ref=e278]:
+                - generic [ref=e280]: THUMBNAIL
+                - generic:
+                  - generic "Ryzen 9700x tuned profile" [ref=e281]: 9700x Tuned
+                  - generic [ref=e282]:
+                    - button "Project Settings" [ref=e283] [cursor=pointer]:
+                      - img [ref=e284]
+                    - button "Remove from Registry" [ref=e287] [cursor=pointer]:
+                      - img [ref=e288]
+              - generic [ref=e291]:
+                - heading "MSC_CONTENT_API" [level=3] [ref=e293]
+                - generic [ref=e296]: STOPPED
+                - generic [ref=e297]:
+                  - generic [ref=e298]: PORT3010
+                  - generic [ref=e299]: UPTIME--
+              - generic [ref=e300]:
+                - button "BUILD" [ref=e301] [cursor=pointer]:
+                  - img [ref=e302]
+                  - generic [ref=e306]: BUILD
+                - button "LOGS" [ref=e307] [cursor=pointer]:
+                  - img [ref=e308]
+                  - generic [ref=e310]: LOGS
+                - button "REPAIR" [ref=e311] [cursor=pointer]:
+                  - img [ref=e312]
+                  - generic [ref=e314]: REPAIR
+                - button "NUKE" [ref=e315] [cursor=pointer]:
+                  - img [ref=e316]
+                  - generic [ref=e319]: NUKE
+            - generic [ref=e320]:
+              - generic [ref=e321]:
+                - generic [ref=e323]: THUMBNAIL
+                - generic:
+                  - generic "Ryzen 9700x tuned profile" [ref=e324]: 9700x Tuned
+                  - generic [ref=e325]:
+                    - button "Project Settings" [ref=e326] [cursor=pointer]:
+                      - img [ref=e327]
+                    - button "Remove from Registry" [ref=e330] [cursor=pointer]:
+                      - img [ref=e331]
+              - generic [ref=e334]:
+                - heading "MSC_AUTH_SERVICE" [level=3] [ref=e336]
+                - generic [ref=e339]: RUNNING
+                - generic [ref=e340]:
+                  - generic [ref=e341]: PORT3002
+                  - generic [ref=e342]: UPTIME48H
+                - generic [ref=e343]:
+                  - generic [ref=e344]:
+                    - generic [ref=e345]: Started on
+                    - generic "http://localhost:3002" [ref=e346]
+                    - generic "GET / on project port after start" [ref=e347]: Booting… (waiting for HTTP)
+                  - button "Open" [ref=e348] [cursor=pointer]:
+                    - img [ref=e349]
+                    - text: Open
+              - generic [ref=e353]:
+                - button "STOP" [ref=e354] [cursor=pointer]:
+                  - img [ref=e355]
+                  - generic [ref=e357]: STOP
+                - button "LOGS" [ref=e358] [cursor=pointer]:
+                  - img [ref=e359]
+                  - generic [ref=e361]: LOGS
+                - button "REPAIR" [ref=e362] [cursor=pointer]:
+                  - img [ref=e363]
+                  - generic [ref=e365]: REPAIR
+                - button "NUKE" [ref=e366] [cursor=pointer]:
+                  - img [ref=e367]
+                  - generic [ref=e370]: NUKE
+            - generic [ref=e371]:
+              - generic [ref=e372]:
+                - generic [ref=e374]: THUMBNAIL
+                - generic:
+                  - generic "Ryzen 9700x tuned profile" [ref=e375]: 9700x Tuned
+                  - generic [ref=e376]:
+                    - button "Project Settings" [ref=e377] [cursor=pointer]:
+                      - img [ref=e378]
+                    - button "Remove from Registry" [ref=e381] [cursor=pointer]:
+                      - img [ref=e382]
+              - generic [ref=e385]:
+                - generic [ref=e386]:
+                  - heading "MSC_MEDIA_GATE" [level=3] [ref=e387]
+                  - img [ref=e388]
+                - generic [ref=e392]: ERROR
+                - generic [ref=e393]:
+                  - generic [ref=e394]: PORT3003
+                  - generic [ref=e395]: UPTIME--
+              - generic [ref=e396]:
+                - button "REBUILD" [ref=e397] [cursor=pointer]:
+                  - img [ref=e398]
+                  - generic [ref=e402]: REBUILD
+                - button "LOGS" [ref=e403] [cursor=pointer]:
+                  - img [ref=e404]
+                  - generic [ref=e406]: LOGS
+                - button "REPAIR" [ref=e407] [cursor=pointer]:
+                  - img [ref=e408]
+                  - generic [ref=e410]: REPAIR
+                - button "NUKE" [ref=e411] [cursor=pointer]:
+                  - img [ref=e412]
+                  - generic [ref=e415]: NUKE
+        - generic [ref=e416]:
+          - generic [ref=e418]:
+            - button "SYSTEM" [ref=e419] [cursor=pointer]:
+              - generic [ref=e420]: SYSTEM
+            - button "MSC_PRIMARY_GATE" [ref=e421] [cursor=pointer]:
+              - generic [ref=e422]: MSC_PRIMARY_GATE
+              - img [ref=e423]
+            - button "MEDIA_PRO_RENDER_V4" [ref=e426] [cursor=pointer]:
+              - generic [ref=e428]: MEDIA_PRO_RENDER_V4
+              - img [ref=e429]
+            - button "MSC_AUTH_SERVICE" [ref=e432] [cursor=pointer]:
+              - generic [ref=e433]: MSC_AUTH_SERVICE
+              - img [ref=e434]
+          - generic [ref=e437]:
+            - heading "SYSTEM_LOGS" [level=2] [ref=e438]
+            - generic [ref=e439]:
+              - button "Detach to floating window" [ref=e440] [cursor=pointer]:
+                - img [ref=e441]
+              - button "Collapse Drawer" [ref=e445] [cursor=pointer]:
+                - img [ref=e446]
+              - button [ref=e448] [cursor=pointer]:
+                - img [ref=e449]
+          - generic [ref=e454]:
+            - generic [ref=e455]:
+              - generic [ref=e456]: "[14:22:01]"
+              - generic [ref=e457]: "SYSTEM_INIT:"
+              - generic [ref=e458]: VPE_ENGINE core modules loaded.
+            - generic [ref=e459]:
+              - generic [ref=e460]: "[14:22:03]"
+              - generic [ref=e461]: "WARNING:"
+              - generic [ref=e462]: Node MSC_PRIMARY_GATE reporting high latency.
+            - generic [ref=e463]:
+              - generic [ref=e464]: "[14:22:05]"
+              - generic [ref=e465]: "SYSTEM:"
+              - generic [ref=e466]: PM2 daemon connected successfully.
+            - generic [ref=e467]:
+              - generic [ref=e468]: "[14:22:06]"
+              - generic [ref=e469]: "SYSTEM:"
+              - generic [ref=e470]: Loading project configurations...
+            - generic [ref=e471]:
+              - generic [ref=e472]: "[14:22:08]"
+              - generic [ref=e473]: "READY:"
+              - generic [ref=e474]: All systems operational.
+          - generic [ref=e475]:
+            - generic [ref=e476]: root@vpe:~#
+            - textbox "Type a command..." [ref=e477]
+          - generic [ref=e479]:
+            - generic [ref=e480]:
+              - generic [ref=e481]: "PID: MOCK | DEMO MODE"
+              - img [ref=e482]
+            - generic [ref=e489]: Powered by the MSC Media Engine
+      - contentinfo [ref=e490]:
+        - generic [ref=e491]: Powered by the MSC Media Engine
+  - status [ref=e492]:
+    - generic [ref=e493]:
+      - img [ref=e495]
+      - generic [ref=e497]:
+        - text: Static route
+        - button "Hide static indicator" [ref=e498] [cursor=pointer]:
+          - img [ref=e499]
+  - alert [ref=e502]

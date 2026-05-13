@@ -52,12 +52,11 @@ Thumbs.db
 *.temp
 *.pid
 
-# Playwright / MCP output
-.playwright-mcp/
+# Data and dev profiles (removed from ignore per operator request)
+# .playwright-mcp/
+# /data/
+# vpe-local-data/
 
-# Data and dev profiles
-/data/
-vpe-local-data/
 src/renderer/.next/
 
 # intentional repo content (keep tracked)
