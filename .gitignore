@@ -52,6 +52,14 @@ Thumbs.db
 *.temp
 *.pid
 
+# Playwright / MCP output
+.playwright-mcp/
+
+# Data and dev profiles
+/data/
+vpe-local-data/
+src/renderer/.next/
+
 # intentional repo content (keep tracked)
 # - `.cursor/`, `vpe-backups/`, media/icon.ico, media/_vpe_archive/ (if present), vault placeholders (.gitkeep, .vpe_keep)
 # - media/vault raster assets (.jpg/.jpeg/.png/.webp), vpe-version.lock, and src/main/db/*.sqlite (+ engine JSON) are tracked (operator policy)
