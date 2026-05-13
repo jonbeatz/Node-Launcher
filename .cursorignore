@@ -1,0 +1,3 @@
+# Large local design dumps — keep out of default indexing
+_design_references/
+

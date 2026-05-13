@@ -4,7 +4,7 @@ import { X, RotateCcw, Check, Loader2 } from 'lucide-react'
 interface RepairModalProps {
   isOpen: boolean
   onClose: () => void
-  onApply: () => void
+  onApply: () => void | Promise<void>
   onUndo: () => void
 }
 

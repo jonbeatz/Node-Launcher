@@ -1,13 +1,78 @@
 const EventEmitter = require('events');
-const { spawn } = require('child_process');
+const { spawn, execSync, exec } = require('child_process');
 const fs = require('fs');
 const net = require('net');
 const path = require('path');
 const treeKill = require('tree-kill');
-const { msc_validateProjectPath } = require('./path-guard');
+const {
+  msc_normalizePersistedProjectPath,
+  msc_registryProjectRootExists,
+} = require('./path-guard');
+const { msc_ipcEnrichProjectsRow } = require('./project-detection');
+const { msc_probeHttpHealth } = require('./health-probe');
+const { msc_launcherRendererPort } = require('./launcher-port');
+const { msc_healthPollDelayMs, MSC_HEALTH_FIRST_MS } = require('./health-scheduler');
 
-const MSC_VPE_RENDERER_PORT =
-  parseInt(process.env.VPE_RENDERER_PORT || process.env.PORT || '3000', 10) || 3000;
+const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
+/** No TCP/connect failures persisted to SQLite until elapsed — avoids false red “Offline” while Next/boot compiles. */
+const MSC_STARTUP_GRACE_MS = 20000;
+const MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS = 6;
+/** v1.2.3 — first HTTP health probe after auto `install && dev` pipeline (npm install can run long). */
+const MSC_HEALTH_FIRST_INSTALL_MS = 10000;
+
+/**
+ * JEDI_MOD_136 — no real dev tree on disk: HTTP probes must not flip cards to ERROR / safety-kill the shell.
+ * @param {Record<string, unknown>} row
+ */
+function msc_shouldHarmonizeHttpProbe(row) {
+  const p = String(row?.path ?? '').trim();
+  if (!p) return true;
+  if (!msc_registryProjectRootExists(p)) return true;
+  try {
+    const root = msc_normalizePersistedProjectPath(p);
+    return !fs.existsSync(path.join(root, 'package.json'));
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * @param {string} projectRoot
+ * @returns {{ needsAutoInstall: boolean, v0Prototype: boolean, hasPkg: boolean }}
+ */
+function msc_analyzeDependencyBootstrap(projectRoot) {
+  const pkgPath = path.join(projectRoot, 'package.json');
+  const nmPath = path.join(projectRoot, 'node_modules');
+  const v0UiPath = path.join(projectRoot, 'components', 'ui');
+  const hasPkg = fs.existsSync(pkgPath);
+  const hasNm = fs.existsSync(nmPath);
+  const v0Prototype =
+    hasPkg && !hasNm && fs.existsSync(v0UiPath);
+  const needsAutoInstall = hasPkg && !hasNm;
+  return { needsAutoInstall, v0Prototype, hasPkg };
+}
+
+/**
+ * Shell one-liner: install then run dev/start script (v0 zero-config bootstrap).
+ */
+function msc_shellInstallThenDev(row) {
+  const script = (row.start_script || 'dev').toString();
+  const pm = row.pkg_manager || 'npm';
+  if (pm === 'yarn') return `yarn install && yarn run ${script}`;
+  if (pm === 'pnpm') return `pnpm install && pnpm run ${script}`;
+  return `npm install && npm run ${script}`;
+}
+
+function msc_spawnShellCommand(command, cwd, env) {
+  if (process.platform === 'win32') {
+    return spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', command], {
+      cwd,
+      env,
+      windowsHide: true,
+    });
+  }
+  return spawn('/bin/sh', ['-c', command], { cwd, env });
+}
 
 class MSC_ProjectRunner extends EventEmitter {
   /**
@@ -18,8 +83,10 @@ class MSC_ProjectRunner extends EventEmitter {
     super();
     this.mainWindow = mainWindow;
     this.store = store;
-    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess }>} */
+    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess, healthPollTimer?: NodeJS.Timeout, healthStartedAt?: number, healthFailCount?: number, watchdogEnabled?: boolean, restartAttempts?: number[] }>} */
     this.children = new Map();
+    /** Serialize HTTP health checks across projects (one in flight). */
+    this._healthProbeChain = Promise.resolve();
   }
 
   setMainWindow(win) {
@@ -44,28 +111,134 @@ class MSC_ProjectRunner extends EventEmitter {
     });
   }
 
-  _spawnScript(row, script, mode) {
-    const cwd = msc_validateProjectPath(row.path);
-    const pm = row.pkg_manager || 'npm';
-    const cmd = pm;
-    let args = ['run', script];
-    if (pm === 'yarn') {
-      args = ['run', script];
-    }
-
-    const configuredPort = Number(row.port);
-    const env = { ...process.env, FORCE_COLOR: '1' };
-    if (Number.isFinite(configuredPort) && configuredPort > 0) {
-      env.PORT = String(configuredPort);
-      env.NEXT_PORT = String(configuredPort);
-      env.DEV_PORT = String(configuredPort);
-    }
-
-    const child = spawn(cmd, args, {
-      cwd,
-      shell: process.platform === 'win32',
-      env,
+  _emitProjectsRefresh() {
+    const rows =
+      typeof this.store.listProjectsAlphabetical === 'function'
+        ? this.store.listProjectsAlphabetical()
+        : this.store.getProjects();
+    this._broadcast('vpe:projects-updated', {
+      projects: rows.map((row) => msc_ipcEnrichProjectsRow(row)),
     });
+  }
+
+  _queueHealthProbe(fn) {
+    const run = async () => {
+      try {
+        await fn();
+      } catch (_) {
+        /* ignore */
+      }
+    };
+    const p = this._healthProbeChain.then(run, run);
+    this._healthProbeChain = p.catch(() => {});
+    return p;
+  }
+
+  _clearHealthPolling(projectId) {
+    const rec = this.children.get(projectId);
+    if (rec?.healthPollTimer) {
+      clearTimeout(rec.healthPollTimer);
+      rec.healthPollTimer = undefined;
+    }
+  }
+
+  async _healthPollCycle(projectId) {
+    const rec = this.children.get(projectId);
+    if (!rec?.dev) return;
+    if (rec.healthPollTimer) {
+      clearTimeout(rec.healthPollTimer);
+      rec.healthPollTimer = undefined;
+    }
+
+    let row = this.store.getProject(projectId);
+    if (!row) return;
+
+    await this._queueHealthProbe(async () => {
+      const r = this.children.get(projectId);
+      if (!r?.dev) return;
+      row = this.store.getProject(projectId);
+      if (!row) return;
+
+      const { statusCode, reachedServer } = await msc_probeHttpHealth(row.port);
+      const code = typeof statusCode === 'number' ? statusCode : null;
+      const ts = new Date().toISOString();
+      const rActive = this.children.get(projectId);
+      const elapsedSinceStart =
+        Date.now() - (rActive?.healthStartedAt || Date.now());
+      const pastStartupGrace = elapsedSinceStart >= MSC_STARTUP_GRACE_MS;
+      const harmonizeHttp = msc_shouldHarmonizeHttpProbe(row);
+      // HTTP response (any code): always persist so redirects/503 show truthfully.
+      if (reachedServer) {
+        this.store.setProjectHealth(projectId, code, ts, true);
+      } else if (pastStartupGrace) {
+        if (harmonizeHttp) {
+          this.store.setProjectHealth(projectId, null, ts, null);
+        } else {
+          this.store.setProjectHealth(projectId, null, ts, false);
+        }
+      }
+      // Before grace ends, TCP/connect failures-only: leave DB health cleared → UI stays “Booting…”
+      const failedProbe = !reachedServer;
+      const activeRec = this.children.get(projectId);
+      if (activeRec) {
+        activeRec.healthFailCount = failedProbe
+          ? Number(activeRec.healthFailCount || 0) + 1
+          : 0;
+      }
+      let msg;
+      let lvl = 'info';
+      if (!reachedServer) {
+        msg = `[vpe] health probe: no TCP/HTTP response on ${row.port} (offline or still compiling)`;
+        lvl = pastStartupGrace && !harmonizeHttp ? 'warn' : 'info';
+      } else if (code != null && code >= 500) {
+        msg = `[vpe] health probe: HTTP ${code} (server error)`;
+        lvl = 'warn';
+      } else if (code != null && code >= 200 && code < 300) {
+        msg = `[vpe] health probe: HTTP ${code}`;
+        lvl = 'info';
+      } else {
+        msg = `[vpe] health probe: HTTP ${code}`;
+        lvl = 'warn';
+      }
+      this._persistAndBroadcastLog(projectId, lvl, msg);
+
+      // Safety guard: only terminate if startup grace has passed AND repeated health probes failed.
+      if (activeRec?.dev) {
+        const elapsed = Date.now() - (activeRec.healthStartedAt || Date.now());
+        const failCount = Number(activeRec.healthFailCount || 0);
+        if (
+          elapsed >= MSC_STARTUP_GRACE_MS &&
+          failCount >= MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS &&
+          activeRec.dev.pid &&
+          !msc_shouldHarmonizeHttpProbe(row)
+        ) {
+          this._persistAndBroadcastLog(
+            projectId,
+            'warn',
+            `[vpe] safety stop: ${failCount} consecutive failed health probes after ${Math.round(elapsed / 1000)}s`,
+          );
+          treeKill(activeRec.dev.pid, 'SIGTERM', () => {});
+          return;
+        }
+      }
+
+      this._emitProjectsRefresh();
+    });
+
+    const r2 = this.children.get(projectId);
+    if (r2?.dev) {
+      const elapsed = Date.now() - (r2.healthStartedAt || Date.now());
+      const delay = msc_healthPollDelayMs(elapsed);
+      r2.healthPollTimer = setTimeout(() => {
+        void this._healthPollCycle(projectId);
+      }, delay);
+    }
+  }
+
+  _attachChildStreams(row, child, mode, opts = {}) {
+    const { installBootstrapRec } = opts;
+    const npmReady =
+      /(next dev|next-server|ready - started|Local:\s*http|▲ Next\.js|vite v\d|compiled \S+ in|✓\s*(Ready|Starting))/i;
 
     const flushLines = (bufRef, chunk, streamLevel) => {
       bufRef.buf += chunk.toString('utf8');
@@ -74,6 +247,14 @@ class MSC_ProjectRunner extends EventEmitter {
       for (const raw of lines) {
         const line = raw.trimEnd();
         if (!line) continue;
+        if (
+          installBootstrapRec &&
+          installBootstrapRec.installBootstrap &&
+          npmReady.test(line)
+        ) {
+          this._broadcast('vpe:bootstrap-dev-visible', { projectId: row.id });
+          installBootstrapRec.installBootstrap = false;
+        }
         const lvl = streamLevel === 'stderr' ? 'warn' : 'info';
         this._persistAndBroadcastLog(row.id, lvl, line);
       }
@@ -106,8 +287,54 @@ class MSC_ProjectRunner extends EventEmitter {
       );
       this.emit('exit', { projectId: row.id, mode, code, signal });
     });
+  }
 
+  _spawnScript(row, script, mode) {
+    /** JEDI_MOD_135 — use persisted path as cwd; no package.json / existence gate (shell shows errors if invalid). */
+    const cwd = msc_normalizePersistedProjectPath(row.path);
+    const pm = row.pkg_manager || 'npm';
+    const cmd =
+      process.platform === 'win32'
+        ? pm === 'yarn'
+          ? 'yarn.cmd'
+          : pm === 'pnpm'
+            ? 'pnpm.cmd'
+            : 'npm.cmd'
+        : pm;
+    const args = ['run', script];
+
+    const configuredPort = Number(row.port);
+    const env = this._projectChildEnv(row, configuredPort);
+
+    const child = spawn(cmd, args, {
+      cwd,
+      shell: false,
+      env,
+    });
+
+    this._attachChildStreams(row, child, mode);
     return child;
+  }
+
+  /** `npm install && npm run <script>` (or yarn/pnpm). */
+  _spawnInstallThenDevPipeline(row, installBootstrapRec) {
+    const cwd = msc_normalizePersistedProjectPath(row.path);
+    const configuredPort = Number(row.port);
+    const env = this._projectChildEnv(row, configuredPort);
+    const command = msc_shellInstallThenDev(row);
+    const child = msc_spawnShellCommand(command, cwd, env);
+    this._attachChildStreams(row, child, 'dev', { installBootstrapRec });
+    return child;
+  }
+
+  _projectChildEnv(row, configuredPort) {
+    const env = { ...process.env, FORCE_COLOR: '1' };
+    if (Number.isFinite(configuredPort) && configuredPort > 0) {
+      env.PORT = String(configuredPort);
+      env.NEXT_PORT = String(configuredPort);
+      env.DEV_PORT = String(configuredPort);
+    }
+    return env;
   }
 
   _assertPortConfigured(portLike) {
@@ -145,12 +372,64 @@ class MSC_ProjectRunner extends EventEmitter {
     });
   }
 
+  async _forceReleasePortWindows(port) {
+    if (process.platform !== 'win32') return;
+    const p = Number(port);
+    if (!Number.isFinite(p) || p <= 0) return;
+    try {
+      const stdout = execSync(`netstat -ano | findstr :${p}`, {
+        windowsHide: true,
+      }).toString();
+      const lines = stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const killed = new Set();
+      for (const line of lines) {
+        const parts = line.split(/\s+/);
+        const proto = parts[0] || '';
+        const localAddress = parts[1] || '';
+        const pid = parts[parts.length - 1];
+        // netstat shape:
+        // TCP 127.0.0.1:3006 0.0.0.0:0 LISTENING 9572
+        // TCP [::1]:3006 [::1]:51500 ESTABLISHED 9572
+        // Guard to only kill processes owning this exact local port.
+        if (!/^tcp/i.test(proto)) continue;
+        if (!new RegExp(`:${p}$`).test(localAddress)) continue;
+        if (!pid || pid === '0' || Number.isNaN(Number(pid)) || killed.has(pid)) continue;
+        try {
+          execSync(`taskkill /F /PID ${pid}`, { windowsHide: true, stdio: 'ignore' });
+          killed.add(pid);
+          console.log(`[VPE] Force-killed ghost process ${pid} on Port ${p}`);
+        } catch (_) {
+          // Kill failed silently; preflight will still re-check the port.
+        }
+      }
+    } catch (_) {
+      // Port clear or netstat/findstr did not match.
+    }
+    // Last-resort cleanup if the port is still occupied by a lingering node process.
+    const stillInUse = await this._isPortInUse(p);
+    if (stillInUse) {
+      try {
+        execSync('taskkill /F /IM node.exe', { windowsHide: true, stdio: 'ignore' });
+        console.warn(`[VPE] Last-resort cleanup: taskkill /F /IM node.exe (port ${p} still occupied)`);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  }
+
   async _runDevPreflight(row) {
-    // Validates path/root and package.json before process spawn.
-    const projectRoot = msc_validateProjectPath(row.path);
+    /** JEDI_MOD_135 — port + script hints only; cwd is not validated for disk/package.json here. */
+    const projectRoot = msc_normalizePersistedProjectPath(row.path);
     const port = this._assertPortConfigured(row.port);
     this._assertScriptPortCompatibility(projectRoot, row, port);
-    const inUse = await this._isPortInUse(port);
+    let inUse = await this._isPortInUse(port);
+    if (inUse) {
+      await this._forceReleasePortWindows(port);
+      inUse = await this._isPortInUse(port);
+    }
     if (inUse) {
       throw new Error(
         [
@@ -208,34 +487,139 @@ class MSC_ProjectRunner extends EventEmitter {
 
     await this._runDevPreflight(row);
 
-    this._persistAndBroadcastLog(
-      row.id,
-      'info',
-      `[vpe] starting dev (${row.pkg_manager} run ${row.start_script})`,
-    );
+    const projectRoot = msc_normalizePersistedProjectPath(row.path);
+    const boot = msc_analyzeDependencyBootstrap(projectRoot);
+    let installBootstrap = false;
 
-    const child = this._spawnScript(row, row.start_script, 'dev');
+    // JEDI_MOD_24: Initialize watchdog from the project row
+    const watchdogFromRow = row.watchdog_enabled === 1 || row.watchdog_enabled === true;
+    rec.watchdogEnabled = watchdogFromRow;
+    if (!rec.restartAttempts) rec.restartAttempts = [];
+
+    /** @type {{ installing?: boolean, projectKind?: string }} */
+    const extra = {};
+
+    /** @type {import('child_process').ChildProcess} */
+    let child;
+
+    if (boot.needsAutoInstall) {
+      installBootstrap = true;
+      rec.installBootstrap = true;
+      if (boot.v0Prototype) {
+        this._persistAndBroadcastLog(
+          row.id,
+          'info',
+          '[VPE] v0 project detected. Missing dependencies. Launching msc_autoRepairInstaller...',
+        );
+        extra.installing = true;
+        extra.projectKind = 'v0-prototype';
+      } else {
+        this._persistAndBroadcastLog(
+          row.id,
+          'info',
+          '[VPE] Missing node_modules. Running install before dev (`npm install && npm run …`).',
+        );
+        extra.installing = true;
+      }
+      child = this._spawnInstallThenDevPipeline(row, rec);
+    } else {
+      this._persistAndBroadcastLog(
+        row.id,
+        'info',
+        `[vpe] starting dev (${row.pkg_manager} run ${row.start_script})`,
+      );
+      child = this._spawnScript(row, row.start_script, 'dev');
+    }
+
     rec.dev = child;
+    rec.healthFailCount = 0;
 
     this.store.setProjectRunning(row.id);
+    this.store.clearProjectHealth(row.id);
+    this._emitProjectsRefresh();
 
-    child.on('close', () => {
+    rec.healthStartedAt = Date.now();
+    const firstProbeMs =
+      installBootstrap ? MSC_HEALTH_FIRST_INSTALL_MS : MSC_HEALTH_FIRST_MS;
+    rec.healthPollTimer = setTimeout(() => {
+      void this._healthPollCycle(row.id);
+    }, firstProbeMs);
+
+    child.on('close', (code, signal) => {
       const r = this.children.get(row.id);
-      if (r) r.dev = undefined;
+      if (!r || r.dev !== child) return;
+
+      const isUnexpectedExit = code !== 0 && code !== null;
+      const watchdogActive = !!r.watchdogEnabled;
+
+      if (watchdogActive && isUnexpectedExit) {
+        // Watchdog Logic: Check for infinite loop (max 3 restarts in 60s)
+        const now = Date.now();
+        if (!r.restartAttempts) r.restartAttempts = [];
+        r.restartAttempts = r.restartAttempts.filter(ts => now - ts < 60000);
+
+        if (r.restartAttempts.length < 3) {
+          r.restartAttempts.push(now);
+          this._persistAndBroadcastLog(
+            row.id,
+            'warn',
+            `[vpe] Watchdog: Project exited unexpectedly (code ${code}). Auto-restarting in 2s... (Attempt ${r.restartAttempts.length}/3)`,
+          );
+
+          // UI Feedback: Notify renderer of auto-restart
+          this._broadcast('vpe:project-watchdog-restart', { 
+            projectId: row.id, 
+            attempt: r.restartAttempts.length 
+          });
+
+          // Delay restart
+          setTimeout(() => {
+            const currentRec = this.children.get(row.id);
+            if (currentRec && !currentRec.dev) {
+              void this.startDev(row);
+            }
+          }, 2000);
+          
+          return; // Exit early, don't set to stopped yet
+        } else {
+          this._persistAndBroadcastLog(
+            row.id,
+            'error',
+            `[vpe] Watchdog: Max restart attempts (3) reached within 60s. Disabling watchdog for this session.`,
+          );
+          r.watchdogEnabled = false;
+        }
+      }
+
+      this._clearHealthPolling(row.id);
+      r.dev = undefined;
+      r.healthFailCount = 0;
+      r.installBootstrap = false;
+      this.store.clearProjectHealth(row.id);
       this.store.setProjectStopped(row.id);
+      this._emitProjectsRefresh();
     });
 
-    this.emit('start', { projectId: row.id, mode: 'dev' });
-    return { ok: true, status: 'running' };
+    this.emit('start', {
+      projectId: row.id,
+      mode: 'dev',
+      installing: !!extra.installing,
+      projectKind: extra.projectKind,
+    });
+    return { ok: true, status: 'running', ...extra };
   }
 
   stopDev(projectId) {
     const rec = this.children.get(projectId);
     if (!rec?.dev) {
+      this.store.clearProjectHealth(projectId);
       this.store.setProjectStopped(projectId);
+      if (rec) rec.installBootstrap = false;
+      this._emitProjectsRefresh();
       return { ok: true, status: 'stopped' };
     }
 
+    this._clearHealthPolling(projectId);
     const pid = rec.dev.pid;
     this._persistAndBroadcastLog(
       projectId,
@@ -244,7 +628,10 @@ class MSC_ProjectRunner extends EventEmitter {
     );
     treeKill(pid, 'SIGTERM', () => {});
     rec.dev = undefined;
+    rec.installBootstrap = false;
+    this.store.clearProjectHealth(projectId);
     this.store.setProjectStopped(projectId);
+    this._emitProjectsRefresh();
     this.emit('stop', { projectId, mode: 'dev' });
     return { ok: true, status: 'stopped' };
   }
@@ -288,18 +675,27 @@ class MSC_ProjectRunner extends EventEmitter {
   /** Stops dev + build for one project (registry delete, app quit, etc.). */
   stopProject(projectId) {
     const rec = this.children.get(projectId);
+    this._clearHealthPolling(projectId);
     if (rec?.build?.pid) treeKill(rec.build.pid, 'SIGTERM', () => {});
     if (rec?.dev?.pid) treeKill(rec.dev.pid, 'SIGTERM', () => {});
     if (rec) {
       rec.dev = undefined;
       rec.build = undefined;
+      rec.installBootstrap = false;
     }
+    this.store.clearProjectHealth(projectId);
     this.store.setProjectStopped(projectId);
+    this._emitProjectsRefresh();
     return { ok: true };
   }
 
   killAll() {
     for (const [, rec] of this.children) {
+      if (rec.healthPollTimer) {
+        clearTimeout(rec.healthPollTimer);
+        rec.healthPollTimer = undefined;
+      }
+      rec.installBootstrap = false;
       if (rec.dev?.pid) treeKill(rec.dev.pid, 'SIGTERM', () => {});
       if (rec.build?.pid) treeKill(rec.build.pid, 'SIGTERM', () => {});
     }

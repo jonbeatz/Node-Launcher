@@ -33,9 +33,14 @@ export function DeleteConfirmModal({ isOpen, projectName, onClose, onConfirm }: 
         {/* Content */}
         <div className="px-6 pb-5">
           <p className="font-sans text-[13px] text-[#A0A0A0] text-center leading-relaxed">
-            Remove <span className="text-white font-medium">{projectName}</span> from VPE? 
-            This will not delete any project files from your disk. 
-            You can re-add this project later by scanning the directory again.
+            Remove <span className="text-white font-medium">{projectName}</span> from VPE? You can
+            re-add this project later by scanning the directory again.
+          </p>
+          <p className="mt-3 font-sans text-[12px] text-[#ffcc66] text-center leading-snug">
+            Warning: This will permanently remove the project registry and DELETE all media files
+            from the Project Vault (including paths such as{' '}
+            <span className="font-mono text-[11px] text-[#c8c8c8]">…/media/vault/</span> or your
+            configured vault drive).
           </p>
         </div>
 

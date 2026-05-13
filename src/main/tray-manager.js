@@ -1,6 +1,8 @@
 const { Tray, Menu, nativeImage, app } = require('electron');
+const path = require('path');
+const fs = require('fs');
 
-const MSC_TRAY_BRAND = 'Powered by the MSC Media Engine';
+const MSC_TRAY_BRAND = 'Powered by the MSC Media Engine v1.6.0';
 
 class MSC_TrayManager {
   /**
@@ -19,7 +21,33 @@ class MSC_TrayManager {
   }
 
   init() {
-    const icon = nativeImage.createEmpty();
+    const isDev = require('electron-is-dev');
+    let msc_iconPath;
+    
+    if (isDev) {
+      msc_iconPath = path.join(app.getAppPath(), 'media', 'icon.ico');
+    } else {
+      // In production, extraResources puts it next to the executable or in resources
+      msc_iconPath = path.join(process.resourcesPath, 'icon.ico');
+    }
+
+    if (!fs.existsSync(msc_iconPath)) {
+      msc_iconPath = path.join(__dirname, '..', '..', 'media', 'icon.ico');
+    }
+
+    if (!fs.existsSync(msc_iconPath)) {
+      // Legacy layout + different dev cwd
+      msc_iconPath = path.join(app.getAppPath(), 'build', 'icon.ico');
+    }
+
+    if (!fs.existsSync(msc_iconPath)) {
+      msc_iconPath = path.join(__dirname, '..', '..', 'build', 'icon.ico');
+    }
+
+    const icon = fs.existsSync(msc_iconPath) 
+      ? nativeImage.createFromPath(msc_iconPath)
+      : nativeImage.createEmpty();
+    
     this.tray = new Tray(icon);
     this.setStatus('Idle');
     this.updateMenu('Idle');

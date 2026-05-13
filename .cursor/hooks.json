@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "powershell.exe -ExecutionPolicy Bypass -File .cursor/hooks/start-api.ps1"
+      }
+    ]
+  }
+}

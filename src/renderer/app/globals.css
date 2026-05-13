@@ -1,46 +1,10 @@
+/* Palette tokens + dark theme lock — load order owned by root layout.tsx (before this file). */
+/* Loaded via URL so static export + assetPrefix './' works under Electron file:// */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Mulish:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Roboto:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-:root {
-  /* VPE Squared Registry - v6 */
-  --background: #121212;
-  --foreground: #FFFFFF;
-  --card: #1c1c1c;
-  --card-foreground: #FFFFFF;
-  --popover: #1c1c1c;
-  --popover-foreground: #FFFFFF;
-  --primary: #4fde82;
-  --primary-foreground: #000000;
-  --secondary: #1c1c1c;
-  --secondary-foreground: #FFFFFF;
-  --muted: #1c1c1c;
-  --muted-foreground: #A0A0A0;
-  --accent: #4fde82;
-  --accent-foreground: #000000;
-  --destructive: #e02b20;
-  --destructive-foreground: #FFFFFF;
-  --border: #333333;
-  --input: #333333;
-  --ring: #4fde82;
-  --terminal: #0a0a0a;
-  /* Theme accent - switchable between green and red in settings */
-  --theme-accent: #4fde82;
-  --vader-red: #e02b20;
-  --vpe-green: #4fde82;
-  --vader-glow: 0 0 15px rgba(79, 222, 130, 0.4);
-  --success: #00cc66;
-  --error: #ff4444;
-  --warning: #ffcc00;
-  --text-muted: #A0A0A0;
-  --text-dimmed: #555555;
-  /* Squared Registry - 4px max radius */
-  --radius: 4px;
-  --radius-md: 4px;
-  --radius-lg: 4px;
-  --msc-studio-bg: #121212;
-  --msc-vader-accent: #e02b20;
-}
 
 @layer base {
   * {
@@ -51,7 +15,26 @@
     outline-offset: 2px;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground;
+  }
+
+  /**
+   * v1.8.3 — Settings → Font Style maps to `--vpe-font-family` via `vpe-font-engine.ts`:
+   * VPE Classic | Mulish Studio | Google Sans (Modern) | Noto Sans | Poppins.
+   */
+  .vpe-theme-font {
+    font-family: var(--vpe-font-family), ui-sans-serif, system-ui, sans-serif !important;
+  }
+
+  /* v1.8.1 — cards/modals inherit UI stack */
+  .vpe-project-card,
+  .vpe-modal-surface {
+    font-family: inherit;
+  }
+
+  .vpe-card-title {
+    font-weight: var(--vpe-title-font-weight, 700);
+    letter-spacing: var(--vpe-title-letter-spacing, -0.02em);
   }
 }
 
@@ -116,6 +99,31 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   transition: border-color 0.15s ease;
+}
+
+/** v1.8.5 — ultra-thin metallic wire (chrome → charcoal) on Studio Dark. */
+.vpe-project-card.vpe-card-chrome-selected {
+  border: 1px solid transparent !important;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(to bottom right, #9ca3af, #1f2937) border-box !important;
+  background-clip: padding-box, border-box !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+}
+
+/** v1.8.5 — bespoke settings depth: recessed panels + lifted open section. */
+.vpe-settings-depth [data-slot='accordion-item'] {
+  background: #121212;
+  border-bottom: 1px solid rgba(156, 163, 175, 0.14) !important;
+  border-color: rgba(156, 163, 175, 0.14) !important;
+}
+
+.vpe-settings-depth [data-slot='accordion-item'][data-state='open'] {
+  background: #1c1c1c;
+}
+
+.vpe-project-card.vpe-card-chrome-selected:hover {
+  border-color: transparent !important;
 }
 
 .vader-card:hover {
@@ -221,7 +229,196 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #4a4a4a;
+}
+
+.vpe-terminal-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #333 #121212;
+}
+
+.vpe-terminal-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vpe-terminal-scrollbar::-webkit-scrollbar-track {
+  background: #121212;
+}
+
+.vpe-terminal-scrollbar::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 10px;
+}
+
+.vpe-terminal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+/* v1.2.2 — neutral depth (cards + sidebar). Obsidian Glass cards use their own shadow. */
+.vpe-project-card:not(.vpe-card-obsidian-glass),
+.vpe-sidebar {
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+/* JEDI_MOD_01 — Obsidian Glass [VPE-OBSIDIAN-GLASS] (cinema + compact shells); JEDI_MOD_06 — border-box + outline for stable specular during accordion motion */
+.vpe-project-card.vpe-card-obsidian-glass {
+  box-sizing: border-box;
+  position: relative;
+  outline: 1px solid transparent;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+  transition:
+    background 300ms ease,
+    box-shadow 300ms ease,
+    border-color 300ms ease !important;
+}
+
+/**
+ * JEDI_MOD_11 — Hover “glaze” uses ::before only (.boxBling already owns ::after). Does not alter base Tailwind BG.
+ */
+.vpe-project-card.vpe-card-obsidian-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.028) 45%,
+    rgba(255, 255, 255, 0) 72%
+  );
+}
+
+.vpe-project-card.vpe-card-obsidian-glass:hover:not(.vpe-card-obsidian-glass--error)::before {
+  opacity: 1;
+}
+
+.vpe-project-card.vpe-card-obsidian-glass:hover:not(.vpe-card-obsidian-glass--error) {
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.65) !important;
+  border-top-color: rgba(255, 255, 255, 0.24) !important;
+  border-left-color: rgba(255, 255, 255, 0.07) !important;
+  border-right-color: rgba(255, 255, 255, 0.07) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.vader-card.vpe-project-card.vpe-card-obsidian-glass:hover:not(.vpe-card-obsidian-glass--error) {
+  border-top-color: rgba(255, 255, 255, 0.24);
+  border-left-color: rgba(255, 255, 255, 0.07);
+  border-right-color: rgba(255, 255, 255, 0.07);
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+
+.vpe-project-card.vpe-card-obsidian-glass.vpe-card-obsidian-glass--error {
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(224, 43, 32, 0.88) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.62), 0 0 0 1px rgba(224, 43, 32, 0.12) !important;
+}
+
+.vpe-project-card.vpe-card-obsidian-glass.vpe-card-obsidian-glass--error:hover {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.025)),
+    rgba(30, 20, 20, 0.88) !important;
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.68), 0 0 0 1px rgba(255, 90, 80, 0.2) !important;
+  border-color: rgba(255, 100, 90, 0.95) !important;
+}
+
+/**
+ * JEDI_MOD_09 — Metallic chrome only on the upper header stack (`.vpe-card-chrome-selected-header`),
+ * not the accordion. Padding fill stays transparent so thumb + #242424 body show through.
+ */
+.vpe-project-card.vpe-card-obsidian-glass .vpe-card-chrome-selected-header {
+  box-sizing: border-box;
+  border-radius: 4px 4px 0 0;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    linear-gradient(to bottom right, #9ca3af, #1f2937) border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: box-shadow 200ms ease, filter 200ms ease;
+}
+
+.vpe-project-card.vpe-card-obsidian-glass .vpe-card-chrome-selected-header:hover {
+  background:
+    linear-gradient(transparent, transparent) padding-box,
+    linear-gradient(to bottom right, #b0b8c4, #1f2937) border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+/* System Log / embedded terminal — transparent fill fixes compositor black box under blur */
+.vpe-system-log-viewport {
+  background-color: transparent !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: hidden !important;
+}
+
+/* v1.2.4 — redundant outer scrollbar: only `.vpe-terminal-scrollbar` scrolls */
+/* v1.2.7 — kill horizontal jitter on the log drawer column */
+.vpe-log-drawer-root {
+  overflow: hidden !important;
+  overflow-x: hidden !important;
+  min-width: 0;
+}
+
+/* v1.2.8 — Scorched Earth “digital burn” on system health panel */
+@keyframes vpe-digital-burn {
+  0%, 100% {
+    filter: brightness(1);
+    box-shadow: inset 0 0 0 transparent;
+  }
+  50% {
+    filter: brightness(1.32) saturate(0.35) contrast(1.08);
+    box-shadow: inset 0 0 52px rgba(224, 43, 32, 0.22);
+  }
+}
+
+.vpe-scorched-burn {
+  animation: vpe-digital-burn 0.45s ease-in-out 3;
+}
+
+/* boxBling Effect */
+.box-bling {
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.box-bling::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  border-radius: inherit;
+  background: linear-gradient(45deg, var(--vader-red), transparent, var(--vpe-green), transparent) border-box;
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: destination-out;
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.5;
+  animation: bling-rotate 4s linear infinite;
+}
+
+@keyframes bling-rotate {
+  0% { filter: hue-rotate(0deg) brightness(1); }
+  50% { filter: hue-rotate(180deg) brightness(1.5); }
+  100% { filter: hue-rotate(360deg) brightness(1); }
+}
+
+.vader-card:hover.box-bling::before {
+  opacity: 1;
+  box-shadow: 0 0 15px var(--msc-vader-accent);
 }
 
 /* Resize Handle */
@@ -332,4 +529,27 @@ html {
 
 body {
   background-color: #121212;
+}
+
+/* Dashboard grids — gap on the grid class (full-width cinematic rhythm). */
+.vpe-grid-cinema {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1280px) {
+  .vpe-grid-cinema {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .vpe-grid-cinema {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vpe-grid-compact {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
 }

@@ -1,0 +1,18 @@
+---
+description: Optimize for Ryzen 9700x and Windows 11 25H2 filesystem
+globs: ["src/main/**", "src/electron/**", "scripts/**"]
+---
+
+# Hardware & OS Optimization Rules
+
+## 1. Thread Management
+- For heavy tasks (AST scanning, Puppeteer work, or environment recovery), offload where practical (e.g. Node **`worker_threads`**) so the Electron UI stays near **60fps**.
+- Avoid long synchronous I/O on the main thread during dashboard interactions.
+
+## 2. Windows 11 I/O & pathing
+- **Batching:** Batch file operations during **`npm run vpe:nuke-install`**, vault reconcile, or large repairs to reduce Windows Defender overhead.
+- **Pathing:** Use the Node **`path`** module; prefer normalized absolute paths on Windows.
+
+## 3. Process safety
+- Use **`tree-kill`** (or equivalent) so PM2 / dev child processes are fully reaped.
+- **Environment nuke:** The supported sequence matches **`Project-Bible.md` §7**: stop stray **`node.exe`** (**`taskkill /F /IM node.exe /T`**), then run **`npm run vpe:nuke-install`** (includes purge + **`npm install`**). Verify termination before manual directory deletes if you bypass the script.

@@ -1,0 +1,22 @@
+---
+description: Enforce Vader Shield IPC security and contextBridge isolation
+globs: ["src/renderer/**", "src/main/**", "src/preload/**"]
+---
+
+# Vader Shield Security Protocol
+
+## 1. Zero Direct Node Access
+- NEVER suggest `require('fs')`, `require('path')`, or `require('child_process')` inside any file in `src/renderer/`.
+- NEVER allow `nodeIntegration: true` or `contextIsolation: false` in any `new BrowserWindow()` configuration within the main process.
+- **Preload only:** All privileged operations MUST be defined in `src/preload/preload.js` using `contextBridge.exposeInMainWorld`.
+
+## 2. IPC Communication
+- Use `ipcRenderer.invoke` for asynchronous operations that return data (e.g. fetching the project registry).
+- Use `ipcRenderer.send` for fire-and-forget actions where appropriate.
+
+## 3. Sovereign Vault media (sanctioned surface)
+- **`vpe-vault:`** is the **only** sanctioned privileged protocol for serving **Sovereign Vault** raster assets (e.g. internal **`_vpe_thumb.png`**) to the renderer. Do **not** rely on raw `file://` URLs for vault thumbnails in production UI—Chromium blocks or sandboxes them; privileged handlers live in **`vpe-vault-protocol.js`** (see **`TRUTH.md`**).
+
+## 4. Implementation guardrail
+- If a user asks for system access, confirm the method exists on **`window.vpeAPI`** (or documented preload surface).
+- If missing: implement **`ipcMain.handle`** in main → expose in preload → call from renderer.

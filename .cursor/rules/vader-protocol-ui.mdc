@@ -1,0 +1,25 @@
+---
+description: Apply Vader Protocol (Studio Dark/Glassmorphic) UI standards
+globs: ["**/*.{css,scss,tsx,jsx}"]
+---
+
+# Vader Protocol UI Standards
+
+## 1. Visual tokens & color discipline
+- **Primary palette:** Background **#121212** | Surface **#1c1c1c** | Accent **#e02b20** (Vader Red).
+- **Utility:** Borders **1px solid #333333** | Shadows use **`vader-glow`** (`0 0 15px rgba(224, 43, 32, 0.4)`).
+- **No hardcoding:** Avoid stray hex outside the palette; prefer tokens / Tailwind theme keys (`bg-vader-bg`, etc.).
+
+## 2. Running / health states (official tokens)
+- **Green:** Running with healthy or accepted HTTP signal (per card health line).
+- **Amber / yellow:** Building, installing, booting HTTP, **or Staging / Idle** — **official** state for **unlinked** or **non-HTTP-runnable** repos while a dev session is active (`vpe_repo_runnable_for_http === false`, staging copy on **`Msc_ProjectCard`** / list **Idle**). Not an error by itself.
+- **Red:** True errors, unreachable after grace when a runnable repo is expected, or destructive actions.
+
+## 3. Component architecture
+- **Vader cards:** 4:3 thumbnails; 40px sparkline strip; vault overlay rules per **`TRUTH.md`** (**`_vpe_thumb.png`**).
+- **Log drawer:** Glassmorphic surface, **`backdrop-blur`**, documented padding/z-index from `.cursorrules` §5.
+- **HUD framing:** 1px horizontal lines top/bottom (**#e02b20** @ ~30% opacity).
+
+## 4. Naming & typography
+- **CSS / Tailwind:** Prefix custom classes with **`msc-`** where project-specific.
+- **Typography:** JetBrains Mono for code, terminal, monospace data.

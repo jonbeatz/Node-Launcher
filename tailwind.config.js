@@ -52,7 +52,7 @@ module.exports = {
         sm: 'calc(var(--radius) - 2px)',
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'Montserrat', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--vpe-font-family)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         'vader-glow': 'var(--vader-glow)',

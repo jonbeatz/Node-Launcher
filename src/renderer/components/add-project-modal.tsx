@@ -1,12 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, type ChangeEvent } from 'react'
 import { X, FolderSearch, Package, Check, Loader2, FolderOpen, Upload, Camera } from 'lucide-react'
+import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
 
 interface AddProjectModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit?: (data: ProjectData) => void
+}
+
+/** Privileged schemes load in the Electron shell; `data:` is used for draft picks (see `vpe:pick-thumbnail`). */
+function msc_modalThumbnailPreviewSrc(href: string | null | undefined): string | undefined {
+  if (href == null || String(href).trim() === '') return undefined
+  const s = String(href)
+  if (s.startsWith('data:') || s.startsWith('vpe-vault:') || s.startsWith('vpe-asset:')) return s
+  return s
 }
 
 interface ProjectData {
@@ -18,15 +27,21 @@ interface ProjectData {
   port: string
   portLock: boolean
   thumbnailUrl?: string | null
+  /** Passed to IPC: `auto` clears registry override (classifier). */
+  projectTypePayload?: 'auto' | VpeShieldProjectType | null
 }
 
 export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalProps) {
+  const thumbFileInputRef = useRef<HTMLInputElement>(null)
   const createDraftId = () =>
     typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID()
       : `project-${Date.now()}`
   const [isScanning, setIsScanning] = useState(false)
   const [scanned, setScanned] = useState(false)
+  const [projectTypeSelect, setProjectTypeSelect] = useState<
+    'auto' | VpeShieldProjectType
+  >('auto')
   const [projectData, setProjectData] = useState<ProjectData>({
     id: createDraftId(),
     name: '',
@@ -36,6 +51,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     port: '3001',
     portLock: false,
     thumbnailUrl: null,
+    projectTypePayload: 'auto',
   })
 
   if (!isOpen) return null
@@ -52,16 +68,22 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     let detectedPackageManager: ProjectData['packageManager'] = 'pnpm'
     let detectedStartScript = 'dev'
     let suggestedPort = '3001'
+    let detectedShield: VpeShieldProjectType = 'unknown'
     try {
       if (window.vpeAPI?.inspectProject) {
         const info = await window.vpeAPI.inspectProject(pickedPath)
         detectedPackageManager = info?.detection?.pkg_manager ?? detectedPackageManager
         detectedStartScript = info?.detection?.start_script ?? detectedStartScript
         suggestedPort = String(info?.suggestedPort ?? suggestedPort)
+        const pt = info?.project_type
+        if (pt === 'v0' || pt === 'electron' || pt === 'web' || pt === 'node' || pt === 'unknown') {
+          detectedShield = pt
+        }
       }
     } catch {
       // Keep modal usable even if inspect IPC fails.
     }
+    setProjectTypeSelect(detectedShield)
     setProjectData({
       id: projectData.id || createDraftId(),
       name: normalizedName,
@@ -71,26 +93,48 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
       port: String(suggestedPort),
       portLock: false,
       thumbnailUrl: projectData.thumbnailUrl ?? null,
+      projectTypePayload: detectedShield,
     })
     setScanned(true)
     setIsScanning(false)
   }
 
   const handlePickThumbnail = async () => {
-    if (!window.vpeAPI?.pickThumbnail) return
-    try {
-      const href = await window.vpeAPI.pickThumbnail(projectData.id)
-      if (!href) return
-      setProjectData((prev) => ({ ...prev, thumbnailUrl: href }))
-    } catch {
-      // Keep setup flow resilient; save path still works without thumbnail.
+    if (window.vpeAPI?.pickThumbnail) {
+      try {
+        const href = await window.vpeAPI.pickThumbnail(
+          projectData.id,
+          projectData.name || null,
+        )
+        if (!href) return
+        setProjectData((prev) => ({ ...prev, thumbnailUrl: href }))
+      } catch {
+        // Keep setup flow resilient; save path still works without thumbnail.
+      }
+      return
     }
+    thumbFileInputRef.current?.click()
+  }
+
+  const handleLocalThumbFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = ''
+    if (!f || !String(f.type || '').startsWith('image/')) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const r = reader.result
+      if (typeof r === 'string') {
+        setProjectData((prev) => ({ ...prev, thumbnailUrl: r }))
+      }
+    }
+    reader.readAsDataURL(f)
   }
 
   const handleSubmit = () => {
     onSubmit?.(projectData)
     onClose()
     setScanned(false)
+    setProjectTypeSelect('auto')
     setProjectData({
       id: createDraftId(),
       name: '',
@@ -100,6 +144,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
       port: '3001',
       portLock: false,
       thumbnailUrl: null,
+      projectTypePayload: 'auto',
     })
   }
 
@@ -188,11 +233,20 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
                   Thumbnail (Optional)
                 </label>
                 <div className="flex items-center gap-3">
+                  <input
+                    ref={thumbFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    aria-hidden
+                    tabIndex={-1}
+                    onChange={handleLocalThumbFile}
+                  />
                   <div className="w-16 h-12 rounded bg-[#0a0a0a] border border-[#333333] overflow-hidden flex items-center justify-center shrink-0">
-                    {projectData.thumbnailUrl ? (
+                    {msc_modalThumbnailPreviewSrc(projectData.thumbnailUrl) ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={projectData.thumbnailUrl}
+                        src={msc_modalThumbnailPreviewSrc(projectData.thumbnailUrl)}
                         alt=""
                         className="w-full h-full object-cover"
                       />
@@ -231,6 +285,40 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
                     <FolderOpen size={16} />
                   </button>
                 </div>
+              </div>
+
+              {/* Project type (shields) */}
+              <div>
+                <label className="block font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] mb-2">
+                  Project Type
+                </label>
+                <select
+                  value={projectTypeSelect === 'auto' ? 'auto' : projectTypeSelect}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    const next =
+                      v === 'auto'
+                        ? 'auto'
+                        : (v as VpeShieldProjectType)
+                    setProjectTypeSelect(next)
+                    setProjectData((prev) => ({
+                      ...prev,
+                      projectTypePayload: next === 'auto' ? 'auto' : next,
+                    }))
+                  }}
+                  className="w-full px-3 py-2 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-[13px] text-white focus:outline-none focus:border-[#4fde82] transition-colors"
+                >
+                  <option value="auto">Auto (detect from folder)</option>
+                  <option value="v0">v0 (components/ui)</option>
+                  <option value="electron">Electron</option>
+                  <option value="web">Web (Next / React)</option>
+                  <option value="node">Node</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+                <p className="mt-2 font-sans text-[11px] text-[#555555]">
+                  Defaults to the scan result — pick <span className="text-[#A0A0A0]">Auto</span>{' '}
+                  to persist no override (classifier decides), or lock a shield type.
+                </p>
               </div>
 
               {/* Package Manager */}

@@ -1,0 +1,18 @@
+-- VPE SQLite structural snapshot (historical note: user_version advances with migrations; see VPE_SQLITE_USER_VERSION)
+-- No sensitive data — reference only. Canonical DDL + migrations: src/main/db/persistent-store.js
+--
+-- Base tables: projects, logs, repair_runs (VPE_SQLITE_BASE_DDL)
+-- Incremental migrations add columns through v13, including:
+--   projects.has_documentation INTEGER NOT NULL DEFAULT 1  (v1.9.8 / user_version 13)
+--
+-- projects (all columns after migrate):
+--   id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager,
+--   is_favorite, health_http_code, health_checked_at, health_reachable, project_type,
+--   is_archived, notes, dev_session_started_at, has_documentation, sort_order
+--
+-- settings (created at user_version 5+, extended through 12):
+--   id, minimize_to_tray, theme_accent, launch_at_login, auto_start_projects, default_view,
+--   font_style, port_range_start, port_range_end, auto_sync_db_on_close
+--
+-- logs: id, project_id, timestamp, level, message
+-- repair_runs: id, project_id, project_name, created_at, status, description, files_changed

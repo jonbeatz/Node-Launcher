@@ -1,0 +1,17 @@
+---
+description: Rules for AST-based code repairs and Next.js 15 Suspense patching
+globs: ["src/**/*.{js,jsx,ts,tsx,mjs}", "scripts/repair/**"]
+---
+
+# Vader Repair Suite Protocol
+
+## 1. Safe patching lifecycle
+- **Backup first:** Before automated code edits, write a **`.vader-backup`** (or script-defined backup) **next to the source file under the repo / `scripts/` tree** — same disk area as the patched file. **Do not** store repair backups inside **`media/vault`** (Sovereign Vault is for project card assets and attachments, not AST scratch).
+- **AST strategy:** Use **`scripts/repair`** / **`vader-fix-suspense.mjs`** patterns for transformations that must stay structural.
+- **Diff requirement:** Show before/after in UI or chat before applying when the flow is interactive.
+
+## 2. Next.js 15 Suspense specifics
+- Target **`useSearchParams`** / **`useParams`** CSR bailout sites; wrap the **smallest** subtree in **`<Suspense>`**.
+
+## 3. Activation context
+- Suggest automated repairs when the user says repair / patch / fix suspense, or when build errors clearly match Suspense CSR bailout.
