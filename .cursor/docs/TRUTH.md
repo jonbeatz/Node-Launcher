@@ -4,6 +4,8 @@ This document is the **Constitution** of the Vader Project Engine. It serves as 
 
 **Filesystem:** This file lives only at **`.cursor/docs/TRUTH.md`**. It consolidates all core technical principles.
 
+**Agent Tooling & Context:** The project relies heavily on the **Model Context Protocol (MCP)** for advanced agent workflows (database access, filesystem, terminal control, and external APIs). Documentation for available tools is stored at **`.cursor/docs/MCPs.md`**. Custom project-level MCP overrides live in **`.cursor/mcp.json`**.
+
 **Shipped release vs. Iron Curtain:** Root **`package.json` → `version`** is the **authoritative ship string** (**v2.2.6-SOVEREIGN**). The **Iron Curtain** (**v2.2.6-SOVEREIGN Baseline**) in `main.js` (`msc_ironCurtainVersionAudit`) still enforces a **minimum engine of v2.2.5** (semver core) so older binaries cannot corrupt modern sovereign SQLite / vault layouts. **v2.2.6-SOVEREIGN** is the current product line; **v2.2.5** is the *floor*, not the marketing label. Product deltas: **[`VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md)**. Operator command tables: **[`Project-Bible.md`](./Project-Bible.md) §7 — Command Lexicon**.
 
 ## 1. Architectural Integrity

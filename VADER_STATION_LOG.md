@@ -353,7 +353,8 @@ Replaced dual toggles with a single **`viewMode`**: **`cinema`** (large grid + j
 
 ## Product snapshot
 
-- **Ritual:** [.cursor/prompts/Start-Project.md](.cursor/prompts/Start-Project.md) · entry [.cursor/docs/guides/START-HERE.md](.cursor/docs/guides/START-HERE.md)
+- **Ritual:** [.cursor/prompts/Start-Project.md](.cursor/prompts/Start-Project.md)
+- **Agent Tooling:** Review available MCPs and environment capabilities at [.cursor/docs/MCPs.md](.cursor/docs/MCPs.md)
 - **Shipped app version / branch:** root **`package.json`** + **[Checkpoint.md](.cursor/docs/guides/Checkpoint.md)** (authoritative for build lines)
 
 *Update this file when a major mission completes or API behavior changes; keep it brief.*
