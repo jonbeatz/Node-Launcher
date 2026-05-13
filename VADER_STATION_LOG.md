@@ -13,6 +13,17 @@
 
 ---
 
+## [2026-05-13] — EOD: MCP hygiene + GitHub smoke test
+
+**What we did**
+- Confirmed **GitHub** MCP responds (`list_pull_requests`, `get_pull_request` with **`pull_number`** — not `issue_number`).
+- Plugin MCP audit: **Stripe / Notion / Atlassian** stay **Needs authentication** until **Connect**; **Vercel** already authenticated; **Tavily** search works with API key.
+- **Cursor Settings → Plugin MCP Servers:** entries have no trash can because they come from **installed Cursor plugins** — remove from the list by **uninstalling that plugin** (or leave unauthenticated entries; they stay inert).
+
+**Next session:** **Start Project** per **`.cursor/prompts/Start-Project.md`** — agent runs **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless the operator says **verify-only**.
+
+---
+
 ## [2026-05-12] — End of Day MCP & CI Fixes
 
 **What was accomplished today:**
