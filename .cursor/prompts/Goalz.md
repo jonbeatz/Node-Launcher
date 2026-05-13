@@ -57,7 +57,7 @@ The two old prompts disagreed on hex depth (`#0c0c0c` vs `#121212`, rounded vs �
 | Nuke / vault repair runbooks | **[`../docs/REPAIR_PROTOCOLS.md`](../docs/REPAIR_PROTOCOLS.md)** |
 | Agent enforcement | **[`../../.cursorrules`](../../.cursorrules)** |
 | **Engine cold start** | **[`./Start-Master.md`](./Start-Master.md)** (Electron / dashboard / Bible §7) |
-| LiteLLM + ngrok ritual | **[`./Start-Project.md`](./Start-Project.md)** |
+| `google-api` / LiteLLM / ngrok | **[`./Start-Project.md`](./Start-Project.md)** — Agent auto-starts bridge (**`.\google-api\vpe-start-api.ps1 -StartNgrok`**) and pings for **green `200`** |
 | History | **[`../../VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md)** |
 
 ---

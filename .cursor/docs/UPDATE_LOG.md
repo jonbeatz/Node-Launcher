@@ -29,6 +29,20 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 - When an MCP tool running via Python/`uvx` on Windows gives silent timeouts or decoding errors, always verify if `PYTHONIOENCODING=utf-8` is required in the environment variables.
 - Project-level MCPs automatically override or add to global MCPs when you are in that specific Cursor workspace. They live in `.cursor/mcp.json`.
 
+## [2026-05-13] - Automated Build System Implemented
+
+### 🛠 Features & Logic
+- **Build Engine**: Created `scripts\upload_build.ps1` to automate packaging and deployment.
+- **Versioning**: Implemented `VPE-JediBuild-$branch-v1.x` auto-incrementing logic.
+- **Cursor Integration**: Added project-level rule to trigger deployment via the "Upload Build" phrase.
+
+### ✅ Results
+- **First Build**: Successfully pushed `VPE-JediBuild-main-v1.1` to GitHub.
+- **Workflow**: Reduced deployment time from ~5 minutes (manual) to <10 seconds (automated).
+
+### 📝 Docs / ritual (same day)
+- **Start Project default** flipped to **agent auto-starts** the **`google-api`** bridge (**`vpe-start-api.ps1 -StartNgrok`**) + **`vpe-ping-api.ps1`** unless **verify-only**; reconciled **`.cursorrules`**, **`TRUTH.md` §7**, **`Project-Bible.md` §8**, **`VADER_STATION_LOG.md`**, **`End-Project.md`**, hook banner text, **`Workspace-Hygiene-Report.md`**, and **`Start-Project.md`** (repo-relative **`pwsh -File .\google-api\...`**). **`Command Authority`** in **`.cursorrules`** now explicitly allows those launchers.
+
 ---
 
 *(Add new entries above this line following the same format)*

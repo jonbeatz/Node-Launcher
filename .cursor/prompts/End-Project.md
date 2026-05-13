@@ -30,4 +30,4 @@ When the operator says **End Project**, **closeout**, or **end session**, execut
 
 5. **Handoff:**
    - Inform the operator that the log is updated, the code is pushed, and the session is safely archived.
-   - Provide a 1-sentence recap of what the *very first* task should be when they run **Start Project** tomorrow.
+   - Provide a 1-sentence recap of what the *very first* task should be when they run **Start Project** tomorrow: follow **`Start-Project.md`** so the agent **auto-starts** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** and **`vpe-ping-api.ps1`** unless they explicitly ask for **verify-only** (paths + **:4000** probe only).

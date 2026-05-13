@@ -98,6 +98,13 @@ Unix-style manual reset (no npm script): `rm -rf node_modules .next dist && npm 
 ### Version & branding
 - **Ship:** **`package.json`** version **`2.2.6-SOVEREIGN`** · preload **`vpeInfo.version`** · footer uses **`msc_mscEngineFooterLine()`** (same string across dashboard, settings, terminal chrome).
 
+### Google API bridge — operator commands & invariants (2026-05-13)
+
+- **Start API (preferred):** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** from repo root — **LiteLLM :4000** + **ngrok** in one step. **Start Project default:** agents run the same command plus **`vpe-ping-api.ps1`** unless **verify-only** — see **`Start-Project.md`**. **cmd:** **`google-api\vpe-start-api.cmd -StartNgrok`**. **Fallback:** **`vpe-start-api.ps1`** + second terminal **`ngrok http 4000`**.
+- **Do not** use **`cd /d ... &&`** inside **PowerShell** to launch the API ( **`cd /d`** is **cmd** only); use **`Set-Location`** to repo root or **`pwsh -File "<fullpath>\google-api\vpe-start-api.ps1"`**.
+- **Vertex:** **`litellm_config.yaml`** keeps **`vader-31-pro`** / **`vader-3-flash`** on **`gemini-3.1-pro-preview`** / **`gemini-3-flash-preview`** with **`vertex_location: global`**. Changing only the region to **`us-central1`** without changing the model ID will **not** restore a “broken” bridge — it will break Gemini 3 preview.
+- **Verify bridge:** **`GET http://127.0.0.1:4000/v1/models`** with **`Authorization: Bearer <master_key>`** from **`litellm_config.yaml`**; optional **`POST /v1/chat/completions`** with **`vader-3-flash`**. Public URL: **`ngrok-skip-browser-warning: true`** + same **`Authorization`** header. To see **green 200** access lines in the LiteLLM terminal, run **`.\google-api\vpe-ping-api.ps1`** in a second pane while LiteLLM runs in the first.
+
 ---
 
 **Standard Operating Procedure:** Run diagnostics / path repair from the UI before packaging when the catalog or vault was hand-edited.

@@ -6,7 +6,7 @@ This document is the **Constitution** of the Vader Project Engine. It serves as 
 
 **Agent Tooling & Context:** The project relies heavily on the **Model Context Protocol (MCP)** for advanced agent workflows (database access, filesystem, terminal control, and external APIs). Documentation for available tools is stored at **`.cursor/docs/MCPs.md`**. Custom project-level MCP overrides live in **`.cursor/mcp.json`**.
 
-**Shipped release vs. Iron Curtain:** Root **`package.json` → `version`** is the **authoritative ship string** (**v2.2.6-SOVEREIGN**). The **Iron Curtain** (**v2.2.6-SOVEREIGN Baseline**) in `main.js` (`msc_ironCurtainVersionAudit`) still enforces a **minimum engine of v2.2.5** (semver core) so older binaries cannot corrupt modern sovereign SQLite / vault layouts. **v2.2.6-SOVEREIGN** is the current product line; **v2.2.5** is the *floor*, not the marketing label. Product deltas: **[`VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md)**. Operator command tables: **[`Project-Bible.md`](./Project-Bible.md) §7 — Command Lexicon**.
+**Shipped release vs. Iron Curtain:** Root **`package.json` → `version`** is the **authoritative ship string** (**v2.2.6-SOVEREIGN**). The **Iron Curtain** (**v2.2.6-SOVEREIGN Baseline**) in `main.js` (`msc_ironCurtainVersionAudit`) still enforces a **minimum engine of v2.2.5** (semver core) so older binaries cannot corrupt modern sovereign SQLite / vault layouts. **v2.2.6-SOVEREIGN** is the current product line; **v2.2.5** is the *floor*, not the marketing label. Product deltas: **[`VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md)**. **npm / operator scripts:** **[`Project-Bible.md`](./Project-Bible.md) §7 — Command Lexicon**. **LiteLLM / Vertex / ngrok:** **this file §7** (Google API bridge).
 
 ## 1. Architectural Integrity
 - **The Vader Shield:** The renderer layer must remain "dumb" regarding the OS. It may only communicate through **`src/preload`** (canonical gate: **`preload.js`**) via **`contextBridge`** — **`nodeIntegration`** off.
@@ -41,6 +41,16 @@ The `contextBridge` in `src/preload/preload.js` exposes two distinct APIs:
 - **Surface:** #1c1c1c (Cards & Modals)
 - **Accent:** #e02b20 (Vader Red Actions)
 - **Border:** #333333 (Framing & Hairlines)
+
+## 7. Google API bridge (`google-api/` — LiteLLM → Vertex, ngrok)
+
+- **Start Project (agents):** per **`Start-Project.md`**, agents **auto-start** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** and **`.\google-api\vpe-ping-api.ps1`** from repo root unless the operator says **verify-only** (then probe **:4000** only).
+- **Canonical start (operator or agent shell, repo root):** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** — LiteLLM on **port 4000** plus **ngrok** sidecar (see **`google-api/README.md`**). **cmd.exe:** **`google-api\vpe-start-api.cmd -StartNgrok`**. **PowerShell any cwd:** **`pwsh -File "<repo>\google-api\vpe-start-api.ps1" -StartNgrok`** (never use **`cd /d`** inside **PowerShell**; that is **cmd** only).
+- **Two-pane alternative:** **`.\google-api\vpe-start-api.ps1`** then **`ngrok http 4000`** ( **`scripts\vpe-add-node-launcher-user-path.ps1`** once if **`ngrok`** is missing from PATH).
+- **Vertex routing:** **`google-api/litellm_config.yaml`** — proxy aliases **`vader-31-pro`** / **`vader-3-flash`** map to **`vertex_ai/gemini-3.1-pro-preview`** and **`vertex_ai/gemini-3-flash-preview`** with **`vertex_location: global`**. Those Gemini **3 preview** IDs require the **global** endpoint; pairing them with **`us-central1`** breaks routing.
+- **Environment (launcher):** absolute **`GOOGLE_APPLICATION_CREDENTIALS`** → **`google-api/gcp_key.json`**; **`GOOGLE_CLOUD_PROJECT`** from the JSON **`project_id`**; **`GOOGLE_CLOUD_LOCATION`** and **`VERTEXAI_LOCATION`** default to **`global`** when unset; this repo’s **`google-api\ngrok.exe`** is prepended to **`PATH`** for the session when present.
+- **Clients via ngrok free host:** send header **`ngrok-skip-browser-warning: true`** on **`*.ngrok-free.dev`** to avoid the browser interstitial on API calls.
+- **Access log (green `200`):** with LiteLLM running in **one** integrated terminal, run **`.\google-api\vpe-ping-api.ps1`** in a **second** pane — it issues **`GET /v1/models`** and **`POST /v1/chat/completions`** so the LiteLLM/Uvicorn pane shows **`200`** access lines (ANSI green in Cursor / Windows Terminal when color is enabled). Details: **`google-api/README.md`**.
 
 **Signature:** Powered by the MSC Media Engine · v2.2.6-SOVEREIGN
 

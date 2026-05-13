@@ -4,6 +4,15 @@
 
 ---
 
+## [2026-05-13] — Start Project protocol: Agent Auto-starts API
+
+**What changed**
+- **Canonical default:** **Start Project** now defaults to the agent **automatically starting the API bridge** (`.\google-api\vpe-start-api.ps1 -StartNgrok`) in a background shell.
+- **Ping:** The agent automatically runs `vpe-ping-api.ps1` to ensure the operator sees the **green 200** HTTP access log lines in the LiteLLM terminal.
+- **Docs:** `Start-Project.md` and `.cursorrules` updated to reflect the agent-driven start as the default.
+
+---
+
 ## [2026-05-12] — End of Day MCP & CI Fixes
 
 **What was accomplished today:**
@@ -137,7 +146,7 @@
 2. **Regression:** Smoke an **old Node-Launcher / pre–2.1.0** checkout or packaged build — confirm **Iron Curtain** (`main.js`) exits cleanly (**`dialog.showErrorBox`** + **`process.exit(0)`**) and does **not** crash into vault sync / wipes. Use **`VPE_SKIP_IRON_CURTAIN=1`** only for intentional legacy debugging on this tree.
 3. **Optional:** Wire UI for **`vpe:repair-vault-links`** (already in main) if operators need a button beside maintenance purge.
 
-**Start Project / full context:** Follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** canonical order: **`.cursorrules`** → **`AGENT-BOOT.md`** §1 + §4 → **`API-SetUp-Master.md`** → **`.\google-api\vpe-start-api.ps1`** + **`ngrok http 4000`** → confirm **`[VPE STANDBY]`** / **API is Live** → **`VADER_STATION_LOG.md`**. **Engine / Electron cold start only:** **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)**.
+**Start Project / full context:** Follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — **default = agent auto-starts API:** **`.cursorrules`** → **`.cursor/docs/TRUTH.md`** §7 → **`.cursor/docs/Project-Bible.md`** §7 / §8 → verify **`google-api/`** + PATH → **`VADER_STATION_LOG.md`**. Unless the operator says **verify-only**, agents run **`.\google-api\vpe-start-api.ps1 -StartNgrok`**, then **`.\google-api\vpe-ping-api.ps1`**, and report **API is Live**. **Engine / Electron cold start only:** **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)**.
 
 ---
 

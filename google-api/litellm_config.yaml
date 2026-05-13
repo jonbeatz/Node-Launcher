@@ -1,15 +1,26 @@
+# LiteLLM proxy → Google Cloud Vertex AI (Gemini 3 preview).
+# Model IDs: see https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models
+# Gemini 3.x preview models use the global Vertex endpoint (vertex_location: global), not regional.
+#
+# drop_params: Cursor / OpenAI clients often send params Gemini 3 does not accept on Vertex
+# (e.g. frequency_penalty, presence_penalty, parallel_tool_calls=false with multiple tools).
+# Stripping those avoids Vertex 400 INVALID_ARGUMENT. See google-api/README.md.
+
+litellm_settings:
+  drop_params: true
+
 model_list:
   - model_name: vader-31-pro
     litellm_params:
       model: vertex_ai/gemini-3.1-pro-preview
       vertex_project: "wordpress-map-1492461083797"
-      vertex_location: "global" # <--- Keeps us on the global stable endpoint
+      vertex_location: "global"
 
   - model_name: vader-3-flash
     litellm_params:
       model: vertex_ai/gemini-3-flash-preview
       vertex_project: "wordpress-map-1492461083797"
-      vertex_location: "global" # <--- Keeps us on the global stable endpoint
+      vertex_location: "global"
 
 general_settings:
   master_key: sk-vader-protocol-1234

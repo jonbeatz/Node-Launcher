@@ -23,7 +23,7 @@ Archived obsolete prompt fragments to clear up the root prompt folder while keep
   - `Run.md`
   - `v0-Dev-Prompt.md`
 - **Kept Active**:
-  - `Start-Project.md` (LiteLLM/ngrok ritual)
+  - `Start-Project.md` (default: agent auto-starts `google-api` bridge + ping; **verify-only** skips start)
   - `Start-Master.md` (Engine cold start)
   - `Goalz.md` (Merged project compass)
   - `VADER_MASTER_MANIFEST.md`

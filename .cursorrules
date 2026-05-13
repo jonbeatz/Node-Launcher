@@ -26,14 +26,16 @@ If documentation conflicts occur, follow this hierarchy strictly:
 
 **Critical:** Before performing any build, deployment, or environment setup, read and adhere to the scripts and protocols in **`Project-Bible.md` §7** and **`REPAIR_PROTOCOLS.md`**.
 
-**Crucial:** Always ensure the **LiteLLM API** is running by executing the **"start API"** or **Start Project** flow from repo root: **`.\google-api\vpe-start-api.ps1`** in a **Cursor integrated terminal pane** (sets **`GOOGLE_APPLICATION_CREDENTIALS`** to **`.\google-api\gcp_key.json`**, prints the **ngrok** command for a **second pane**, runs **LiteLLM** on **port 4000** from **`google-api\`**). Run **`ngrok http 4000`** as a **global** command in another integrated pane (**`google-api`** on **User PATH** — **`scripts\vpe-add-node-launcher-user-path.ps1`**). After **`[VPE STANDBY]`**, confirm **Uvicorn** on **4000** and report **"API is Live"**.
+**Start Project — default (agent runs API):** Canonical ritual is **`.cursor/prompts/Start-Project.md`**. Agents **automatically start** the API bridge (**`.\google-api\vpe-start-api.ps1 -StartNgrok`** in a background shell) when the operator says "Start Project", unless the operator explicitly says "verify-only". After starting the bridge, the agent runs **`vpe-ping-api.ps1`** to generate **green `200`** access lines in the LiteLLM terminal and confirms **API is Live**.
 
 ## 2.5 Terminal Discipline (Vader Station v1.7.7)
 - **NEVER** launch external PowerShell/CMD windows for API bridging or dev servers.
 - **USE** Cursor’s integrated **Terminal** (and agent **shell** tools) — organize work with **split panes**, not pop-out consoles.
-- **Pane 1 — VPE Main Interface:** `npm run dev`
-- **Pane 2 — LiteLLM Bridge:** `.\google-api\vpe-start-api.ps1` (from repo root)
-- **Pane 3 — ngrok Tunnel:** `ngrok http 4000` (**global** command — **`google-api`** on **User PATH**; see **`scripts\vpe-add-node-launcher-user-path.ps1`**)
+- **Start Project + API:** On **Start Project** (unless the operator says **verify-only**), agents **auto-start** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** and **`.\google-api\vpe-ping-api.ps1`** per **`Start-Project.md`**. **Do not** autostart **`npm run dev`** unless the operator asks for the VPE UI.
+- **Pane 1 — VPE Main Interface:** `npm run dev` (operator-run when needed)
+- **Pane 2 — LiteLLM + ngrok (recommended):** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** from repo root (one command: LiteLLM **:4000** + ngrok sidecar; see **`google-api/README.md`**).
+- **Alternative — two panes:** **`.\google-api\vpe-start-api.ps1`** (no switch), then **`ngrok http 4000`** (**`google-api`** on **User PATH** — **`scripts\vpe-add-node-launcher-user-path.ps1`** once, reopen terminal).
+- **cmd.exe:** **`google-api\vpe-start-api.cmd`** — same PowerShell script (**`%*`** passes **`-StartNgrok`** etc.).
 
 ## 3. Tech Stack & Architecture Standards
 - **Frameworks:** Electron 28+ (Main) & Next.js 15+ Static Export (UI)
@@ -55,7 +57,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 ## 4. Active Agency & Recovery Protocols
 - **Fix Local First:** If the local environment breaks, the agent must proactively run recovery commands defined in **`package.json`** (e.g. **`npm run dev`**) rather than just listing instructions.
 - **Smoke Checks:** After any runtime change, the agent must verify `http://localhost:3000/` and report HTTP status (report 200/404/500).
-- **Command Authority:** Never reference or run scripts not currently explicitly defined in `package.json`.
+- **Command Authority:** Never reference or run scripts not currently explicitly defined in `package.json` **except** documented **`google-api/*.ps1`** launchers (**`vpe-start-api.ps1`**, **`vpe-ping-api.ps1`**, **`vpe-start-api.cmd`**) per **`Start-Project.md`** / **`TRUTH.md` §7**.
 - **Safe Cleanup:** Never run destructive `.next` cleanup while `next dev` is actively running.
 
 ## 5. Vader Protocol (Design System)
@@ -136,6 +138,14 @@ If documentation conflicts occur, follow this hierarchy strictly:
 
 ## 11. Data Schema (SQLite catalog; legacy `projects.json` shape)
 Runtime persistence is **SQLite** (`projects` table and related columns). The JSON below is the **logical** shape agents use when reasoning about a row; **authoritative columns** match `persistent-store.js` / migrations.
+
+### 🚀 VPE-JediBuild Deployment Protocol
+- **Trigger Phrase**: "Upload Build"
+- **Context**: When this phrase is used, the agent must execute the automated deployment script.
+- **Commands to Run**: 
+  1. Verify the `dist` folder exists and contains an `.exe`.
+  2. Execute: `powershell.exe -ExecutionPolicy Bypass -File "D:\Cursor_Projectz\Node-Launcher-v2\scripts\upload_build.ps1"`
+- **Expected Outcome**: The script will zip the `win-unpacked` folder, auto-increment the version (e.g., VPE-JediBuild-main-v1.2), and push the release to GitHub.
 
 **`path` (Sovereign):** The registry **`path`** is the **user repo root** string the UI and **`vpe:save-settings`** trust for persistence. **`msc_normalizePersistedProjectPath`** applies vault + `vpe-local-data` guards only — **no save-time gate** on folder existence or **`package.json`** (reclaimed / half-linked rows allowed). Stricter validation applies only for **spawn** / tooling paths.
 
