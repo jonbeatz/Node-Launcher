@@ -4,6 +4,18 @@
 
 ---
 
+## [2026-05-12] — End of Day MCP & CI Fixes
+
+**What was accomplished today:**
+- Fixed the `better-sqlite3` native module mismatch in GitHub Actions CI by introducing `npx electron-rebuild`.
+- Updated GitHub Actions to Node.js 24 to clear up deprecation warnings.
+- Overhauled MCP configurations: extracted NovaMira settings to a project-level override (`.cursor/mcp.json`).
+- Successfully integrated and tested the Tavily MCP for live web searching and security queries.
+- Documented all active tools in `.cursor/docs/MCPs.md` and added a new check-in log (`UPDATE_LOG.md`) for tracking codebase modifications over time.
+- Next session: Start by reviewing any newly logged issues in `UPDATE_LOG.md` and continue feature development on `VPE-JediBuild-v1.1`.
+
+---
+
 ## Session — 2026-05-12 (v2.2.6-SOVEREIGN · Refactor & harmonizer seal)
 
 **Git:** Documented in **`.cursor/docs/Project-Bible.md` §8**; commit message used for this wave: `Refactored Original Code Update`.
