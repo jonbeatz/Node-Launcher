@@ -10,7 +10,7 @@ The **Vader Project Engine (VPE)** is a tactical desktop command center for the 
 
 ## 🏛 1. The Constitution (Source of Truth)
 
-**Cold start:** follow **[`.cursor/docs/TRUTH.md`](.cursor/docs/TRUTH.md)** and **[`.cursorrules`](.cursorrules)**. Agent phased checklist: **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)**.
+**Cold start:** follow **[`.cursor/docs/TRUTH.md`](.cursor/docs/TRUTH.md)** and **[`.cursorrules`](.cursorrules)**. Engine cold start checklist: **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)**. Google API / LiteLLM bridge: **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)**.
 
 Hierarchy of authority:
 
