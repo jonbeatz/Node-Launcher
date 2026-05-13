@@ -1,0 +1,64 @@
+{
+  "mcpServers": {
+    "novamira-novamirav3-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@automattic/mcp-wordpress-remote@latest"
+      ],
+      "env": {
+        "WP_API_URL": "http://novamirav3.local/wp-json/mcp/mcp-adapter-default-server",
+        "WP_API_USERNAME": "novaAdmin",
+        "WP_API_PASSWORD": "YKYneKTfIXwcDyR0wWgnDBRj"
+      }
+    },
+    "novamira-novamirav4-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@automattic/mcp-wordpress-remote@latest"
+      ],
+      "env": {
+        "WP_API_URL": "http://novamirav4.local/wp-json/mcp/mcp-adapter-default-server",
+        "WP_API_USERNAME": "novaAdmin",
+        "WP_API_PASSWORD": "dnz2hsx9QG0Gim9ggxr8r5Kc"
+      }
+    },
+    "novamira-mscv2-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@automattic/mcp-wordpress-remote@latest"
+      ],
+      "env": {
+        "WP_API_URL": "https://mscv2.local/wp-json/mcp/mcp-adapter-default-server",
+        "WP_API_USERNAME": "novaAdmin",
+        "WP_API_PASSWORD": "2Gt5YYHYXlEr1LENfyZ0OWbi"
+      }
+    },
+    "novamira-mscclean-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@automattic/mcp-wordpress-remote@latest"
+      ],
+      "env": {
+        "WP_API_URL": "http://mscclean.local/wp-json/mcp/mcp-adapter-default-server",
+        "WP_API_USERNAME": "mscAdmin",
+        "WP_API_PASSWORD": "PFd81dYZtchSzT9KVTIoRrJR"
+      }
+    },
+    "msc-v1": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@automattic/mcp-wordpress-remote@latest"
+      ],
+      "env": {
+        "WP_API_URL": "http://msc-redesign-v1.local/wp-json/mcp/mcp-adapter-default-server",
+        "WP_API_USERNAME": "novaAdmin",
+        "WP_API_PASSWORD": "JxJPTqZ44Hs8I8zcPXSzwPt5"
+      }
+    }
+  }
+}
