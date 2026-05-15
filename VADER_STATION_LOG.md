@@ -4,6 +4,36 @@
 
 ---
 
+## [2026-05-15] — End Project (operator): bridge + verify + handoff
+
+- **`vpe-end-api-bridge.ps1`**: port **4000** already free; teardown complete (no stray LiteLLM/ngrok for **4000**).
+- **`npm run typecheck`**: pass.
+- **`npm run lint`**: pass (Next.js notes deprecation of `next lint`; no ESLint issues).
+- **Git:** uncommitted docs/MCP work still on tree (see **`git status`**); no commit (operator did not ask).
+
+**Next session:** **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — mandatory reads, **`npm run start-project:smoke`**, then **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**; paste new ngrok **`…/v1`** into Cursor if the tunnel URL changed.
+
+---
+
+## [2026-05-15] — MCP Infrastructure Upgrade: Figma, Firecrawl, Magic UI, and Prisma
+
+**What we did**
+- **Project `.cursor/mcp.json`:** Added **`firecrawl`**, **`docker`**, and **`google-workspace`** blocks (plus existing NovaMira WordPress MCPs). **JSON repaired** on resume: **`msc-v1`** was missing a closing **`env`** brace; removed a stray trailing **`}`**.
+- **Docs:** **`AGENTS.md`**, **`DESIGN.md`**, **`.cursor/docs/DESIGN_STANDARDS.md`**, **`.cursor/skills/`** (`git-commit.md`, `ui-generator.md`); **`MCPs.md`**, **`README.md`**, **`UPDATE_LOG.md`**, **`VADER_STATION_LOG.md`** updated.
+- **Workstation notes:** Prefer **`desktop-automation`** + **`desktop-commander`** over **`windows-mcp`** (remove **`windows-mcp`** from Cursor if it stays red). **`untitledui`**: if UI shows red, try **MCP → Refresh**; tools can still work.
+
+**Action Required (Pending API Keys / paths)**
+- **Firecrawl:** Replace placeholder in **`.cursor/mcp.json`** → **`FIRECRAWL_API_KEY`** (get key from [firecrawl.dev](https://www.firecrawl.dev/)).
+- **Figma (remote MCP):** Usually **Cursor Settings → MCP → HTTP** to Figma’s hosted endpoint per [Figma MCP help](https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server) — not always stored in this repo’s **`mcp.json`**.
+- **Postman:** **`POSTMAN_API_KEY`** in Cursor MCP settings for that server.
+- **Resend:** **`RESEND_API_KEY`** in Cursor MCP settings.
+- **Vercel:** **`VERCEL_API_TOKEN`** in Cursor MCP settings (or env for **`mcp-vercel`**).
+- **Google Workspace:** In **`.cursor/mcp.json`**, set real paths for **`GOOGLE_CREDENTIALS_PATH`** and **`GOOGLE_TOKEN_PATH`** (OAuth **`credentials.json`** + generated **`token.json`** after first auth).
+- **Postgres (local MCP):** If you use it, set a valid **`DATABASE_URL`** / connection string in that MCP’s env (local Postgres was not listening when last probed).
+- **UntitledUI PRO:** Optional **`key`** / OAuth per UntitledUI docs if you want PRO components.
+
+---
+
 ## [2026-05-15] — Start/End Project: `vpe-end-api-bridge` + port-4000 lock
 
 **What was wrong**

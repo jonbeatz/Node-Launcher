@@ -59,6 +59,34 @@
         "WP_API_USERNAME": "novaAdmin",
         "WP_API_PASSWORD": "JxJPTqZ44Hs8I8zcPXSzwPt5"
       }
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "env": {
+        "FIRECRAWL_API_KEY": "REPLACE_ME_WITH_FIRECRAWL_KEY"
+      }
+    },
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "docker-mcp"
+      ]
+    },
+    "google-workspace": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@google/mcp-server-workspace"
+      ],
+      "env": {
+        "GOOGLE_CREDENTIALS_PATH": "REPLACE_ME_WITH_PATH_TO_CREDENTIALS_JSON",
+        "GOOGLE_TOKEN_PATH": "REPLACE_ME_WITH_PATH_TO_TOKEN_JSON"
+      }
     }
   }
 }

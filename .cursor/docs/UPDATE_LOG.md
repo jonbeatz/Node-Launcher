@@ -29,6 +29,37 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 - When an MCP tool running via Python/`uvx` on Windows gives silent timeouts or decoding errors, always verify if `PYTHONIOENCODING=utf-8` is required in the environment variables.
 - Project-level MCPs automatically override or add to global MCPs when you are in that specific Cursor workspace. They live in `.cursor/mcp.json`.
 
+## [2026-05-15] - MCP Infrastructure Overhaul & Design Standards
+
+### 🛠 Fixes & Root Issues Resolved
+- **Redundant OS Tools**: 
+    - **Root Issue:** `windows-mcp` was erroring and conflicting with other desktop automation tools.
+    - **Fix:** Documented removal of `windows-mcp` in favor of more stable `desktop-automation` and `desktop-commander`.
+- **`untitledui` Connectivity**:
+    - **Root Issue:** False-positive error indicator in Cursor UI.
+    - **Fix:** Verified live tool functionality; documented that a settings refresh clears the transient error.
+
+### 📝 Updates & Improvements
+- **New MCP Servers (project `.cursor/mcp.json`)**: Added **`firecrawl`**, **`docker`**, and **`google-workspace`** alongside existing NovaMira WordPress MCPs.
+- **Design-to-Code workflow:** **`figma`**, **Magic UI**, and **Prisma** MCPs are typically wired in **Cursor global MCP** or vendor docs; **`AGENTS.md`** describes how to combine them with **`untitledui`** / **`fetch`** in prompts.
+- **Agent Instruction Layers**:
+    - Created **`DESIGN.md`** for 2026 UI/UX standards (Tailwind v4, OKLCH).
+    - Created **`AGENTS.md`** for multi-agent workflow orchestration.
+    - Created **`.cursor/skills/`** with `git-commit.md` and `ui-generator.md` for specialized agent behaviors.
+
+### 💡 Helpful Info & Notes
+- **Pending configuration** (keys / paths — see also **`VADER_STATION_LOG.md`** top entry):
+    - **`firecrawl`**: `FIRECRAWL_API_KEY` in project **`.cursor/mcp.json`**
+    - **`figma`**: Remote MCP + OAuth per Figma docs (not necessarily in repo **`mcp.json`**)
+    - **`google-workspace`**: `GOOGLE_CREDENTIALS_PATH` + `GOOGLE_TOKEN_PATH` in project **`.cursor/mcp.json`**
+    - **`postman`**: `POSTMAN_API_KEY` in Cursor MCP settings
+    - **`resend`**: `RESEND_API_KEY` in Cursor MCP settings
+    - **`vercel` / `mcp-vercel`**: `VERCEL_API_TOKEN` in Cursor MCP settings
+    - **Local `postgres` MCP**: valid DB connection string in env if you use it
+    - **UntitledUI PRO**: optional license / OAuth per vendor if you want full PRO catalog
+
+---
+
 ## [2026-05-15] - End Project bridge teardown + Start Project port recovery
 
 ### 📝 Docs & scripts

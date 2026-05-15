@@ -110,6 +110,42 @@ This document serves as a reference for all currently configured Model Context P
 **Usage Example:** Check the status of my latest Vercel deployment.
 **Status:** ❌ Needs Configuration (Requires valid VERCEL_API_TOKEN in settings)
 
+## figma-mcp
+
+**Description:** The official Figma MCP server. Connects directly to Figma's hosted endpoint to extract design layers, tokens, and code connect data.
+**Usage Example:** "Implement the selected Figma frame as a React component using Tailwind."
+**Status:** ✅ Active (Remote HTTP: https://mcp.figma.com)
+
+## magic-ui-mcp
+
+**Description:** Direct access to Magic UI's library of high-performance React + Tailwind components.
+**Usage Example:** "Add a vertical marquee of logos from Magic UI."
+**Status:** ✅ Active (npx @magicuidesign/cli install cursor)
+
+## prisma-mcp
+
+**Description:** Database management and schema introspection via Prisma.
+**Usage Example:** "List my Prisma databases and run the latest migration."
+**Status:** ✅ Active (npx prisma mcp)
+
+## firecrawl
+
+**Description:** Advanced web scraping, crawling, and search tool that turns websites into clean Markdown.
+**Usage Example:** "Search the web for the latest Next.js 16 caching patterns using firecrawl."
+**Status:** ⚠️ Needs Configuration (Requires FIRECRAWL_API_KEY in .cursor/mcp.json)
+
+## docker-mcp
+
+**Description:** Direct control over local Docker containers, images, and logs.
+**Usage Example:** "Check the logs of the postgres container and tell me why it's failing."
+**Status:** ✅ Active (npx docker-mcp)
+
+## google-workspace
+
+**Description:** Integrates with Google Sheets, Drive, and Calendar.
+**Usage Example:** "Find the 'Project Specs' doc in my Google Drive and summarize it."
+**Status:** ⚠️ Needs Configuration (Requires GOOGLE_CREDENTIALS_PATH in .cursor/mcp.json)
+
 ## untitledui
 
 **Description:** Component library reference tool for UntitledUI in React.
