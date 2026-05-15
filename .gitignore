@@ -52,10 +52,13 @@ Thumbs.db
 *.temp
 *.pid
 
-# Data and dev profiles (removed from ignore per operator request)
+# Data and dev profiles
 # .playwright-mcp/
 # /data/
-# vpe-local-data/
+
+# VPE repo-local runtime (Electron userData, cache, session — regenerates; keep out of commits)
+vpe-local-data/cache/
+vpe-local-data/
 
 src/renderer/.next/
 
