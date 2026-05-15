@@ -54,7 +54,7 @@ Thumbs.db
 
 # Data and dev profiles
 # .playwright-mcp/
-# /data/
+# Do not ignore /data/ — `data/vader.sqlite` is tracked for operator backup (catalog).
 
 # VPE repo-local runtime (Electron userData, cache, session — regenerates; keep out of commits)
 vpe-local-data/cache/
