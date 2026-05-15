@@ -56,8 +56,8 @@ The two old prompts disagreed on hex depth (`#0c0c0c` vs `#121212`, rounded vs �
 | Commands + architecture | **[`../docs/Project-Bible.md`](../docs/Project-Bible.md)** (especially **§7**) |
 | Nuke / vault repair runbooks | **[`../docs/REPAIR_PROTOCOLS.md`](../docs/REPAIR_PROTOCOLS.md)** |
 | Agent enforcement | **[`../../.cursorrules`](../../.cursorrules)** |
-| **Engine cold start** | **[`./Start-Master.md`](./Start-Master.md)** (Electron / dashboard / Bible §7) |
-| `google-api` / LiteLLM / ngrok | **[`./Start-Project.md`](./Start-Project.md)** — Agent auto-starts bridge (**`.\google-api\vpe-start-api.ps1 -StartNgrok`**) and pings for **green `200`** |
+| **Session close / bridge** | **[`./End-Project.md`](./End-Project.md)** — run **`.\google-api\vpe-end-api-bridge.ps1`** first to free **:4000** + ngrok; then log / git as requested |
+| `google-api` / LiteLLM / ngrok | **[`./Start-Project.md`](./Start-Project.md)** — Re-read mandatory docs, **`npm run start-project:smoke`**, then auto-start bridge (**`.\google-api\vpe-start-api.ps1 -StartNgrok`**) + **`vpe-ping-api.ps1`**; no **`npm run dev`** by default |
 | History | **[`../../VADER_STATION_LOG.md`](../../VADER_STATION_LOG.md)** |
 
 ---

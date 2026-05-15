@@ -1,33 +1,29 @@
 # End Project — VPE session closeout
 
-When the operator says **End Project**, **closeout**, or **end session**, execute this wrap-up ritual to ensure all work is documented, committed, and ready for the next day.
+When the operator says **End Project**, **closeout**, or **end session**, execute this wrap-up ritual so the next **Start Project** is clean (especially **LiteLLM on :4000** and **ngrok**).
 
 ## Agent procedure (canonical order)
 
-1. **Verify State:**
-   - Run `npm run typecheck` and `npm run lint` to ensure no lingering TS/lint errors remain in the `src/` tree. 
-   - Report any failures to the operator before proceeding. Do NOT commit broken code without approval.
+1. **Stop Google API bridge (LiteLLM + ngrok):** From repo root run **`pwsh -NoProfile -ExecutionPolicy Bypass -File ".\google-api\vpe-end-api-bridge.ps1"`**. This frees **TCP 4000** (stale LiteLLM) and stops **ngrok** processes whose CLI forwards to **4000**, avoiding **“port 4000 already in use”** and **ngrok ↔ Uvicorn port mismatch** on the next session. See **`google-api/README.md`** and **[`.cursor/docs/Cursor-LiteLLM-Bridge.md`](../docs/Cursor-LiteLLM-Bridge.md)**.
 
-2. **Log the Work:**
-   - Update `VADER_STATION_LOG.md` at the repo root.
-   - Add a brief bulleted summary of today's achievements, architectural decisions, or bugs squashed under a new heading with today's date.
-   - Example:
-     ```markdown
-     ## [Date] — [Brief Title]
-     - Implemented X feature using Y pattern.
-     - Fixed Z bug by updating `persistent-store.js`.
-     - Next session: Start by testing the X feature edge cases.
-     ```
+2. **Verify state (code):**
+   - Run **`npm run typecheck`** and **`npm run lint`** to ensure no lingering TS/lint errors in the tree.
+   - Report failures to the operator before proceeding.
 
-3. **Status Check:**
-   - Run `git status` to see exactly what files were modified.
+3. **Log the work:**
+   - Update **`VADER_STATION_LOG.md`** at the repo root.
+   - Add a brief bulleted summary under a new **`## [Date] — …`** heading (achievements, decisions, bugs, **next session** pointer).
 
-4. **Commit and Push:**
-   - Stage all changes (`git add .`).
-   - Draft a clear, descriptive conventional commit message based on the day's work.
-   - Commit the changes (`git commit -m "chore: end of day session sync"` or similar).
-   - Push to the current remote branch (`git push`).
+4. **Status check:** Run **`git status`** and summarize modified files.
 
-5. **Handoff:**
-   - Inform the operator that the log is updated, the code is pushed, and the session is safely archived.
-   - Provide a 1-sentence recap of what the *very first* task should be when they run **Start Project** tomorrow: follow **`Start-Project.md`** so the agent **auto-starts** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** and **`vpe-ping-api.ps1`** unless they explicitly ask for **verify-only** (paths + **:4000** probe only).
+5. **Commit and push:** Only if the operator **explicitly** asked to commit this session (per repo rules). Otherwise skip commit/push and say so in the handoff.
+
+6. **Handoff:**
+   - Confirm **API bridge stopped** (or note if operator asked to leave LiteLLM running).
+   - One-sentence **next session** pointer: follow **`Start-Project.md`** — mandatory reads, **`npm run start-project:smoke`**, then **`vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**; paste **new** ngrok **`…/v1`** into Cursor if the tunnel was restarted.
+
+---
+
+## Operator paste block (human)
+
+> **End Project.** Follow **`.cursor/prompts/End-Project.md`**. Run **`.\google-api\vpe-end-api-bridge.ps1`** from repo root. Then **`npm run typecheck`** and **`npm run lint`**, log **`VADER_STATION_LOG.md`**, **`git status`**. **Do not** commit unless I explicitly ask. Confirm bridge stopped and hand off.

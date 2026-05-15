@@ -2,7 +2,7 @@
 
 This file is the **single** “start the VPE repo / agent cold start for engine work” checklist (merged from the retired **Start-Master-Build***, **Step2–Step6**, and earlier **Start-Master** split). Deep law: **[`../docs/TRUTH.md`](../docs/TRUTH.md)** · commands: **[`../docs/Project-Bible.md`](../docs/Project-Bible.md) §7** · repairs: **[`../docs/REPAIR_PROTOCOLS.md`](../docs/REPAIR_PROTOCOLS.md)** · rules: **[`../../.cursorrules`](../../.cursorrules)**.
 
-For **`google-api` / LiteLLM / ngrok**, use **[`Start-Project.md`](./Start-Project.md)** — **default = Agent auto-starts API bridge** (`.\google-api\vpe-start-api.ps1 -StartNgrok`) and pings for green 200.
+For **`google-api` / LiteLLM / ngrok**, use **[`Start-Project.md`](./Start-Project.md)** — **default = mandatory doc reads + `npm run start-project:smoke` + Agent auto-starts API bridge** (`.\google-api\vpe-start-api.ps1 -StartNgrok`) and **`vpe-ping-api.ps1`** for green **200**. **Start Project** does **not** autostart **`npm run dev`**; use this file when you explicitly need the **VPE UI**.
 
 ---
 

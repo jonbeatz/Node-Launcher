@@ -1,0 +1,19 @@
+---
+description: When the user says Start Project / start project / cold session — mandatory doc refresh, API bridge, smoke test; never long-running dev by default.
+alwaysApply: true
+---
+
+# Start Project (VPE ritual)
+
+Treat the operator message as a **Start Project** ritual when they say **Start Project**, **start project**, **cold session**, **full bootstrap**, or clearly want the **VPE session ritual** (Google API + station context).
+
+**Canonical procedure:** follow **`.cursor/prompts/Start-Project.md`** step-for-step. Do not skip the **mandatory document reads** there.
+
+**Hard defaults**
+
+1. **Re-read** the files listed in **Start-Project.md** (full context refresh) using the editor **Read** tool before executing shells or claiming the repo state.
+2. **Do not** run **`npm run dev`**, **`npm run vader:dev`**, or other long-running Electron + Next dev servers unless the operator **explicitly** asks for the **VPE UI**, **dashboard**, **renderer dev**, or similar.
+3. **Do** run **`npm run start-project:smoke`** as the default health check (TypeScript + SQLite migration verification).
+4. **Do** start the **API bridge** per **Start-Project.md** (**`.\google-api\vpe-start-api.ps1 -StartNgrok`** in a background shell, then **`vpe-ping-api.ps1`**) unless the operator says **verify-only** or **:4000** already serves **`/v1/models`**. If start fails **port 4000 in use**, run **`.\google-api\vpe-end-api-bridge.ps1`** first, then retry **`vpe-start-api.ps1 -StartNgrok`**.
+
+The **sessionStart** hook only prints a banner; it does **not** start LiteLLM.

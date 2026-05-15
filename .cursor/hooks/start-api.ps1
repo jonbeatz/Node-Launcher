@@ -1,4 +1,4 @@
-# VPE — sessionStart hook: banner only (does not spawn LiteLLM). Start Project = agent auto-starts bridge per Start-Project.md unless verify-only.
+# VPE — sessionStart hook: banner only (does not spawn LiteLLM). Start Project = agent: mandatory doc reads + npm run start-project:smoke + API bridge per Start-Project.md unless verify-only.
 
 $ErrorActionPreference = 'Stop'
 $hooksDir = $PSScriptRoot
@@ -6,10 +6,10 @@ $repoRoot = (Resolve-Path (Join-Path $hooksDir '..\..')).Path
 $starter = Join-Path $repoRoot 'google-api\vpe-start-api.ps1'
 
 Write-Host '────────────────────────────────────────' -ForegroundColor DarkRed
-Write-Host ' VPE · sessionStart — Start Project = Auto-start API bridge' -ForegroundColor Cyan
+Write-Host ' VPE · sessionStart — Start Project = Docs + smoke + API bridge' -ForegroundColor Cyan
 Write-Host '────────────────────────────────────────' -ForegroundColor DarkRed
-Write-Host '  Default: follow .cursor\prompts\Start-Project.md (Agent will start the API).' -ForegroundColor Green
-Write-Host '  Optional VPE UI: npm run dev' -ForegroundColor DarkGray
+Write-Host '  Default: .cursor\prompts\Start-Project.md — Read mandatory docs, npm run start-project:smoke, then API.' -ForegroundColor Green
+Write-Host '  VPE UI (when you need it): npm run dev  |  Forge: npm run vader:dev' -ForegroundColor DarkGray
 Write-Host '  Optional API (when YOU need Vertex bridge):' -ForegroundColor DarkYellow
 Write-Host '    .\google-api\vpe-start-api.ps1 -StartNgrok   (repo root)' -ForegroundColor White
 Write-Host '    Or: .\google-api\vpe-start-api.ps1  then  ngrok http 4000' -ForegroundColor DarkGray

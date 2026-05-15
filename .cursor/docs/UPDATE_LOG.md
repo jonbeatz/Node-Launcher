@@ -29,6 +29,35 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 - When an MCP tool running via Python/`uvx` on Windows gives silent timeouts or decoding errors, always verify if `PYTHONIOENCODING=utf-8` is required in the environment variables.
 - Project-level MCPs automatically override or add to global MCPs when you are in that specific Cursor workspace. They live in `.cursor/mcp.json`.
 
+## [2026-05-15] - End Project bridge teardown + Start Project port recovery
+
+### 📝 Docs & scripts
+- **`google-api/vpe-end-api-bridge.ps1`**: free **:4000**, stop matching **ngrok**; **`.gitignore`** allowlist; **`.cursorrules`** Command Authority.
+- **`End-Project.md`**: step 1 = teardown; **commit/push only if operator asked** (align repo rules); **operator paste block**.
+- **`Start-Project.md`** + **`start-project-ritual.mdc`**: **`Cursor-LiteLLM-Bridge.md`** in mandatory reads; bridge steps renumbered; **`vpe-end-api-bridge`** before retry on port conflict; default **operator paste** includes **`Cursor-LiteLLM-Bridge.md`** + port recovery.
+- **`Cursor-LiteLLM-Bridge.md`**: **Sovereign fix summary** table.
+- **`TRUTH.md`** §7, **`Project-Bible.md`** §8, **`README.md`** §1: aligned with mandatory reads, **`vpe-end-api-bridge`**, and **`vpe-start-api`** preflight (**`PORT`**, **:4000** lock).
+
+---
+
+## [2026-05-14] - Cursor ↔ LiteLLM: `ERROR_PROVIDER_ERROR` runbook
+
+### 📝 Docs
+- Added **[`.cursor/docs/Cursor-LiteLLM-Bridge.md`](./Cursor-LiteLLM-Bridge.md)** — OpenAI override must use **`…/v1`** (not **`…/cursor`**) for Gemini 3 on LiteLLM **1.83.x**; **`POST /cursor/chat/completions`** can **500** while **`/v1/chat/completions`** and **`/v1/responses`** succeed; ngrok / Agent vs Ask / key path notes; **stale ngrok (ERR_NGROK_3200)** as #1 “worked yesterday” failure.
+- Added **`google-api/vpe-verify-public-url.ps1`** — fails fast when Cursor’s ngrok **`/v1/models`** URL is offline (**ERR_NGROK_3200**). **`vpe-start-api.ps1 -StartNgrok`** now prints a **Cursor must update URL** reminder. **`vpe-print-cursor-settings.ps1`** warns that ngrok hostnames expire when the tunnel stops.
+
+---
+
+## [2026-05-14] - Start Project ritual: doc re-read + smoke script + no dev autostart
+
+### 📝 Docs & tooling
+- **`npm run start-project:smoke`**: **`typecheck`** + **`test:migrations`** — default agent health check on **Start Project** (no Next/Electron dev).
+- **`.cursor/prompts/Start-Project.md`**: mandatory ordered **Read** list, smoke step, API bridge, **verify-only** still runs smoke + probes **:4000** only.
+- **`.cursor/rules/start-project-ritual.mdc`**: **`alwaysApply: true`** reinforcement.
+- **Aligned:** **`.cursorrules`**, **`TRUTH.md` §7**, **`Project-Bible.md` §7–§8**, **`README.md`**, **`VADER_STATION_LOG.md`**, **`Start-Master.md`**, **`Goalz.md`**, **`google-api/README.md`**, **`End-Project.md`**, **`.cursor/hooks/start-api.ps1`** banner.
+
+---
+
 ## [2026-05-13] - Automated Build System Implemented
 
 ### 🛠 Features & Logic

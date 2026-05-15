@@ -68,6 +68,7 @@ Single reference for **maintenance, vault, and build** flows. Authoritative list
 | **`npm run vader:deploy`** | Full deploy | **`vader:clean-sync`** then **`build:win`**—maximum hygiene before packaging. |
 | **`npm run build:win`** | Package only | Assumes tree is already verified; runs **`build:main`** (renderer prebuild + electron-builder). |
 | **`npm run typecheck`** | Renderer TS | `tsc --noEmit` on `src/renderer`. |
+| **`npm run start-project:smoke`** | Start Project smoke | **`typecheck`** then **`test:migrations`** — default agent health check on **Start Project**; does **not** start Next/Electron dev. |
 | **`npm run rebuild:natives`** | Native modules | **`electron-rebuild -f -o better-sqlite3`** when the SQLite binary mismatches Node/Electron. |
 | **`npm run test:migrations`** | SQLite schema check | Verifies SQLite schema is at the correct version (v17 SOVEREIGN) before boot. |
 
@@ -100,10 +101,12 @@ Unix-style manual reset (no npm script): `rm -rf node_modules .next dist && npm 
 
 ### Google API bridge — operator commands & invariants (2026-05-13)
 
-- **Start API (preferred):** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** from repo root — **LiteLLM :4000** + **ngrok** in one step. **Start Project default:** agents run the same command plus **`vpe-ping-api.ps1`** unless **verify-only** — see **`Start-Project.md`**. **cmd:** **`google-api\vpe-start-api.cmd -StartNgrok`**. **Fallback:** **`vpe-start-api.ps1`** + second terminal **`ngrok http 4000`**.
+- **Start API (preferred):** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** from repo root — **LiteLLM :4000** + **ngrok** in one step. **Start Project default:** agents **re-read** mandatory docs (**`Start-Project.md`** list, including **`Cursor-LiteLLM-Bridge.md`**), run **`npm run start-project:smoke`**, then the same API command plus **`vpe-ping-api.ps1`** unless **verify-only** — see **`Start-Project.md`**. **Do not** autostart **`npm run dev`** on **Start Project**. **cmd:** **`google-api\vpe-start-api.cmd -StartNgrok`**. **Fallback:** **`vpe-start-api.ps1`** + second terminal **`ngrok http 4000`**. If start fails **port 4000 in use**, run **`.\google-api\vpe-end-api-bridge.ps1`** then retry.
+- **End API / clean session:** **`.\google-api\vpe-end-api-bridge.ps1`** — first step of **`End-Project.md`**: frees **:4000** and stops **ngrok** forwarding to **4000** so the next start does not collide with a zombie LiteLLM or wrong tunnel target.
 - **Do not** use **`cd /d ... &&`** inside **PowerShell** to launch the API ( **`cd /d`** is **cmd** only); use **`Set-Location`** to repo root or **`pwsh -File "<fullpath>\google-api\vpe-start-api.ps1"`**.
 - **Vertex:** **`litellm_config.yaml`** keeps **`vader-31-pro`** / **`vader-3-flash`** on **`gemini-3.1-pro-preview`** / **`gemini-3-flash-preview`** with **`vertex_location: global`**. Changing only the region to **`us-central1`** without changing the model ID will **not** restore a “broken” bridge — it will break Gemini 3 preview.
 - **Verify bridge:** **`GET http://127.0.0.1:4000/v1/models`** with **`Authorization: Bearer <master_key>`** from **`litellm_config.yaml`**; optional **`POST /v1/chat/completions`** with **`vader-3-flash`**. Public URL: **`ngrok-skip-browser-warning: true`** + same **`Authorization`** header. To see **green 200** access lines in the LiteLLM terminal, run **`.\google-api\vpe-ping-api.ps1`** in a second pane while LiteLLM runs in the first.
+- **Cursor + `vader-*` models:** **[`.cursor/docs/Cursor-LiteLLM-Bridge.md`](./Cursor-LiteLLM-Bridge.md)** — base URL **`…/v1`**, **`ERROR_PROVIDER_ERROR`** triage, **`/cursor` adapter caveat** with Gemini 3. **`.\google-api\vpe-print-cursor-settings.ps1`** prints paste-ready Cursor values. **`.\google-api\vpe-verify-public-url.ps1`** checks ngrok URLs are still live (**ERR_NGROK_3200** when tunnel stopped).
 
 ---
 

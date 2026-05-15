@@ -71,6 +71,9 @@ google-api/*
 !google-api/vpe-start-api.ps1
 !google-api/vpe-start-api.cmd
 !google-api/vpe-ping-api.ps1
+!google-api/vpe-print-cursor-settings.ps1
+!google-api/vpe-verify-public-url.ps1
+!google-api/vpe-end-api-bridge.ps1
 !google-api/README.md
 # Legacy root paths (if old copies remain)
 gcp_key.json

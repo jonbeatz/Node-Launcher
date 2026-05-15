@@ -4,6 +4,36 @@
 
 ---
 
+## [2026-05-15] — Start/End Project: `vpe-end-api-bridge` + port-4000 lock
+
+**What was wrong**
+- **Cursor** looked fine but **LiteLLM** sometimes listened on a **non-4000** port while **ngrok** still targeted **4000**, or **4000** stayed occupied by a **zombie** proxy → provider errors or failed starts.
+
+**What we did**
+- **`google-api/vpe-end-api-bridge.ps1`**: stop **TCP listeners on 4000** and **ngrok** CLIs forwarding **`http … 4000`**. Wired into **`.cursor/prompts/End-Project.md`** step 1 and **Start-Project** “port in use” recovery.
+- **`vpe-start-api.ps1`**: preflight **reject** if **4000** busy; **clear `PORT`** env; reminder line for **Uvicorn must be `:4000`**.
+- **Mandatory read** added: **`Cursor-LiteLLM-Bridge.md`** in **Start-Project.md**; **Sovereign fix summary** table in that bridge doc.
+
+---
+
+## [2026-05-14] — Cursor `ERROR_PROVIDER_ERROR` + LiteLLM `/v1` vs `/cursor`
+
+**What changed**
+- **Runbook:** **[`.cursor/docs/Cursor-LiteLLM-Bridge.md`](.cursor/docs/Cursor-LiteLLM-Bridge.md)** — Cursor OpenAI override should use **`http://127.0.0.1:4000/v1`** (or **`https://<tunnel>/v1`**), **`master_key`** as API key, exact model IDs **`vader-3-flash`** / **`vader-31-pro`**. Avoid **`…/cursor`** base with Gemini 3 on LiteLLM **1.83.x** (adapter can **500**).
+- **Verified locally:** **`POST /v1/chat/completions`** and **`POST /v1/responses`** succeed for **`vader-3-flash`**; **`POST /cursor/chat/completions`** returned **500** with transform error on same stack.
+
+---
+
+## [2026-05-14] — Start Project: mandatory doc re-read + smoke default (no dev autostart)
+
+**What changed**
+- **Start Project** now requires agents to **Read** the full mandatory doc set in order (**`README.md`**, **`.cursorrules`**, **`TRUTH.md`**, **`Project-Bible.md`**, **`REPAIR_PROTOCOLS.md`** skim, **`VADER_STATION_LOG.md`**, **`google-api/README.md`**, **`Start-Master.md`** skim) before shells — see **`.cursor/prompts/Start-Project.md`**.
+- **Default health check:** **`npm run start-project:smoke`** (**`typecheck`** + **`test:migrations`**) — **not** **`npm run dev`** / **`vader:dev`** unless the operator explicitly asks for the **VPE UI**.
+- **Enforcement:** **`.cursor/rules/start-project-ritual.mdc`** (**`alwaysApply: true`**) + **`.cursorrules`** + **`TRUTH.md` §7** + **`README.md`** §1 aligned.
+- **API bridge** unchanged in spirit: **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only** or **:4000** already up.
+
+---
+
 ## [2026-05-13] — Start Project protocol: Agent Auto-starts API
 
 **What changed**
@@ -20,7 +50,7 @@
 - Plugin MCP audit: **Stripe / Notion / Atlassian** stay **Needs authentication** until **Connect**; **Vercel** already authenticated; **Tavily** search works with API key.
 - **Cursor Settings → Plugin MCP Servers:** entries have no trash can because they come from **installed Cursor plugins** — remove from the list by **uninstalling that plugin** (or leave unauthenticated entries; they stay inert).
 
-**Next session:** **Start Project** per **`.cursor/prompts/Start-Project.md`** — agent runs **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless the operator says **verify-only**.
+**Next session:** **Start Project** per **`.cursor/prompts/Start-Project.md`** — mandatory **Read** of listed docs, **`npm run start-project:smoke`**, then **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**. No autostart **`npm run dev`** unless you want the UI.
 
 ---
 
@@ -157,7 +187,7 @@
 2. **Regression:** Smoke an **old Node-Launcher / pre–2.1.0** checkout or packaged build — confirm **Iron Curtain** (`main.js`) exits cleanly (**`dialog.showErrorBox`** + **`process.exit(0)`**) and does **not** crash into vault sync / wipes. Use **`VPE_SKIP_IRON_CURTAIN=1`** only for intentional legacy debugging on this tree.
 3. **Optional:** Wire UI for **`vpe:repair-vault-links`** (already in main) if operators need a button beside maintenance purge.
 
-**Start Project / full context:** Follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — **default = agent auto-starts API:** **`.cursorrules`** → **`.cursor/docs/TRUTH.md`** §7 → **`.cursor/docs/Project-Bible.md`** §7 / §8 → verify **`google-api/`** + PATH → **`VADER_STATION_LOG.md`**. Unless the operator says **verify-only**, agents run **`.\google-api\vpe-start-api.ps1 -StartNgrok`**, then **`.\google-api\vpe-ping-api.ps1`**, and report **API is Live**. **Engine / Electron cold start only:** **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)**.
+**Start Project / full context:** Follow **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** + **`.cursor/rules/start-project-ritual.mdc`**. Agents **Read** mandatory docs in order, run **`npm run start-project:smoke`**, then unless **verify-only** start **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** and report **API is Live**. **Do not** autostart **`npm run dev`** / **`vader:dev`**. **Engine / UI when needed:** **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)**.
 
 ---
 

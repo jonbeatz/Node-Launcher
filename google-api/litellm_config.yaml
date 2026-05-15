@@ -2,6 +2,9 @@
 # Model IDs: see https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models
 # Gemini 3.x preview models use the global Vertex endpoint (vertex_location: global), not regional.
 #
+# Cursor IDE: set Override OpenAI Base URL to http://127.0.0.1:4000/v1 (or https://<ngrok>/v1).
+# Do NOT use …/cursor as the base for Gemini 3 on LiteLLM 1.83.x — see .cursor/docs/Cursor-LiteLLM-Bridge.md
+#
 # drop_params: Cursor / OpenAI clients often send params Gemini 3 does not accept on Vertex
 # (e.g. frequency_penalty, presence_penalty, parallel_tool_calls=false with multiple tools).
 # Stripping those avoids Vertex 400 INVALID_ARGUMENT. See google-api/README.md.

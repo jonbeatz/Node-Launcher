@@ -10,7 +10,12 @@ The **Vader Project Engine (VPE)** is a tactical desktop command center for the 
 
 ## 🏛 1. The Constitution (Source of Truth)
 
-**Cold start:** follow **[`.cursor/docs/TRUTH.md`](.cursor/docs/TRUTH.md)** and **[`.cursorrules`](.cursorrules)**. Engine cold start checklist: **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)**. Google API / LiteLLM bridge: **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)**.
+**Cold start:** follow **[`.cursor/docs/TRUTH.md`](.cursor/docs/TRUTH.md)** and **[`.cursorrules`](.cursorrules)**.
+
+- **Start Project** (in Agent chat — full station + API context): **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — agents **re-read** the listed docs (including **`Cursor-LiteLLM-Bridge.md`**), run **`npm run start-project:smoke`** ( **`typecheck`** + **`test:migrations`** ), start **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**. If **port 4000 in use**, run **`.\google-api\vpe-end-api-bridge.ps1`** then retry start. **Default:** no **`npm run dev`** until you ask for the **VPE UI**.
+- **End Project** (session close — clean next Start): **[`.cursor/prompts/End-Project.md`](.cursor/prompts/End-Project.md)** — run **`.\google-api\vpe-end-api-bridge.ps1`** first to free **:4000** and matching **ngrok**.
+- **Engine / UI dev** (when you want the dashboard): **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)** — **`npm run dev`** or **`npm run vader:dev`**.
+- **Google API** details: **`google-api/README.md`**. **Cursor + `vader-*` models:** **[`.cursor/docs/Cursor-LiteLLM-Bridge.md`](.cursor/docs/Cursor-LiteLLM-Bridge.md)**.
 
 Hierarchy of authority:
 
@@ -27,7 +32,7 @@ Hierarchy of authority:
 
 ### Local development URL
 
-**`npm run dev`** or **`npm run vader:dev`** — Electron + Next renderer; default Next dev URL **`http://localhost:3000`**. Managed projects use **other ports** (not `3000`).
+**`npm run dev`** or **`npm run vader:dev`** — Electron + Next renderer; default Next dev URL **`http://localhost:3000`**. Managed projects use **other ports** (not `3000`). These are **not** started automatically on **Start Project**; use **`npm run start-project:smoke`** for a quick health check instead.
 
 ### Tech stack (summary)
 

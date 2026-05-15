@@ -77,6 +77,19 @@ Write-VpeLine "GOOGLE_APPLICATION_CREDENTIALS -> $KeyPathResolved" "Green"
 Write-VpeLine "LiteLLM config -> $ConfigPath" "Green"
 Write-VpeLine "Listen port -> $Port" "Green"
 
+# ngrok forwards to $Port — LiteLLM MUST bind the same port. If another proxy is on $Port, a second
+# LiteLLM may bind elsewhere (e.g. 16027) while ngrok still hits $Port -> Cursor ERROR_PROVIDER_ERROR.
+$busy = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+if ($busy.Count -gt 0) {
+    Write-VpeLine "[VPE ERROR] TCP port $Port is already in use (another LiteLLM or dev server)." "Red"
+    Write-VpeLine "  Stop it, then re-run. ngrok is configured for http://127.0.0.1:$Port — mismatched ports break Cursor." "Yellow"
+    exit 1
+}
+if (Test-Path Env:PORT) {
+    Write-VpeLine "[VPE WARN] Removing env PORT=$($env:PORT) so Uvicorn uses --port $Port (not a random port)." "Yellow"
+    Remove-Item Env:\PORT
+}
+
 if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
     Write-VpeLine "[VPE WARN] ngrok not on PATH - run scripts\vpe-add-node-launcher-user-path.ps1 once, or use google-api\ngrok.exe from this folder." "Yellow"
 }
@@ -92,7 +105,15 @@ if ($StartNgrok) {
         try {
             $tunnels = Invoke-RestMethod -Uri 'http://127.0.0.1:4040/api/tunnels' -TimeoutSec 5
             $pub = $tunnels.tunnels | Where-Object { $_.proto -eq 'https' } | Select-Object -First 1 -ExpandProperty public_url
-            if ($pub) { Write-VpeLine "[VPE] ngrok public URL -> $pub" "Green" }
+            if ($pub) {
+                Write-VpeLine "[VPE] ngrok public URL -> $pub" "Green"
+                Write-VpeLine "" "White"
+                Write-VpeLine "[VPE CRITICAL] Cursor 'Override OpenAI Base URL' must be: $($pub.TrimEnd('/'))/v1" "Yellow"
+                Write-VpeLine "  Free ngrok hostnames DIE when this tunnel stops. If Cursor breaks tomorrow, run:" "DarkYellow"
+                Write-VpeLine "    .\google-api\vpe-verify-public-url.ps1 -BaseUrl '<paste Cursor URL here>'" "Cyan"
+                Write-VpeLine "  Then re-start ngrok + LiteLLM and paste the NEW URL into Cursor Models." "DarkYellow"
+                Write-VpeLine "" "White"
+            }
         } catch {
             Write-VpeLine "[VPE WARN] ngrok inspector not ready yet — open http://127.0.0.1:4040 for the public URL." "Yellow"
         }
@@ -110,5 +131,6 @@ if ($StartNgrok) {
 }
 
 Write-VpeLine "[VPE STANDBY] Starting LiteLLM (Vertex backend per litellm_config.yaml)..." "Green"
+Write-VpeLine "[VPE] After startup: Uvicorn MUST show http://0.0.0.0:$Port — if you see a different port, stop duplicate LiteLLM and re-run." "DarkYellow"
 Set-Location -LiteralPath $ScriptRootSafe
 & litellm --config "./litellm_config.yaml" --port $Port

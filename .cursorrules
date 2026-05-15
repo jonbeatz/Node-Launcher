@@ -22,17 +22,17 @@ If documentation conflicts occur, follow this hierarchy strictly:
 
 **Documentation layout (v2.2.6-SOVEREIGN):** The canonical reference docs live directly under **`.cursor/docs/`**: **`TRUTH.md`** (constitution), **`Project-Bible.md`** (architecture + script lexicon), **`REPAIR_PROTOCOLS.md`** (nuke/vault guides). **`VADER_STATION_LOG.md`** lives at **repo root**. (Legacy subfolders like `core/`, `guides/`, and loose root files like `API-SetUp-Master.md` have been archived or merged into the TRUTH/Bible trio).
 
-**Session bootstrap (cold start):** For VPE codebase / Electron-only cold starts (dashboard, IPC, PM2, no API bridge), follow **`.cursor/prompts/Start-Master.md`**. If working on the LiteLLM API bridge (google-api), use **`.cursor/prompts/Start-Project.md`**.
+**Session bootstrap (cold start):** Full station + API context: **`.cursor/prompts/Start-Project.md`** (mandatory doc reads, **`npm run start-project:smoke`**, API bridge). VPE codebase / Electron UI work **after** that ritual: **`.cursor/prompts/Start-Master.md`**. If the operator only says **Start Project**, **do not** auto-start **`npm run dev`** / **`npm run vader:dev`** — they ask for the **VPE UI** explicitly.
 
 **Critical:** Before performing any build, deployment, or environment setup, read and adhere to the scripts and protocols in **`Project-Bible.md` §7** and **`REPAIR_PROTOCOLS.md`**.
 
-**Start Project — default (agent runs API):** Canonical ritual is **`.cursor/prompts/Start-Project.md`**. Agents **automatically start** the API bridge (**`.\google-api\vpe-start-api.ps1 -StartNgrok`** in a background shell) when the operator says "Start Project", unless the operator explicitly says "verify-only". After starting the bridge, the agent runs **`vpe-ping-api.ps1`** to generate **green `200`** access lines in the LiteLLM terminal and confirms **API is Live**.
+**Start Project — default (agent runs API + smoke, not dev):** Canonical ritual is **`.cursor/prompts/Start-Project.md`** and **`.cursor/rules/start-project-ritual.mdc`**. When the operator says **Start Project** / **start project** / **cold session** / **full bootstrap**, agents **first** **Read** every file listed there ( **`README.md`**, **`.cursorrules`**, **`TRUTH.md`**, **`Project-Bible.md`**, **`REPAIR_PROTOCOLS.md`** skim, **`VADER_STATION_LOG.md`**, **`google-api/README.md`**, **`Start-Master.md`** skim). Then run **`npm run start-project:smoke`**. Then **automatically start** the API bridge (**`.\google-api\vpe-start-api.ps1 -StartNgrok`** in a background shell) unless **verify-only** or **:4000** already returns **200** for **`/v1/models`**. After starting the bridge, run **`vpe-ping-api.ps1`** for **green `200`** lines and confirm **API is Live**. **Do not** run **`npm run dev`** / **`npm run vader:dev`** unless the operator explicitly requests the **VPE UI** / **dashboard** / **Electron dev**.
 
 ## 2.5 Terminal Discipline (Vader Station v1.7.7)
 - **NEVER** launch external PowerShell/CMD windows for API bridging or dev servers.
 - **USE** Cursor’s integrated **Terminal** (and agent **shell** tools) — organize work with **split panes**, not pop-out consoles.
-- **Start Project + API:** On **Start Project** (unless the operator says **verify-only**), agents **auto-start** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** and **`.\google-api\vpe-ping-api.ps1`** per **`Start-Project.md`**. **Do not** autostart **`npm run dev`** unless the operator asks for the VPE UI.
-- **Pane 1 — VPE Main Interface:** `npm run dev` (operator-run when needed)
+- **Start Project + API:** On **Start Project** (unless **verify-only**), agents follow **`Start-Project.md`**: **mandatory doc reads** → **`npm run start-project:smoke`** → **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`.\google-api\vpe-ping-api.ps1`** when the bridge is not already up. **Do not** autostart **`npm run dev`** / **`npm run vader:dev`** unless the operator explicitly asks for the **VPE UI**.
+- **Pane 1 — VPE Main Interface:** **`npm run dev`** or **`npm run vader:dev`** — **operator-requested only** (not part of the default **Start Project** ritual).
 - **Pane 2 — LiteLLM + ngrok (recommended):** **`.\google-api\vpe-start-api.ps1 -StartNgrok`** from repo root (one command: LiteLLM **:4000** + ngrok sidecar; see **`google-api/README.md`**).
 - **Alternative — two panes:** **`.\google-api\vpe-start-api.ps1`** (no switch), then **`ngrok http 4000`** (**`google-api`** on **User PATH** — **`scripts\vpe-add-node-launcher-user-path.ps1`** once, reopen terminal).
 - **cmd.exe:** **`google-api\vpe-start-api.cmd`** — same PowerShell script (**`%*`** passes **`-StartNgrok`** etc.).
@@ -55,9 +55,9 @@ If documentation conflicts occur, follow this hierarchy strictly:
 - **API assets:** **`ngrok.exe`**, **`vpe-start-api.ps1`**, **`litellm_config.yaml`**, **`gcp_key.json`** — **only** under **`google-api/`** (no second copy at repo root; **`scripts/vpe-verify-ngrok-path.ps1`** only verifies PATH).
 
 ## 4. Active Agency & Recovery Protocols
-- **Fix Local First:** If the local environment breaks, the agent must proactively run recovery commands defined in **`package.json`** (e.g. **`npm run dev`**) rather than just listing instructions.
-- **Smoke Checks:** After any runtime change, the agent must verify `http://localhost:3000/` and report HTTP status (report 200/404/500).
-- **Command Authority:** Never reference or run scripts not currently explicitly defined in `package.json` **except** documented **`google-api/*.ps1`** launchers (**`vpe-start-api.ps1`**, **`vpe-ping-api.ps1`**, **`vpe-start-api.cmd`**) per **`Start-Project.md`** / **`TRUTH.md` §7**.
+- **Fix Local First:** If the local environment breaks, the agent must proactively run recovery commands defined in **`package.json`** (e.g. **`npm run start-project:smoke`**, **`npm run vpe:nuke-install`**, or **`npm run dev`** when the operator needs the UI) rather than just listing instructions.
+- **Smoke checks:** **Start Project** default: **`npm run start-project:smoke`** ( **`typecheck`** + **`test:migrations`** ) — **not** **`npm run dev`**. After **renderer/runtime** changes where a running dev server is in scope, verify **`http://localhost:3000/`** and report HTTP status when a dev server is already running or the operator asked you to start one.
+- **Command Authority:** Never reference or run scripts not currently explicitly defined in `package.json` **except** documented **`google-api/*.ps1`** launchers (**`vpe-start-api.ps1`**, **`vpe-ping-api.ps1`**, **`vpe-print-cursor-settings.ps1`**, **`vpe-verify-public-url.ps1`**, **`vpe-end-api-bridge.ps1`**, **`vpe-start-api.cmd`**) per **`Start-Project.md`** / **`End-Project.md`** / **`TRUTH.md` §7** / **`Cursor-LiteLLM-Bridge.md`**.
 - **Safe Cleanup:** Never run destructive `.next` cleanup while `next dev` is actively running.
 
 ## 5. Vader Protocol (Design System)

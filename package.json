@@ -34,6 +34,7 @@
     "build:renderer": "next build src/renderer",
     "lint": "next lint src/renderer",
     "test:migrations": "cross-env ELECTRON_RUN_AS_NODE=1 electron test/verify-migrations.js",
+    "start-project:smoke": "npm run typecheck && npm run test:migrations",
     "vault:reconcile-msc": "cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/vault-reconcile-msc-media-pro.cjs",
     "test:e2e": "playwright test",
     "test:e2e:electron": "npm run build:renderer && playwright test --config=playwright.electron.config.ts",
