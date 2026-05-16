@@ -110,12 +110,6 @@ This document serves as a reference for all currently configured Model Context P
 **Usage Example:** Check the status of my latest Vercel deployment.
 **Status:** ❌ Needs Configuration (Requires valid VERCEL_API_TOKEN in settings)
 
-## figma-mcp
-
-**Description:** The official Figma MCP server. Connects directly to Figma's hosted endpoint to extract design layers, tokens, and code connect data.
-**Usage Example:** "Implement the selected Figma frame as a React component using Tailwind."
-**Status:** ✅ Active (Remote HTTP: https://mcp.figma.com)
-
 ## magic-ui-mcp
 
 **Description:** Direct access to Magic UI's library of high-performance React + Tailwind components.
@@ -139,6 +133,18 @@ This document serves as a reference for all currently configured Model Context P
 **Description:** Direct control over local Docker containers, images, and logs.
 **Usage Example:** "Check the logs of the postgres container and tell me why it's failing."
 **Status:** ✅ Active (npx docker-mcp)
+
+## animate-ui-mcp
+
+**Description:** Official Shadcn/UI and Animate UI registry MCP. Allows the agent to search and install high-quality animated components directly into the codebase.
+**Usage Example:** "Search for an animated button in animate-ui and install it."
+**Status:** ✅ Active (npx shadcn@latest mcp)
+
+## agent-browser
+
+**Description:** High-efficiency Rust-based browser automation. Uses compact accessibility trees to minimize context usage while controlling Chrome.
+**Usage Example:** "Open firecrawl.dev and take a snapshot using agent-browser."
+**Status:** ✅ Active (npx agent-browser serve)
 
 ## google-workspace
 
@@ -171,12 +177,6 @@ This document serves as a reference for all currently configured Model Context P
 **Status:** ✅ Active
 
 ## desktop-automation
-
-**Description:** Deep Windows OS integration allowing the AI to launch apps, manage windows, press keys, and check processes.
-**Usage Example:** Use windows-mcp to list all running processes consuming more than 1GB of RAM.
-**Status:** ✅ Active
-
-## windows-mcp
 
 **Description:** Deep Windows OS integration allowing the AI to launch apps, manage windows, press keys, and check processes.
 **Usage Example:** Use windows-mcp to list all running processes consuming more than 1GB of RAM.

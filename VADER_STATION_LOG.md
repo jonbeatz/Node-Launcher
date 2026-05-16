@@ -24,7 +24,7 @@
 
 **Action Required (Pending API Keys / paths)**
 - **Firecrawl:** Replace placeholder in **`.cursor/mcp.json`** → **`FIRECRAWL_API_KEY`** (get key from [firecrawl.dev](https://www.firecrawl.dev/)).
-- **Figma (remote MCP):** Usually **Cursor Settings → MCP → HTTP** to Figma’s hosted endpoint per [Figma MCP help](https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server) — not always stored in this repo’s **`mcp.json`**.
+- **Figma (remote MCP):** [RETIRED] Removed from Sovereign workflow.
 - **Postman:** **`POSTMAN_API_KEY`** in Cursor MCP settings for that server.
 - **Resend:** **`RESEND_API_KEY`** in Cursor MCP settings.
 - **Vercel:** **`VERCEL_API_TOKEN`** in Cursor MCP settings (or env for **`mcp-vercel`**).

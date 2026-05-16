@@ -4,11 +4,12 @@ This document defines the high-end design standards for the Vader Project Engine
 
 ## Modern Tech Stack (2026)
 
-- **Framework:** Next.js 16 (App Router, PPR, Cache Components)
+- **Framework:** Next.js 16 (App Router + PPR + Cache Components)
 - **Styling:** Tailwind CSS v4 (Zero-runtime, OKLCH colors, Container Queries)
-- **UI Components:** Magic UI, Shadcn/UI (Customized), UntitledUI
-- **Animations:** Framer Motion (Motion for React), React Bits
+- **UI Registries:** Animate UI, Shadcn/UI, UntitledUI, ForgeUI, Cult UI
+- **Animations:** Motion for React (Framer), React Bits
 - **Icons:** Lucide React, SVGL (Brand Assets)
+- **Linter:** `@google/design.md` (Design system validation)
 
 ## Design System Tokens
 

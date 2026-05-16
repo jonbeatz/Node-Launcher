@@ -67,7 +67,7 @@
         "firecrawl-mcp"
       ],
       "env": {
-        "FIRECRAWL_API_KEY": "REPLACE_ME_WITH_FIRECRAWL_KEY"
+        "FIRECRAWL_API_KEY": "fc-3a0a2170a03047e4b3511126e1391541"
       }
     },
     "docker": {
@@ -87,6 +87,22 @@
         "GOOGLE_CREDENTIALS_PATH": "REPLACE_ME_WITH_PATH_TO_CREDENTIALS_JSON",
         "GOOGLE_TOKEN_PATH": "REPLACE_ME_WITH_PATH_TO_TOKEN_JSON"
       }
+    },
+    "agent-browser": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "agent-browser",
+        "serve"
+      ]
+    },
+    "animate-ui": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "shadcn@latest",
+        "mcp"
+      ]
     }
   }
 }
