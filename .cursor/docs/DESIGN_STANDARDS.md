@@ -4,17 +4,18 @@ This document defines the high-end design standards for the Vader Project Engine
 
 ## Modern Tech Stack (2026)
 
-- **Framework:** Next.js 16 (App Router + PPR + Cache Components)
-- **Styling:** Tailwind CSS v4 (Zero-runtime, OKLCH colors, Container Queries)
+- **Framework:** Next.js 15 (Stable Release)
+- **Styling:** Tailwind CSS v3.4 (Stable Baseline)
 - **UI Registries:** Animate UI, Shadcn/UI, UntitledUI, ForgeUI, Cult UI
 - **Animations:** Motion for React (Framer), React Bits
 - **Icons:** Lucide React, SVGL (Brand Assets)
 - **Linter:** `@google/design.md` (Design system validation)
 
-## Design System Tokens
+## Design System Tokens & Color Space
 
 ### Colors (OKLCH)
-Prefer OKLCH for better color accuracy and accessibility.
+The project utilizes the **OKLCH** color space for superior perceptual uniformity and accessibility. Although running on Tailwind v3.4, OKLCH values remain fully integrated via custom CSS variable mappings and the `@google/design.md` validation layer.
+
 - **Primary:** `oklch(60% 0.15 250)` (Vader Blue)
 - **Secondary:** `oklch(70% 0.1 200)`
 - **Accent:** `oklch(85% 0.2 150)` (Neon Glow)

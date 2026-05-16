@@ -103,6 +103,32 @@
         "shadcn@latest",
         "mcp"
       ]
+    },
+    "instawp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@instawp/mcp-wp"
+      ],
+      "env": {
+        "WP_API_URL": "YOUR_INSTAWP_SITE_URL/wp-json",
+        "WP_API_USERNAME": "admin",
+        "WP_API_PASSWORD": "YOUR_APP_PASSWORD"
+      }
+    },
+    "elementor-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@instawp/mcp-elementor"
+      ]
+    },
+    "woocommerce-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@instawp/mcp-woocommerce"
+      ]
     }
   }
 }

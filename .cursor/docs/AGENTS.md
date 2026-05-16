@@ -11,14 +11,14 @@ This repository utilizes an advanced multi-agent workflow powered by Cursor and 
 
 ## Advanced Workflow Patterns
 
-## 3. High-Performance UI (Registry-First)
+### 1. High-Performance UI (Registry-First)
 - **Trigger:** "Implement a new React component from a registry."
 - **Tools:** `animate-ui-mcp`, `untitledui-mcp`, `agent-browser`.
 - **Process:**
   1. Use `animate-ui-mcp` (shadcn) to find and install high-quality animated components.
   2. Use `untitledui-mcp` for standard business UI building blocks.
   3. Use `agent-browser` to visit component libraries (Watermelon, ForgeUI, Cult UI) and extract live code or rationale if MCP is not available.
-  4. Generate production JSX with Tailwind v4 classes and OKLCH color tokens.
+  4. Generate production JSX with Tailwind v3 classes and OKLCH color tokens.
 
 ### 2. Database-Driven Development (Prisma + Postgres)
 - **Trigger:** "Add a notifications feed to the database and UI."
@@ -36,7 +36,7 @@ This repository utilizes an advanced multi-agent workflow powered by Cursor and 
   2. Use `fetch-mcp` to check the live URL for 200 OK.
   3. Use `playwright-mcp` to run smoke tests on the deployed site.
 
-## 4. High-Efficiency Web Research & Scraping
+### 4. High-Efficiency Web Research & Scraping
 - **Trigger:** "Find technical examples or research a topic on the live web."
 - **Tools:** `firecrawl`, `agent-browser`.
 - **Process:**
@@ -44,7 +44,7 @@ This repository utilizes an advanced multi-agent workflow powered by Cursor and 
   2. Use `agent-browser` for complex interactive flows (logging into documentation sites, clicking through menus).
   3. Synthesize findings into technical specs or implement directly using the extracted code.
 
-## 5. Automated Design System Validation
+### 5. Automated Design System Validation
 - **Trigger:** "Validate my design tokens or check for UI regressions."
 - **Tools:** `@google/design.md` (CLI).
 - **Process:**

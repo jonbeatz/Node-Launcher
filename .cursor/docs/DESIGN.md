@@ -18,7 +18,7 @@ This file defines the visual identity and UI/UX standards for the Vader Project 
 - **Base Size:** 16px
 - **Scale:** 1.250 (Major Third)
 
-## 3. Component Standards (Tailwind v4)
+## 3. Component Standards (Tailwind v3 Stable)
 
 ### Buttons
 - **Primary:** `bg-vader-blue text-white hover:bg-vader-blue/90 transition-all rounded-lg px-4 py-2 font-semibold shadow-vader`
@@ -38,7 +38,7 @@ This file defines the visual identity and UI/UX standards for the Vader Project 
 
 When generating UI, agents MUST:
 1. Prioritize **Magic UI** for landing pages and high-impact animations.
-2. Use **OKLCH** color values for all CSS.
+2. Use **OKLCH** color values for all CSS (Tailwind v3.4+ compatible).
 3. Ensure **Dark Mode** is the primary and default experience.
 4. Implement **Skeleton States** for all data-fetching components.
 5. Use **Lucide React** for icons, but check **SVGL** for brand logos.

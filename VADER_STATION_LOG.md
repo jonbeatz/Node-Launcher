@@ -4,7 +4,28 @@
 
 ---
 
-## [2026-05-15] — End Project (operator): bridge + verify + handoff
+## [2026-05-15] — Master Consolidation & v2.2.6-SOVEREIGN Audit
+**Status:** ✅ MISSION COMPLETE — MASTER VERSION READY
+
+**Execution Summary**
+- **Documentation Harmonization:**
+  - Relocated `AGENTS.md` and `DESIGN.md` to canonical paths under **`.cursor/docs/`**.
+  - Authoritative branch history established in **`.cursor/docs/guides/Checkpoint.md`**.
+  - Updated **`README.md`** to reference the new Sovereign documentation architecture.
+- **Stack Alignment:**
+  - formally aligned **`DESIGN_STANDARDS.md`** with the production stack (**Next.js 15 / Tailwind v3.4**).
+  - Documented OKLCH color space integration within the stable v3 baseline.
+- **MCP Finalization:**
+  - Cataloged **InstaWP**, **Elementor**, **WooCommerce**, and **Firecrawl** in **`MCPs.md`**.
+  - Verified **`.cursor/mcp.json`** syntax integrity.
+- **Quality Control:**
+  - **`npm run start-project:smoke`**: PASSED (Typecheck + Migrations).
+  - Validated all internal documentation cross-links.
+
+**Action Required (Operator Credentials)**
+- **Active Keys Needed:** Paste values for **InstaWP**, **Elementor**, and **Google Workspace** into your local **`.env`** to fully unlock the expansion pack.
+
+---
 
 - **`vpe-end-api-bridge.ps1`**: port **4000** already free; teardown complete (no stray LiteLLM/ngrok for **4000**).
 - **`npm run typecheck`**: pass.
@@ -19,7 +40,7 @@
 
 **What we did**
 - **Project `.cursor/mcp.json`:** Added **`firecrawl`**, **`docker`**, and **`google-workspace`** blocks (plus existing NovaMira WordPress MCPs). **JSON repaired** on resume: **`msc-v1`** was missing a closing **`env`** brace; removed a stray trailing **`}`**.
-- **Docs:** **`AGENTS.md`**, **`DESIGN.md`**, **`.cursor/docs/DESIGN_STANDARDS.md`**, **`.cursor/skills/`** (`git-commit.md`, `ui-generator.md`); **`MCPs.md`**, **`README.md`**, **`UPDATE_LOG.md`**, **`VADER_STATION_LOG.md`** updated.
+- **Docs:** **`.cursor/docs/AGENTS.md`**, **`.cursor/docs/DESIGN.md`**, **`.cursor/docs/DESIGN_STANDARDS.md`**, **`.cursor/skills/`** (`git-commit.md`, `ui-generator.md`); **`MCPs.md`**, **`README.md`**, **`UPDATE_LOG.md`**, **`VADER_STATION_LOG.md`** updated.
 - **Workstation notes:** Prefer **`desktop-automation`** + **`desktop-commander`** over **`windows-mcp`** (remove **`windows-mcp`** from Cursor if it stays red). **`untitledui`**: if UI shows red, try **MCP → Refresh**; tools can still work.
 
 **Action Required (Pending API Keys / paths)**

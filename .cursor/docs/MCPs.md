@@ -116,6 +116,24 @@ This document serves as a reference for all currently configured Model Context P
 **Usage Example:** "Add a vertical marquee of logos from Magic UI."
 **Status:** ✅ Active (npx @magicuidesign/cli install cursor)
 
+## instawp
+
+**Description:** Managed workspace control for large-scale WordPress site management.
+**Usage Example:** "List the plugins installed on my InstaWP site."
+**Status:** ⚠️ Needs Configuration (Requires INSTAWP_API_URL and APP_PASSWORD in .cursor/mcp.json or .env)
+
+## elementor-mcp
+
+**Description:** Specialized tools for direct Elementor page-builder manipulation.
+**Usage Example:** "Add a new section to my Elementor landing page."
+**Status:** ✅ Active (npx @instawp/mcp-elementor)
+
+## woocommerce-mcp
+
+**Description:** Deep integration for e-commerce logic and product management.
+**Usage Example:** "Fetch the latest 5 orders from my WooCommerce store."
+**Status:** ✅ Active (npx @instawp/mcp-woocommerce)
+
 ## prisma-mcp
 
 **Description:** Database management and schema introspection via Prisma.

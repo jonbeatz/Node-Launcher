@@ -15,8 +15,9 @@ The **Vader Project Engine (VPE)** is a tactical desktop command center for the 
 - **Start Project** (in Agent chat — full station + API context): **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — agents **re-read** the listed docs (including **`Cursor-LiteLLM-Bridge.md`**), run **`npm run start-project:smoke`** ( **`typecheck`** + **`test:migrations`** ), start **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**. If **port 4000 in use**, run **`.\google-api\vpe-end-api-bridge.ps1`** then retry start. **Default:** no **`npm run dev`** until you ask for the **VPE UI**.
 - **End Project** (session close — clean next Start): **[`.cursor/prompts/End-Project.md`](.cursor/prompts/End-Project.md)** — run **`.\google-api\vpe-end-api-bridge.ps1`** first to free **:4000** and matching **ngrok**.
 - **Engine / UI dev** (when you want the dashboard): **[`.cursor/prompts/Start-Master.md`](.cursor/prompts/Start-Master.md)** — **`npm run dev`** or **`npm run vader:dev`**.
-- **[AGENTS.md](AGENTS.md)**: Advanced workflow orchestration and multi-agent patterns.
-- **[.cursor/docs/DESIGN_STANDARDS.md](.cursor/docs/DESIGN_STANDARDS.md)**: High-end UI/UX and Tailwind v4 standards.
+- **[AGENTS.md](.cursor/docs/AGENTS.md)**: Advanced workflow orchestration and multi-agent patterns.
+- **[.cursor/docs/DESIGN.md](.cursor/docs/DESIGN.md)**: Sovereign Design System Specification.
+- **[.cursor/docs/DESIGN_STANDARDS.md](.cursor/docs/DESIGN_STANDARDS.md)**: High-end UI/UX and Tailwind v3 standards.
 - **[.cursor/docs/MCPs.md](.cursor/docs/MCPs.md)**: Full catalog of active and configured MCP servers.
 - **Google API** details: **`google-api/README.md`**. **Cursor + `vader-*` models:** **[`.cursor/docs/Cursor-LiteLLM-Bridge.md`](.cursor/docs/Cursor-LiteLLM-Bridge.md)**.
 
