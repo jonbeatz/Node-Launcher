@@ -3,9 +3,9 @@ Write-Host "🦾 VADER PROTOCOL v2.5 ACTIVE" -ForegroundColor Magenta
 
 # --- CONFIGURATION ---
 $repo = "jonbeatz/Node-Launcher"
-$distFolder = "D:\Cursor_Projectz\Node-Launcher-v2\dist"
+$distFolder = "D:\Cursor_Projectz\Node-Launcher-v3\dist"
 $unpackedFolder = "$distFolder\win-unpacked"
-$templatePath = "D:\Cursor_Projectz\Node-Launcher-v2\.cursor\docs\release_notes_template.md"
+$templatePath = "D:\Cursor_Projectz\Node-Launcher-v3\.cursor\docs\release_notes_template.md"
 
 # 1. RELEASE PREFIX — JediBuild lanes use the git branch name (VPE-JediBuild-v1.3 → …-v1.1, …-v1.2 on GitHub).
 #    Other branches keep the historical main-line prefix so Upload Build still works everywhere.
@@ -23,16 +23,19 @@ Write-Host "🌿 Git branch: $gitBranch  →  release prefix: $cleanPrefix" -For
 Write-Host "🔍 Scrutinizing GitHub for existing releases..." -ForegroundColor Gray
 $ghTags = gh release list --limit 50 | ForEach-Object { ($_ -split "`t")[0] }
 
-$count = 1
-while ($true) {
-    $vaderVersion = "$cleanPrefix-v1.$count"
-    # Skip if tag exists OR if it matches the old double-name glitch pattern
-    if ($ghTags -contains $vaderVersion -or $vaderVersion -match "v1.1-v1.1") { 
-        $count++ 
-    } else { 
-        break 
+    $vaderVersion = "$cleanPrefix"
+    # If the tag already exists, add a suffix to avoid conflict
+    if ($ghTags -contains $vaderVersion) {
+        $count = 1
+        while ($true) {
+            $vaderVersion = "$cleanPrefix-v1.$count"
+            if ($ghTags -contains $vaderVersion) {
+                $count++
+            } else {
+                break
+            }
+        }
     }
-}
 
 Write-Host "🚀 TARGET VERSION: $vaderVersion" -ForegroundColor Cyan
 

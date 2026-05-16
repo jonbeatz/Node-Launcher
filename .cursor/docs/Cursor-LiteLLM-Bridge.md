@@ -18,14 +18,14 @@ This repo exposes **OpenAI-compatible** routes on LiteLLM (**port 4000**). Model
 
 ## Step-by-step — terminal vs Cursor Settings
 
-Repo root example: **`D:\Cursor_Projectz\Node-Launcher-v2`**. **Do not** type only a bare `https://…` URL in PowerShell — it is not a command (use **Part B** for the URL, or **`vpe-verify-public-url.ps1`** in **Part A**).
+Repo root example: **`D:\Cursor_Projectz\Node-Launcher-v3`**. **Do not** type only a bare `https://…` URL in PowerShell — it is not a command (use **Part B** for the URL, or **`vpe-verify-public-url.ps1`** in **Part A**).
 
 ### Part A — Terminal (keep the API window open)
 
 1. **Open folder in terminal**
 
 ```powershell
-Set-Location "D:\Cursor_Projectz\Node-Launcher-v2"
+Set-Location "D:\Cursor_Projectz\Node-Launcher-v3"
 ```
 
 2. **Start LiteLLM + ngrok** (one line; leave this terminal **running**)

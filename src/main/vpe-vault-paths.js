@@ -60,7 +60,7 @@ function msc_projectVaultRootDir() {
 }
 
 /**
- * JEDI_MOD_125 — Canonical vault root for internal thumbnails + `vpe-vault:` (aligns with Node-Launcher-v2 on Windows).
+ * JEDI_MOD_125 — Canonical vault root for internal thumbnails + `vpe-vault:` (aligns with Node-Launcher-v3 on Windows).
  * Still overridable via `VPE_VAULT_ROOT`.
  */
 function msc_projectVaultRootDirSovereign() {
@@ -69,7 +69,7 @@ function msc_projectVaultRootDirSovereign() {
     return path.resolve(String(env).trim());
   }
   if (process.platform === 'win32') {
-    return path.resolve('d:/Cursor_Projectz/Node-Launcher-v2/media/vault');
+    return path.resolve('d:/Cursor_Projectz/Node-Launcher-v3/media/vault');
   }
   return path.join(process.cwd(), 'media', 'vault');
 }

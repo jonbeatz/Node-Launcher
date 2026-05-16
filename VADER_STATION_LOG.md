@@ -4,6 +4,29 @@
 
 ---
 
+## [2026-05-16] — Start Project: Node-Launcher-v3 folder migration
+
+**What we did**
+- Operator copied **`Node-Launcher-v2`** → **`Node-Launcher-v3`** (`D:\Cursor_Projectz\Node-Launcher-v3`). Git repo intact: **`origin`** → `github.com/jonbeatz/Node-Launcher.git`, branch **`VPE-JediBuild-v1.3`**.
+- Updated sovereign vault + doc path examples from **v2** → **v3** (`vpe-vault-paths.js`, `project-settings-modal.tsx`, `upload_build.ps1`, **Start-Project** / **Start-Master** / **TRUTH** / **Project-Bible** / **Cursor-LiteLLM-Bridge** / **UPDATE_LOG**).
+- **`npm run start-project:smoke`**: **PASS** (typecheck + migrations `user_version=17`).
+- API bridge: started per ritual (**`vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`**).
+
+**Operator note:** If you still want thumbnails from the old v2 vault only, set **`VPE_VAULT_ROOT=D:\Cursor_Projectz\Node-Launcher-v2\media\vault`** — default is now **`Node-Launcher-v3\media\vault`** (copied with this tree).
+
+---
+
+## [2026-05-15] — End Project (operator): bridge + verify + handoff
+
+- **`vpe-end-api-bridge.ps1`**: port **4000** already free; no LiteLLM/ngrok listeners to stop.
+- **`npm run typecheck`**: pass.
+- **`npm run lint`**: pass (Next.js notes deprecation of `next lint`; no ESLint issues).
+- **Git:** clean working tree; no commit (operator did not ask).
+
+**Next session:** **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — mandatory reads, **`npm run start-project:smoke`**, then **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**; paste new ngrok **`…/v1`** into Cursor if the tunnel URL changed.
+
+---
+
 ## [2026-05-15] — Master Consolidation & v2.2.6-SOVEREIGN Audit
 **Status:** ✅ MISSION COMPLETE — MASTER VERSION READY
 
@@ -24,15 +47,6 @@
 
 **Action Required (Operator Credentials)**
 - **Active Keys Needed:** Paste values for **InstaWP**, **Elementor**, and **Google Workspace** into your local **`.env`** to fully unlock the expansion pack.
-
----
-
-- **`vpe-end-api-bridge.ps1`**: port **4000** already free; teardown complete (no stray LiteLLM/ngrok for **4000**).
-- **`npm run typecheck`**: pass.
-- **`npm run lint`**: pass (Next.js notes deprecation of `next lint`; no ESLint issues).
-- **Git:** uncommitted docs/MCP work still on tree (see **`git status`**); no commit (operator did not ask).
-
-**Next session:** **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — mandatory reads, **`npm run start-project:smoke`**, then **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**; paste new ngrok **`…/v1`** into Cursor if the tunnel URL changed.
 
 ---
 

@@ -2,7 +2,7 @@
 
 /**
  * v1.7.6 — Privileged `vpe-vault:` protocol; serves `media/vault/<project>/_vpe_thumb.png` by registry id.
- * JEDI_MOD_125 — Sovereign Windows root `Node-Launcher-v2/media/vault`, explicit `image/png` Response, legacy fallback.
+ * JEDI_MOD_125 — Sovereign Windows root `Node-Launcher-v3/media/vault`, explicit `image/png` Response, legacy fallback.
  */
 
 const { protocol, session } = require('electron');

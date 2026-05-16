@@ -21,7 +21,7 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
   - **Fix:** Updated the command to point to the correct NPM package: `@govcraft/payload-cms-mcp`.
 
 ### 📝 Updates & Improvements
-- **Project-Level MCP Configuration**: Extracted the `novamira-*` MCPs from the global `C:\Users\JONBEATZ\.cursor\mcp.json` and placed them into the project-local `D:\Cursor_Projectz\Node-Launcher-v2\.cursor\mcp.json`. This keeps project-specific tools sandboxed and prevents main file clutter.
+- **Project-Level MCP Configuration**: Extracted the `novamira-*` MCPs from the global `C:\Users\JONBEATZ\.cursor\mcp.json` and placed them into the project-local `D:\Cursor_Projectz\Node-Launcher-v3\.cursor\mcp.json`. This keeps project-specific tools sandboxed and prevents main file clutter.
 - **New MCP Documentation**: Created `.cursor/docs/MCPs.md` detailing every active MCP, what it does, example usage, and its current health/status.
 - **Tavily Search Integration**: Successfully integrated the Tavily MCP for live web search and security queries.
 
