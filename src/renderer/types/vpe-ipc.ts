@@ -9,6 +9,7 @@ export type VpeShieldProjectType =
   | 'web'
   | 'node'
   | 'unknown'
+  | 'wordpress-local'
 
 /** SQLite boolean column semantics (0/1) and boolean JSON coercions — not string-typed at the boundary. */
 export type VpeHasDocumentation = number | boolean
@@ -59,6 +60,10 @@ export interface VpeProjectRow {
   project_path_missing?: boolean | number | null
   /** JEDI_MOD_136 — disk root exists and `package.json` present (HTTP health / offline semantics). */
   vpe_repo_runnable_for_http?: boolean | number | null
+  /** LocalWP / wordpress-local: persisted custom domain (e.g. `http://sitename.local/`). */
+  project_url?: string | null
+  /** LocalWP: site identifier / folder slug for the `local.exe` CLI. Falls back to project `name`. */
+  slug?: string | null
 }
 
 /** Dashboard project shape (grids, list, cards). */
@@ -103,4 +108,8 @@ export interface Project {
   project_path_missing?: boolean
   /** JEDI_MOD_136 — false when folder or package.json missing; UI stays staging vs error. */
   vpe_repo_runnable_for_http?: boolean
+  /** LocalWP / wordpress-local: persisted custom domain (e.g. `http://sitename.local/`). */
+  project_url?: string | null
+  /** LocalWP: site identifier / folder slug for the `local.exe` CLI. Falls back to project `name`. */
+  slug?: string | null
 }

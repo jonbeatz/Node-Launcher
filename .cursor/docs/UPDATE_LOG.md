@@ -105,4 +105,71 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 
 ---
 
+## [2026-05-17] — WordPress-Local Bug Sprint: Port Conflict, Thumbnail, STOP ALL & State Isolation
+
+### 🛠 Fixes & Root Issues Resolved
+
+#### 1. Port-4000 False Positive — LiteLLM vs LocalWP GraphQL (`src/main/project-runner.js`)
+
+- **Root Issue:** `msc_isLocalGraphqlListening()` only performed a TCP socket probe on port 4000. Because VPE's own **LiteLLM API bridge** (`vpe-start-api.ps1`) also listens on port 4000, a "port is open" check returned `true` even when Local.exe was not running. VPE then tried to call a `startSite` GraphQL mutation against LiteLLM, which returned `{"detail":"Not Found"}`. The site status was set to `unknown`, and `_startWordPressLocal` continued as if LocalWP had started — but the WordPress site was never actually served.
+- **Fix — Three-Gate Defense:** Three new/modified helpers implement a layered check:
+  - **Gate 1 — `msc_isLocalExeProcessRunning()`** (new): Runs `tasklist /FI "IMAGENAME eq Local.exe"` synchronously. If `Local.exe` is not in the process list, returns `false` immediately — prevents any further probing.
+  - **Gate 2 — TCP socket probe** (existing, now dependent on Gate 1): Connects to `127.0.0.1:4000`; confirms the port is listening.
+  - **Gate 3 — `msc_validateLocalGraphqlEndpoint(info)`** (new): Sends an HTTP POST with body `{"query":"{ __typename }"}` and `Authorization: Bearer <token>` to the GraphQL endpoint. Parses the JSON response; only returns `true` when a `data` key is present. LiteLLM returns `{"detail":"Not Found"}` which fails this check.
+  - `msc_waitForLocalGraphql()` polls all three gates; `maxAttempts` raised from 24 → **120** (60-second cold-start window, 500ms per poll).
+- **Additional hardening:** Wrapped the entire `_startWordPressLocal()` async body in a `runStartupAsync` IIFE with a top-level `catch` so any unhandled rejection falls back gracefully to CLI commands rather than crashing with an unhandled `TypeError`.
+
+#### 2. Thumbnail Preview Shows Wrong Icon in "Add New Project" Modal (`src/renderer/components/add-project-modal.tsx`)
+
+- **Root Issue (Phase 1):** `msc_modalThumbnailPreviewSrc()` allowed raw Windows file paths (e.g., `D:\path\to\screenshot.png`) to pass through as `<img src>`. The renderer cannot load `file://` paths without a custom protocol, so the image rendered as broken — showing a placeholder "broken image" glyph that appeared purple in some OS themes.
+- **Fix (Phase 1):** Updated `msc_modalThumbnailPreviewSrc()` to only allow specific schemes: `data:`, `vpe-vault:`, `vpe-asset:`, `vpe-thumb:`, `http://`, `https://`. Any value that does not match returns `undefined`, causing the component to render the Camera icon placeholder.
+- **Root Issue (Phase 2):** `handleScanDirectory` still auto-populated `thumbnailUrl` from `info.suggested_thumbnail` (the WordPress theme's `screenshot.png`) after each directory scan. This auto-populated a `vpe-thumb:` URL (e.g., pointing to the Divi theme), which passed the scheme filter and rendered as the purple Divi "D" icon.
+- **Fix (Phase 2):** Changed the `setProjectData` call inside `handleScanDirectory` to always set `thumbnailUrl: projectData.thumbnailUrl ?? null`, dropping the `?? detectedThumbnailUrl` fallback. The Camera icon now shows by default until the user explicitly picks a file. The main process (`vpe:add-project` handler) still auto-detects and saves the theme screenshot as the project thumbnail on creation.
+
+#### 3. STOP ALL Did Not Stop LocalWP Instances (`src/main/project-runner.js` + `src/main/vpe-ipc.js`)
+
+- **Root Issue:** `msc_vpeStopAllEngines()` (IPC handler for the dashboard STOP ALL button) only called `pm2Manager.stopAll()` and `projectRunner.killAll()`. WordPress-Local sites are not PM2/PTY processes — they are tracked by the `wpLocal: true` flag on the in-memory runtime record (`this.children` map). `_stopWordPressLocal()` (which sends the LocalWP `stopSite` GraphQL mutation and removes the VPE mu-plugin) was never called during STOP ALL, leaving LocalWP sites in a running state.
+- **Fix — `stopAllWordPressSites(minimizeLocal = true)` (new public method on `MSC_ProjectRunner`):**
+  - Reads `this.store.listProjectsAlphabetical()`, filters for records where `this.children.get(id)?.wpLocal === true`.
+  - Calls `_stopWordPressLocal(id, rec)` for each running WordPress site.
+  - If `minimizeLocal` is true and `Local.exe` is still running, executes a PowerShell one-liner that uses `Add-Type` to P/Invoke `user32.dll ShowWindow(hwnd, SW_MINIMIZE=6)` on every `Local` process window, minimizing (not closing) Local.exe.
+- **`msc_vpeStopAllEngines()` updated:** Step 1 is now `projectRunner.stopAllWordPressSites(true)` before PM2 and PTY teardown, so WordPress sites are gracefully halted first.
+
+#### 4. Project Settings State Cross-Contamination Between Cards (`src/renderer/app/page.tsx`)
+
+- **Root Issue:** `<ProjectSettingsModal>` had no `key` prop. React only re-runs `useState` initialization on mount, so clicking Settings on IWWI-v2 after having opened Settings for IWWI could display stale IWWI values (name, path, thumbnail, port) inside the IWWI-v2 settings panel.
+- **Fix:** Added `key={selectedProjectId}` to `<ProjectSettingsModal>`. React fully unmounts and remounts the component whenever `selectedProjectId` changes, guaranteeing every project opens with a completely fresh state.
+
+---
+
+### 📝 New Project via Direct CDP (IWWI_v3)
+
+During this session, `F:\Websitez\IndieWorldWideInc\Local_WP\IWWI_v3\app\public` was added as a new `wordpress-local` project. The UI scan (`inspectProject` IPC) hung on the slow F: drive and crashed the Electron app. As a workaround, the project was added directly via a **PowerShell CDP WebSocket** call targeting the Electron renderer's CDP endpoint (`ws://127.0.0.1:9225`). The payload included `project_type: 'wordpress-local'` and a base64-encoded thumbnail. This revealed a payload mismatch bug: the renderer sends `projectTypePayload` but the main-process handler (`project-handlers.js`) expects `project_type` — confirmed by reading the handler source and corrected in the CDP test payload.
+
+The vault write confirmed: `CRITICAL SUCCESS: FILE PHYSICALLY WRITTEN TO: media\vault\IWWI_v3\_vpe_thumb.png`.
+
+---
+
+### 🔧 MCPs & Tools Used
+
+| Tool / MCP | How it was used |
+|---|---|
+| **`playwright-electron` MCP** (CDP port **9225**) | Primary Electron UI control: `navigate`, `a11y_take-aria-snapshot`, `content_take-screenshot`, `interaction_click`, `browser_evaluate` (JS injection to trigger React state updates and IPC calls) |
+| **PowerShell CDP WebSocket** (`System.Net.WebSockets.ClientWebSocket`) | Fallback when `playwright-electron` MCP dropped after Electron crash. Used to directly call `Runtime.evaluate` via CDP to inject base64 thumbnail data and invoke `window.vpeAPI.addProject()` |
+| **`user-serkan-ozal.browser-devtools-mcp`** | Additional browser-side inspection and screenshot capture |
+| **`user-browsermcp`** | Browser tab navigation and content checking for WordPress site health |
+| **Shell** (`tasklist`, `netstat`, `Get-Process`) | Process presence checks (Local.exe), CDP port verification (9225), PowerShell log reads |
+| **Console Ninja** | Live renderer console log streaming during test cycles |
+
+---
+
+### 💡 Key Notes for Future Sessions
+
+- **Port 4000 Conflict Pattern:** If LiteLLM is running when you start a WordPress-Local project, the old TCP-only probe would have returned a false positive. The three-gate defense (process → TCP → GraphQL introspection) prevents this. Run `.\google-api\vpe-end-api-bridge.ps1` before doing WordPress-Local testing to avoid any ambiguity on port 4000.
+- **CDP Port:** `playwright-electron` MCP and VPE's Electron dev session both use port **9225** (not the default 9222). This is set via `VPE_REMOTE_DEBUG_PORT=9225` in the dev environment and reflected in `.cursor/mcp.json`. If the MCP fails to connect, verify that `netstat -ano | findstr 9225` shows a listener, and that no zombie Electron process is holding the port.
+- **IWWI_v3 on F: drive:** The `inspectProject` IPC handler can hang indefinitely on slow or network drives. Until a timeout is added to that handler, new WordPress projects on slow drives should be added via direct IPC (bypassing the scan step) or by manually constructing the payload.
+- **WordPress mu-plugin lifecycle:** VPE writes `wp-content/mu-plugins/vpe-local-urls.php` on START (forces `WP_HOME` / `WP_SITEURL` to `http://`) and removes it on STOP. Always confirm the mu-plugins directory is writable on new WordPress sites.
+
+---
+
 *(Add new entries above this line following the same format)*

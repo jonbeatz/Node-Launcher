@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, type ChangeEvent } from 'react'
-import { X, FolderSearch, Package, Check, Loader2, FolderOpen, Upload, Camera } from 'lucide-react'
+import { X, FolderSearch, Package, Check, Loader2, FolderOpen, Upload, Camera, AlertTriangle } from 'lucide-react'
 import type { VpeShieldProjectType } from '@/lib/vpe-bridge'
 
 interface AddProjectModalProps {
@@ -10,12 +10,33 @@ interface AddProjectModalProps {
   onSubmit?: (data: ProjectData) => void
 }
 
-/** Privileged schemes load in the Electron shell; `data:` is used for draft picks (see `vpe:pick-thumbnail`). */
+/**
+ * Resolve a thumbnail href to a value safe to use as <img src> inside the Electron renderer.
+ *
+ * Priority cascade (highest → lowest):
+ *  1. data:       — base64 picked via FileReader or vpe:pick-thumbnail IPC
+ *  2. vpe-vault:  — registered vault asset served by the custom protocol
+ *  3. vpe-asset:  — bundled app asset protocol
+ *  4. vpe-thumb:  — per-project thumbnail protocol
+ *  5. http/https  — remote URL (unusual but valid)
+ *
+ * Raw file-system paths (e.g. `D:\path\to\theme\screenshot.png`) are intentionally
+ * rejected — the renderer cannot load them without a registered protocol, so they
+ * would silently show a broken image or the OS-default icon.
+ */
 function msc_modalThumbnailPreviewSrc(href: string | null | undefined): string | undefined {
   if (href == null || String(href).trim() === '') return undefined
-  const s = String(href)
-  if (s.startsWith('data:') || s.startsWith('vpe-vault:') || s.startsWith('vpe-asset:')) return s
-  return s
+  const s = String(href).trim()
+  if (
+    s.startsWith('data:') ||
+    s.startsWith('vpe-vault:') ||
+    s.startsWith('vpe-asset:') ||
+    s.startsWith('vpe-thumb:') ||
+    s.startsWith('http://') ||
+    s.startsWith('https://')
+  ) return s
+  // Reject raw file paths — they cannot be loaded as img src in the renderer process.
+  return undefined
 }
 
 interface ProjectData {
@@ -29,6 +50,10 @@ interface ProjectData {
   thumbnailUrl?: string | null
   /** Passed to IPC: `auto` clears registry override (classifier). */
   projectTypePayload?: 'auto' | VpeShieldProjectType | null
+  /** WordPress-Local: persisted domain URL (e.g. `http://sitename.local/`). */
+  project_url?: string | null
+  /** WordPress-Local: site slug for the `local.exe` CLI. */
+  slug?: string | null
 }
 
 export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalProps) {
@@ -39,6 +64,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
       : `project-${Date.now()}`
   const [isScanning, setIsScanning] = useState(false)
   const [scanned, setScanned] = useState(false)
+  const [thumbPickError, setThumbPickError] = useState<string | null>(null)
   const [projectTypeSelect, setProjectTypeSelect] = useState<
     'auto' | VpeShieldProjectType
   >('auto')
@@ -52,6 +78,8 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     portLock: false,
     thumbnailUrl: null,
     projectTypePayload: 'auto',
+    project_url: null,
+    slug: null,
   })
 
   if (!isOpen) return null
@@ -69,6 +97,9 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     let detectedStartScript = 'dev'
     let suggestedPort = '3001'
     let detectedShield: VpeShieldProjectType = 'unknown'
+    let detectedProjectUrl: string | null = null
+    let detectedSlug: string | null = null
+    let detectedThumbnailUrl: string | null = null
     try {
       if (window.vpeAPI?.inspectProject) {
         const info = await window.vpeAPI.inspectProject(pickedPath)
@@ -76,8 +107,39 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
         detectedStartScript = info?.detection?.start_script ?? detectedStartScript
         suggestedPort = String(info?.suggestedPort ?? suggestedPort)
         const pt = info?.project_type
-        if (pt === 'v0' || pt === 'electron' || pt === 'web' || pt === 'node' || pt === 'unknown') {
+        if (
+          pt === 'v0' || pt === 'electron' || pt === 'web' ||
+          pt === 'node' || pt === 'unknown' || pt === 'wordpress-local'
+        ) {
           detectedShield = pt
+        }
+        // WordPress-Local: use server-derived URL/slug or fall back to client-side derivation.
+        // Server returns suggested_slug that already steps back out of "public"/"app" dirs.
+        if (info?.is_wordpress) {
+          detectedShield = 'wordpress-local'
+          if (info.suggested_url) {
+            detectedProjectUrl = info.suggested_url
+          } else {
+            const domainSlug = base.replace(/[^a-z0-9]/gi, '').toLowerCase()
+            detectedProjectUrl = domainSlug ? `https://${domainSlug}.local/` : null
+          }
+          // Prefer server-derived slug (traverses out of /public); fall back to URL extraction
+          if (info.suggested_slug) {
+            detectedSlug = info.suggested_slug
+          } else if (detectedProjectUrl) {
+            detectedSlug = detectedProjectUrl
+              .replace(/^https?:\/\//, '')
+              .replace(/\.local\/?$/, '') || null
+          } else {
+            detectedSlug = base.replace(/[^a-z0-9]/gi, '').toLowerCase() || null
+          }
+          // Capture the theme screenshot so the final setProjectData below picks it up.
+          if (info.suggested_thumbnail) {
+            detectedThumbnailUrl = info.suggested_thumbnail
+          }
+        } else if (pt === 'node' || info?.detection?.pkg_manager) {
+          // Confirmed Node.js project via package.json detection — keep 'node' shield.
+          if (detectedShield === 'unknown') detectedShield = 'node'
         }
       }
     } catch {
@@ -92,14 +154,21 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
       startScript: detectedStartScript,
       port: String(suggestedPort),
       portLock: false,
+      // Use any previously uploaded thumb; fall back to the WP theme screenshot.
+      // Never auto-populate the visible thumbnail preview with a detected path.
+      // The camera-icon placeholder stays until the user explicitly picks a thumb.
+      // The main process will auto-detect the theme screenshot on project-add anyway.
       thumbnailUrl: projectData.thumbnailUrl ?? null,
       projectTypePayload: detectedShield,
+      project_url: detectedProjectUrl,
+      slug: detectedSlug,
     })
     setScanned(true)
     setIsScanning(false)
   }
 
   const handlePickThumbnail = async () => {
+    setThumbPickError(null)
     if (window.vpeAPI?.pickThumbnail) {
       try {
         const href = await window.vpeAPI.pickThumbnail(
@@ -108,8 +177,9 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
         )
         if (!href) return
         setProjectData((prev) => ({ ...prev, thumbnailUrl: href }))
-      } catch {
-        // Keep setup flow resilient; save path still works without thumbnail.
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setThumbPickError(msg)
       }
       return
     }
@@ -134,6 +204,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     onSubmit?.(projectData)
     onClose()
     setScanned(false)
+    setThumbPickError(null)
     setProjectTypeSelect('auto')
     setProjectData({
       id: createDraftId(),
@@ -145,6 +216,8 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
       portLock: false,
       thumbnailUrl: null,
       projectTypePayload: 'auto',
+      project_url: null,
+      slug: null,
     })
   }
 
@@ -263,6 +336,12 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
                     UPLOAD THUMBNAIL
                   </button>
                 </div>
+                {thumbPickError && (
+                  <div className="mt-2 flex items-start gap-2 px-2 py-1.5 rounded bg-[#2a1010] border border-[#7a1c1c]">
+                    <AlertTriangle size={12} className="text-[#e02b20] mt-0.5 shrink-0" />
+                    <span className="font-sans text-[11px] text-[#e06060] leading-snug">{thumbPickError}</span>
+                  </div>
+                )}
               </div>
 
               {/* Project Path */}
@@ -313,6 +392,7 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
                   <option value="electron">Electron</option>
                   <option value="web">Web (Next / React)</option>
                   <option value="node">Node</option>
+                  <option value="wordpress-local">WordPress (Local by Flywheel)</option>
                   <option value="unknown">Unknown</option>
                 </select>
                 <p className="mt-2 font-sans text-[11px] text-[#555555]">
@@ -320,6 +400,32 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
                   to persist no override (classifier decides), or lock a shield type.
                 </p>
               </div>
+
+              {/* WordPress-Local: site URL (auto-filled from folder name) */}
+              {(projectTypeSelect === 'wordpress-local') && (
+                <div>
+                  <label className="block font-sans text-[10px] text-[#A0A0A0] uppercase tracking-[0.1em] mb-2">
+                    Site URL <span className="text-[#555555] normal-case">(auto-filled · edit if needed)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={projectData.project_url ?? ''}
+                    onChange={(e) => setProjectData((prev) => ({
+                      ...prev,
+                      project_url: e.target.value || null,
+                      slug: e.target.value
+                        ? e.target.value.replace(/^https?:\/\//, '').replace(/\.local\/?$/, '')
+                        : prev.slug,
+                    }))}
+                    placeholder="http://sitename.local/"
+                    className="w-full px-3 py-2 rounded bg-[#0a0a0a] border border-[#333333] font-sans text-[13px] text-white placeholder:text-[#555555] focus:outline-none focus:border-[#4fde82] transition-colors"
+                  />
+                  <p className="mt-1 font-sans text-[11px] text-[#555555]">
+                    Domain served by Local. VPE launches the site via{' '}
+                    <span className="text-[#A0A0A0]">local.exe start-site</span>.
+                  </p>
+                </div>
+              )}
 
               {/* Package Manager */}
               <div>

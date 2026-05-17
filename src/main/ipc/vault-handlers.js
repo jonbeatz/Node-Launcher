@@ -265,7 +265,44 @@ function msc_registerVaultIpc(ipcMain, c) {
       if (!['http:', 'https:'].includes(parsed.protocol)) {
         throw new Error('VPE: Only http/https URLs are allowed.');
       }
-      await shell.openExternal(parsed.toString());
+
+      let finalUrl = parsed.toString();
+
+      // For *.local domains: the Local router redirects HTTP→HTTPS at port 80/443.
+      // Bypass the router entirely by opening the nginx container port directly —
+      // this always serves HTTP 200 regardless of router/SSL state.
+      if (/\.local$/.test(parsed.hostname)) {
+        try {
+          const sitesPath = path.join(
+            process.env.USERPROFILE || process.env.APPDATA || '',
+            'AppData', 'Roaming', 'Local', 'sites.json',
+          );
+          if (fs.existsSync(sitesPath)) {
+            const sites = JSON.parse(fs.readFileSync(sitesPath, 'utf8'));
+            const targetDomain = parsed.hostname.toLowerCase();
+            for (const entry of Object.values(sites)) {
+              if (entry && String(entry.domain || '').toLowerCase() === targetDomain) {
+                const services = entry.services || {};
+                for (const svc of Object.values(services)) {
+                  if (svc && svc.role === 'http' && Array.isArray((svc.ports?.HTTP || svc.ports?.http)) && (svc.ports.HTTP || svc.ports.http).length > 0) {
+                    const nginxPort = (svc.ports.HTTP || svc.ports.http)[0];
+                    finalUrl = `http://localhost:${nginxPort}/`;
+                    break;
+                  }
+                }
+                break;
+              }
+            }
+          }
+        } catch (_) { /* fall through to domain URL */ }
+
+        // If port lookup failed, at minimum normalize https → http.
+        if (finalUrl === parsed.toString() && parsed.protocol === 'https:') {
+          finalUrl = finalUrl.replace(/^https:\/\//, 'http://');
+        }
+      }
+
+      await shell.openExternal(finalUrl);
       return { ok: true };
     } catch (err) {
       throw new Error(err?.message || 'VPE: Invalid project URL.');

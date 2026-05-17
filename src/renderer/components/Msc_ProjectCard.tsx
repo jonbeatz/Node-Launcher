@@ -315,6 +315,8 @@ interface Msc_ProjectCardOwnProps {
   projectPathMissing?: boolean
   /** JEDI_MOD_136 — false when no package.json on disk; health line stays staging vs offline. */
   repoRunnableForHttp?: boolean
+  /** WordPress-Local: persisted custom domain (e.g. `https://sitename.local/`). */
+  projectUrl?: string | null
   /** JEDI_MOD_27 — parent handles optimistic swap + `reorderProject` IPC when set. */
   onRegistryReorderNeighbor?: (
     projectId: string,
@@ -378,6 +380,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
     onRegistryReorderNeighbor,
     projectPathMissing = false,
     repoRunnableForHttp = true,
+    projectUrl = null,
     initial,
     animate,
     exit,
@@ -415,7 +418,20 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
   const dotTitle = msc_shieldTypeTitle(shieldProjectType)
   const dotHex = msc_shieldColorHex(shieldProjectType)
   const isRunning = status === 'running'
+  /** WordPress-Local: site is served by Local's own server stack — OPEN is always active. */
+  const isWordPressLocal = shieldProjectType === 'wordpress-local'
   const runUrl = `http://localhost:${port}`
+  /** For WordPress cards: show the local domain URL; for Node/Next: show localhost:port. */
+  const displayRunUrl = isWordPressLocal && projectUrl ? projectUrl : runUrl
+  /**
+   * Status badge label: for WordPress shows the clean domain (e.g. "talkshowlandv1.local")
+   * instead of a meaningless port number; for Node/Next shows the port as before.
+   */
+  const displayPortOrDomain = isWordPressLocal
+    ? (projectUrl
+        ? String(projectUrl).replace(/^https?:\/\//, '').replace(/\/$/, '')
+        : 'WordPress Engine')
+    : String(port)
   const isError = status === 'error'
   const isBuilding = status === 'building'
 
@@ -802,9 +818,9 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
                 <span className={msc_readoutDotCls} aria-hidden />
                 <span
                   className={msc_readoutLiveTextCls}
-                  title={`${getStatusLabel()} on port ${port}${healthLine?.label ? ` · ${healthLine.label}` : ''}`}
+                  title={`${getStatusLabel()} — ${displayPortOrDomain}${healthLine?.label ? ` · ${healthLine.label}` : ''}`}
                 >
-                  {getStatusLabel()} — {port}
+                  {getStatusLabel()} — {displayPortOrDomain}
                 </span>
               </div>
               <button
@@ -862,9 +878,9 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
                     </span>
                     <span
                       className="block truncate text-[10px] font-medium leading-tight tracking-tight text-[#7dcea0]/95"
-                      title={runUrl}
+                      title={displayRunUrl}
                     >
-                      {runUrl}
+                      {displayRunUrl}
                     </span>
                     {healthLine && (
                       <span
@@ -953,7 +969,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
           </button>
           <button
             type="button"
-            disabled={!projectPath.trim() || !onOpenInBrowser}
+            disabled={!onOpenInBrowser || !isRunning}
             onClick={(e) => {
               e.stopPropagation()
               if (isRunning && onOpenInBrowser) onOpenInBrowser()
@@ -962,11 +978,11 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
               isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
             }`}
             title={
-              !projectPath.trim()
-                ? 'Set a repo path in settings'
-                : isRunning
-                  ? `Open ${runUrl} in browser`
-                  : 'Start the project to open in browser'
+              isRunning
+                ? isWordPressLocal
+                  ? 'Open WordPress site in browser'
+                  : 'Open in browser'
+                : 'Start the project to open in browser'
             }
           >
             <ExternalLink size={11} className="shrink-0" />
@@ -1154,9 +1170,9 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
                 <span className={msc_readoutDotCls} aria-hidden />
                 <span
                   className={msc_readoutLiveTextCls}
-                  title={`${getStatusLabel()} on port ${port}${healthLine?.label ? ` · ${healthLine.label}` : ''}`}
+                  title={`${getStatusLabel()} — ${displayPortOrDomain}${healthLine?.label ? ` · ${healthLine.label}` : ''}`}
                 >
-                  {getStatusLabel()} — {port}
+                  {getStatusLabel()} — {displayPortOrDomain}
                 </span>
               </div>
               <button
@@ -1209,9 +1225,9 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
                     </span>
                     <span
                       className="block truncate text-[10px] font-medium leading-tight tracking-tight text-[#7dcea0]/95"
-                      title={runUrl}
+                      title={displayRunUrl}
                     >
-                      {runUrl}
+                      {displayRunUrl}
                     </span>
                     {healthLine && (
                       <span
@@ -1308,7 +1324,7 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
 
         <button
           type="button"
-          disabled={!projectPath.trim() || !onOpenInBrowser}
+          disabled={!onOpenInBrowser || !isRunning}
           onClick={(e) => {
             e.stopPropagation()
             if (isRunning && onOpenInBrowser) onOpenInBrowser()
@@ -1317,11 +1333,11 @@ export const Msc_ProjectCard = forwardRef<HTMLDivElement, Msc_ProjectCardProps>(
             isRunning && onOpenInBrowser ? openBtnActiveClass : openBtnIdleClass
           }`}
           title={
-            !projectPath.trim()
-              ? 'Set a repo path in settings'
-              : isRunning
-                ? `Open ${runUrl} in browser`
-                : 'Start the project to open in browser'
+            isRunning
+              ? isWordPressLocal
+                ? 'Open WordPress site in browser'
+                : 'Open in browser'
+              : 'Start the project to open in browser'
           }
         >
           <ExternalLink size={13} className="shrink-0" />

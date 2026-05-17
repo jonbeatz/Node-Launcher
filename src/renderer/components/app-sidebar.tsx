@@ -60,6 +60,7 @@ export function AppSidebar({
     electron: 0,
     web: 0,
     node: 0,
+    wordpress: 0,
     unknown: 0,
   }
 
@@ -72,7 +73,7 @@ export function AppSidebar({
     maintenanceActive && maintenanceTab === tab
 
   const msc_sidebarShieldTint = (tacticalId: VpeTacticalProjectFilter): string =>
-    tacticalId === 'all' ? '#737373' : msc_shieldColorHex(tacticalId)
+    tacticalId === 'all' ? '#ffffff' : msc_shieldColorHex(tacticalId)
 
   return (
     <aside
@@ -221,7 +222,9 @@ export function AppSidebar({
                           className={`shrink-0 rounded-full ${
                             item.id === 'unknown'
                               ? 'ring-1 ring-[#00FFFF]/50 shadow-[0_0_8px_rgba(0,255,255,0.22)]'
-                              : ''
+                              : item.id === 'wordpress'
+                                ? 'ring-1 ring-[#3b82f6]/55 shadow-[0_0_8px_rgba(59,130,246,0.28)]'
+                                : ''
                           }`}
                           style={{
                             width: 10,

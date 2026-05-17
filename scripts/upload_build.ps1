@@ -23,16 +23,19 @@ Write-Host "🌿 Git branch: $gitBranch  →  release prefix: $cleanPrefix" -For
 Write-Host "🔍 Scrutinizing GitHub for existing releases..." -ForegroundColor Gray
 $ghTags = gh release list --limit 50 | ForEach-Object { ($_ -split "`t")[0] }
 
-$count = 1
-while ($true) {
-    $vaderVersion = "$cleanPrefix-v1.$count"
-    # Skip if tag exists OR if it matches the old double-name glitch pattern
-    if ($ghTags -contains $vaderVersion -or $vaderVersion -match "v1.1-v1.1") { 
-        $count++ 
-    } else { 
-        break 
+    $vaderVersion = "$cleanPrefix"
+    # If the tag already exists, add a suffix to avoid conflict
+    if ($ghTags -contains $vaderVersion) {
+        $count = 1
+        while ($true) {
+            $vaderVersion = "$cleanPrefix-v1.$count"
+            if ($ghTags -contains $vaderVersion) {
+                $count++
+            } else {
+                break
+            }
+        }
     }
-}
 
 Write-Host "🚀 TARGET VERSION: $vaderVersion" -ForegroundColor Cyan
 

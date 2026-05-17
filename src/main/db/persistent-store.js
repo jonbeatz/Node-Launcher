@@ -13,8 +13,8 @@ const {
 /** One-time migrate source; cwd file is archived to media/_vpe_archive after boot. */
 const LEGACY_REGISTRY = path.join(process.cwd(), 'projects.json');
 
-/** Final `PRAGMA user_version` after `msc_sqliteMigrateSchemaAndPorts` (v2.2.x: `display_order` for dashboard order). */
-const VPE_SQLITE_USER_VERSION = 17;
+/** Final `PRAGMA user_version` after `msc_sqliteMigrateSchemaAndPorts` (v2.2.x+: `project_url`/`slug` for WordPress-Local). */
+const VPE_SQLITE_USER_VERSION = 19;
 
 /**
  * Initial DDL before incremental migrations (see `msc_sqliteMigrateSchemaAndPorts`).
@@ -304,11 +304,23 @@ class SqlitePersistence {
         payload.watchdog_enabled === true || payload.watchdog_enabled === 1 ? 1 : 0;
     }
 
+    let projectUrlBind = found.project_url != null ? String(found.project_url) : null;
+    if (Object.prototype.hasOwnProperty.call(payload, 'project_url')) {
+      const pv = payload.project_url;
+      projectUrlBind = pv == null || String(pv).trim() === '' ? null : String(pv).trim();
+    }
+
+    let slugBind = found.slug != null ? String(found.slug) : null;
+    if (Object.prototype.hasOwnProperty.call(payload, 'slug')) {
+      const sv = payload.slug;
+      slugBind = sv == null || String(sv).trim() === '' ? null : String(sv).trim();
+    }
+
     this._db
       .prepare(
         `
       UPDATE projects
-      SET name = ?, path = ?, port = ?, thumbnail_url = ?, start_script = ?, build_script = ?, pkg_manager = ?, project_type = ?, is_archived = ?, notes = ?, watchdog_enabled = ?
+      SET name = ?, path = ?, port = ?, thumbnail_url = ?, start_script = ?, build_script = ?, pkg_manager = ?, project_type = ?, is_archived = ?, notes = ?, watchdog_enabled = ?, project_url = ?, slug = ?
       WHERE id = ?
     `,
       )
@@ -324,6 +336,8 @@ class SqlitePersistence {
         isArchivedBind,
         notesBind,
         watchdogBind,
+        projectUrlBind,
+        slugBind,
         payload.id,
       );
   }
@@ -341,6 +355,14 @@ class SqlitePersistence {
         : null;
     const watchdogEnabled =
       payload.watchdog_enabled === false || payload.watchdog_enabled === 0 ? 0 : 1;
+    const projectUrlIns =
+      payload.project_url != null && String(payload.project_url).trim() !== ''
+        ? String(payload.project_url).trim()
+        : null;
+    const slugIns =
+      payload.slug != null && String(payload.slug).trim() !== ''
+        ? String(payload.slug).trim()
+        : null;
     const mx = this._db
       .prepare(
         `SELECT COALESCE(MAX(sort_order), 0) AS ms, COALESCE(MAX(display_order), 0) AS md FROM projects`,
@@ -351,8 +373,8 @@ class SqlitePersistence {
     this._db
       .prepare(
         `
-      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived, notes, watchdog_enabled, sort_order, display_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, name, path, port, status, thumbnail_url, start_script, build_script, pkg_manager, project_type, is_archived, notes, watchdog_enabled, sort_order, display_order, project_url, slug)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -371,6 +393,8 @@ class SqlitePersistence {
         watchdogEnabled,
         nextOrder,
         nextOrder,
+        projectUrlIns,
+        slugIns,
       );
   }
 
@@ -932,6 +956,14 @@ class JsonPersistence {
       const nv = payload.notes;
       p.notes = nv == null ? null : String(nv);
     }
+    if (Object.prototype.hasOwnProperty.call(payload, 'project_url')) {
+      const pv = payload.project_url;
+      p.project_url = pv == null || String(pv).trim() === '' ? null : String(pv).trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'slug')) {
+      const sv = payload.slug;
+      p.slug = sv == null || String(sv).trim() === '' ? null : String(sv).trim();
+    }
     this.save();
   }
 
@@ -943,6 +975,14 @@ class JsonPersistence {
     const notesIni =
       payload.notes != null && String(payload.notes).trim() !== ''
         ? String(payload.notes)
+        : null;
+    const projectUrlJson =
+      payload.project_url != null && String(payload.project_url).trim() !== ''
+        ? String(payload.project_url).trim()
+        : null;
+    const slugJson =
+      payload.slug != null && String(payload.slug).trim() !== ''
+        ? String(payload.slug).trim()
         : null;
     const soRaw = Number(payload.sort_order);
     let sortOrder = Number.isFinite(soRaw) && soRaw > 0 ? Math.floor(soRaw) : 0;
@@ -961,6 +1001,8 @@ class JsonPersistence {
       project_type: pt,
       is_archived: Boolean(payload.is_archived),
       notes: notesIni,
+      project_url: projectUrlJson,
+      slug: slugJson,
       sort_order: sortOrder,
       display_order: sortOrder,
       health_http_code: null,
@@ -1459,6 +1501,24 @@ function msc_sqliteMigrateSchemaAndPorts(db) {
       tx();
     }
     ver = 17;
+  }
+
+  // LocalWP / WordPress-Local: persisted domain URL (e.g. `http://sitename.local/`).
+  if (ver < 18) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('project_url')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN project_url TEXT`);
+    }
+    ver = 18;
+  }
+
+  // LocalWP: site slug for the `local.exe` CLI. Falls back to project `name` at runtime.
+  if (ver < 19) {
+    const names = msc_sqliteTableColumnNames(db, 'projects');
+    if (!names.includes('slug')) {
+      db.exec(`ALTER TABLE projects ADD COLUMN slug TEXT`);
+    }
+    ver = 19;
   }
 
   db.pragma(`user_version = ${ver}`);

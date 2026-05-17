@@ -3,11 +3,22 @@
 /**
  * v1.7.6 — Privileged `vpe-vault:` protocol; serves `media/vault/<project>/_vpe_thumb.png` by registry id.
  * JEDI_MOD_125 — Sovereign Windows root `Node-Launcher-v2/media/vault`, explicit `image/png` Response, legacy fallback.
+ * v2.2.6+ — `vpe-thumb:` protocol: safe file-system passthrough for WordPress theme screenshots.
  */
 
 const { protocol, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
+
+/** Allowed image MIME types served by vpe-thumb://. */
+const VPE_THUMB_MIME = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+};
 const {
   VPE_VAULT_INTERNAL_THUMB,
   msc_projectVaultProjectDir,
@@ -37,7 +48,59 @@ function msc_registerVpeVaultPrivilegedScheme() {
         stream: true,
       },
     },
+    {
+      scheme: 'vpe-thumb',
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+        stream: true,
+      },
+    },
   ]);
+}
+
+/**
+ * `vpe-thumb:` protocol handler — safe passthrough for arbitrary image paths on disk.
+ * URL format mirrors file:// but uses vpe-thumb:// so Electron's renderer CSP allows it.
+ * e.g. vpe-thumb:///D:/path/to/screenshot.png  (Windows)
+ *      vpe-thumb:///home/user/screenshot.png    (POSIX)
+ */
+function msc_registerVpeThumbProtocolHandler() {
+  session.defaultSession.protocol.handle('vpe-thumb', (request) => {
+    const fail = (code = 404) =>
+      new Response('', { status: code, headers: { 'Content-Type': 'text/plain' } });
+    try {
+      const u = new URL(request.url);
+      // pathname: "/D:/path/to/file.png" on Windows, "/home/user/file.png" on POSIX
+      let pathname = decodeURIComponent(u.pathname);
+      // Strip the leading slash only when the next char is a Windows drive letter (e.g. /D:/)
+      if (/^\/[A-Za-z]:[\\/]/.test(pathname)) {
+        pathname = pathname.slice(1);
+      }
+      const absFile = path.normalize(pathname);
+      // Safety: only serve files with allowed image extensions
+      const ext = path.extname(absFile).toLowerCase();
+      const mimeType = VPE_THUMB_MIME[ext];
+      if (!mimeType) return fail(403);
+      if (!fs.existsSync(absFile)) return fail(404);
+      const st = fs.statSync(absFile);
+      if (!st.isFile()) return fail(404);
+      const body = fs.readFileSync(absFile);
+      return new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': mimeType,
+          'Cache-Control': 'no-store, max-age=0',
+        },
+      });
+    } catch (e) {
+      console.warn('[VPE] vpe-thumb protocol error:', e?.message ?? e);
+      return fail(500);
+    }
+  });
+  console.log('[VPE] vpe-thumb protocol handler registered');
 }
 
 /** Register `vpe-vault:` handler; `getStore` must return the persistence API (`getProject`, `listProjectsAlphabetical`). */
@@ -107,4 +170,5 @@ function msc_registerVpeVaultProtocolHandler(getStore) {
 module.exports = {
   msc_registerVpeVaultPrivilegedScheme,
   msc_registerVpeVaultProtocolHandler,
+  msc_registerVpeThumbProtocolHandler,
 };

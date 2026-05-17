@@ -1,6 +1,8 @@
 const EventEmitter = require('events');
 const { spawn, execSync, exec } = require('child_process');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 const net = require('net');
 const path = require('path');
 const treeKill = require('tree-kill');
@@ -14,6 +16,467 @@ const { msc_launcherRendererPort } = require('./launcher-port');
 const { msc_healthPollDelayMs, MSC_HEALTH_FIRST_MS } = require('./health-scheduler');
 
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
+
+// ── LocalWP / WordPress-Local helpers ────────────────────────────────────────
+
+/** Absolute path to LocalWP's sites.json (written by the Local GUI app). */
+const MSC_LOCAL_SITES_JSON = path.join(
+  process.env.USERPROFILE || process.env.APPDATA || '',
+  'AppData', 'Roaming', 'Local', 'sites.json',
+);
+
+/**
+ * Parse LocalWP's sites.json. Returns the raw object or null on any error.
+ * @returns {Record<string, Record<string, unknown>> | null}
+ */
+function msc_readLocalWpSitesJson() {
+  try {
+    if (!fs.existsSync(MSC_LOCAL_SITES_JSON)) return null;
+    return JSON.parse(fs.readFileSync(MSC_LOCAL_SITES_JSON, 'utf8'));
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Find a LocalWP site entry whose `domain` matches `<slug>.local`.
+ * @param {string} slug - e.g. "talkshowlandv1"
+ * @returns {Record<string, unknown> | null}
+ */
+function msc_findLocalWpSiteBySlug(slug) {
+  const sites = msc_readLocalWpSitesJson();
+  if (!sites || typeof sites !== 'object') return null;
+  const target = `${slug}.local`.toLowerCase();
+  for (const entry of Object.values(sites)) {
+    if (entry && typeof entry === 'object' && String(entry.domain || '').toLowerCase() === target) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract the nginx/apache HTTP port from a LocalWP site services block.
+ * Returns null when no HTTP-role service is found.
+ * @param {Record<string, unknown>} siteEntry
+ * @returns {number | null}
+ */
+function msc_getLocalWpNginxPort(siteEntry) {
+  if (!siteEntry || typeof siteEntry !== 'object') return null;
+  const services = siteEntry.services;
+  if (!services || typeof services !== 'object') return null;
+  for (const svc of Object.values(services)) {
+    if (svc && svc.role === 'http' && svc.ports) {
+      const ports = svc.ports.HTTP || svc.ports.http || svc.ports.HTTPS || [];
+      if (Array.isArray(ports) && ports.length > 0) return Number(ports[0]);
+    }
+  }
+  return null;
+}
+
+/**
+ * Discover the Local by Flywheel executable across common install locations.
+ * Checks the legacy `main-cli/win32/local.exe` stub first (pre-v10), then
+ * falls back to the main `Local.exe` GUI app (v10+, supports single-instance
+ * CLI pass-through when Local is already running).
+ * Returns the absolute path (unquoted) or null if not found.
+ * @returns {string | null}
+ */
+function msc_findLocalExePath() {
+  const lad  = process.env.LOCALAPPDATA || '';
+  const pf   = 'C:\\Program Files';
+  const pf86 = 'C:\\Program Files (x86)';
+  const cliSuffix = path.join('resources', 'extraResources', 'main-cli', 'win32', 'local.exe');
+  const guiSuffix = 'Local.exe';
+
+  // Pre-v10 dedicated CLI stub candidates.
+  const cliCandidates = [
+    path.join(lad,  'Programs', 'local-by-flywheel', cliSuffix),
+    path.join(lad,  'Programs', 'Local',             cliSuffix),
+    path.join(pf,   'Local',                         cliSuffix),
+    path.join(pf86, 'Local',                         cliSuffix),
+    path.join(pf,   'local-by-flywheel',             cliSuffix),
+  ];
+  for (const p of cliCandidates) {
+    try { if (fs.existsSync(p)) return p; } catch (_) { /* */ }
+  }
+
+  // Squirrel versioned directory: %LOCALAPPDATA%\local-by-flywheel\app-X.Y.Z\...
+  try {
+    const lbf = path.join(lad, 'local-by-flywheel');
+    if (fs.existsSync(lbf)) {
+      const dirs = fs.readdirSync(lbf).filter((d) => d.startsWith('app-')).sort().reverse();
+      for (const d of dirs) {
+        const p = path.join(lbf, d, cliSuffix);
+        if (fs.existsSync(p)) return p;
+      }
+    }
+  } catch (_) { /* */ }
+
+  // v10+ fallback: the GUI app itself accepts CLI args via Electron single-instance
+  // pass-through when Local is already running (start-site / stop-site / router start).
+  const guiCandidates = [
+    path.join(pf86, 'Local', guiSuffix),
+    path.join(pf,   'Local', guiSuffix),
+    path.join(lad,  'Programs', 'Local', guiSuffix),
+  ];
+  for (const p of guiCandidates) {
+    try { if (fs.existsSync(p)) return p; } catch (_) { /* */ }
+  }
+
+  return null;
+}
+
+/**
+ * Discover the WP-CLI phar and a compatible PHP binary bundled with Local.
+ * Returns { phpExe, wpCliPhar } or null if either component is missing.
+ * @returns {{ phpExe: string, wpCliPhar: string } | null}
+ */
+function msc_findLocalWpCliPaths() {
+  const pf86 = 'C:\\Program Files (x86)';
+  const pf   = 'C:\\Program Files';
+
+  const wpCliPhar = [
+    path.join(pf86, 'Local', 'resources', 'extraResources', 'bin', 'wp-cli', 'wp-cli.phar'),
+    path.join(pf,   'Local', 'resources', 'extraResources', 'bin', 'wp-cli', 'wp-cli.phar'),
+  ].find((p) => { try { return fs.existsSync(p); } catch { return false; } });
+
+  if (!wpCliPhar) return null;
+
+  // Find the highest-version PHP binary in lightning-services.
+  // wpCliPhar is at .../extraResources/bin/wp-cli/wp-cli.phar — step up 3 dirs to extraResources.
+  const lightningBase = path.join(path.dirname(path.dirname(path.dirname(wpCliPhar))), 'lightning-services');
+  let phpExe = null;
+  try {
+    if (fs.existsSync(lightningBase)) {
+      const phpDirs = fs.readdirSync(lightningBase)
+        .filter((d) => d.startsWith('php-'))
+        .sort()
+        .reverse(); // newest first
+      for (const d of phpDirs) {
+        const candidate = path.join(lightningBase, d, 'bin', 'win64', 'php.exe');
+        if (fs.existsSync(candidate)) { phpExe = candidate; break; }
+      }
+    }
+  } catch (_) { /* */ }
+
+  if (!phpExe) return null;
+  return { phpExe, wpCliPhar };
+}
+
+/**
+ * Write a VPE-managed WordPress mu-plugin that forces WP_HOME / WP_SITEURL to
+ * use http:// instead of https://. This prevents WordPress from issuing a 301
+ * redirect to https when the Local router is serving plain HTTP.
+ *
+ * @param {string} wpRoot - absolute path to the WordPress web root (where wp-config.php lives)
+ * @param {string} domain - e.g. "talkshowlandv1.local"
+ * @returns {{ ok: boolean, path?: string, error?: string }}
+ */
+function msc_writeWpVpeMuPlugin(wpRoot, domain) {
+  try {
+    const muDir = path.join(wpRoot, 'wp-content', 'mu-plugins');
+    fs.mkdirSync(muDir, { recursive: true });
+    const pluginPath = path.join(muDir, 'vpe-local-urls.php');
+    const content = [
+      '<?php',
+      '/**',
+      ' * VPE Local URL Override — managed by Vader Project Engine.',
+      ' * Forces WP_HOME / WP_SITEURL to http:// so the Local router can serve the',
+      ' * site over plain HTTP without triggering a WordPress 301 → https redirect.',
+      ' * AUTO-GENERATED: deleted automatically when VPE stops this project.',
+      ' */',
+      "if (!defined('VPE_LOCAL_URL_OVERRIDE')) {",
+      "    define('VPE_LOCAL_URL_OVERRIDE', true);",
+      `    define('WP_HOME',    'http://${domain}');`,
+      `    define('WP_SITEURL', 'http://${domain}');`,
+      '}',
+      '',
+    ].join('\n');
+    fs.writeFileSync(pluginPath, content, 'utf8');
+    return { ok: true, path: pluginPath };
+  } catch (e) {
+    return { ok: false, error: e?.message ?? String(e) };
+  }
+}
+
+/**
+ * Remove the VPE-managed mu-plugin if it exists and was written by VPE.
+ * @param {string} wpRoot
+ * @returns {{ ok: boolean, skipped?: boolean, error?: string }}
+ */
+function msc_removeWpVpeMuPlugin(wpRoot) {
+  try {
+    const pluginPath = path.join(wpRoot, 'wp-content', 'mu-plugins', 'vpe-local-urls.php');
+    if (!fs.existsSync(pluginPath)) return { ok: true, skipped: true };
+    const content = fs.readFileSync(pluginPath, 'utf8');
+    if (content.includes('VPE Local URL Override') || content.includes('VPE_LOCAL_URL_OVERRIDE')) {
+      fs.unlinkSync(pluginPath);
+      return { ok: true };
+    }
+    return { ok: true, skipped: true };
+  } catch (e) {
+    return { ok: false, error: e?.message ?? String(e) };
+  }
+}
+
+/**
+ * Read Local's live GraphQL connection info (written by the running Local GUI).
+ * Returns { url, authToken } or null if the file doesn't exist.
+ * @returns {{ url: string, authToken: string } | null}
+ */
+function msc_readLocalGraphqlInfo() {
+  const gqlPath = path.join(
+    process.env.USERPROFILE || process.env.APPDATA || '',
+    'AppData', 'Roaming', 'Local', 'graphql-connection-info.json',
+  );
+  try {
+    if (!fs.existsSync(gqlPath)) return null;
+    const raw = JSON.parse(fs.readFileSync(gqlPath, 'utf8'));
+    if (raw && raw.url && raw.authToken) return { url: String(raw.url), authToken: String(raw.authToken) };
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Launch Local.exe in the background with a minimized window so it doesn't steal focus.
+ * Uses PowerShell Start-Process -WindowStyle Minimized on Windows to suppress the GUI popup.
+ * Safe no-op when localExePath is falsy.
+ * @param {string | null} localExePath - unquoted absolute path to Local.exe
+ */
+function msc_launchLocalMinimized(localExePath) {
+  if (!localExePath) return;
+  if (process.platform === 'win32') {
+    const safeExe = localExePath.replace(/'/g, "''");
+    const psCmd = `powershell -NoProfile -NonInteractive -WindowStyle Hidden -Command "& { Start-Process -FilePath '${safeExe}' -WindowStyle Minimized }"`;
+    exec(psCmd, { windowsHide: true }, (err) => {
+      if (err) console.warn('[VPE] LocalWP minimized launch warning:', err.message);
+    });
+  } else {
+    exec(`"${localExePath}"`, { windowsHide: true }, () => {});
+  }
+}
+
+/**
+ * Synchronous check: is the Local by Flywheel GUI process (Local.exe) actually running?
+ *
+ * This is the primary gate for `msc_isLocalGraphqlListening`. Without it, a stale
+ * graphql-connection-info.json can produce a false positive when another service
+ * (e.g. LiteLLM) happens to be listening on port 4000 — the same default port Local uses.
+ *
+ * @returns {boolean}
+ */
+function msc_isLocalExeProcessRunning() {
+  if (process.platform !== 'win32') return false;
+  try {
+    const stdout = (execSync('tasklist /FI "IMAGENAME eq Local.exe" /FO CSV /NH', {
+      windowsHide: true,
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }) || '').toString();
+    return stdout.toLowerCase().includes('local.exe');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Three-gate check: resolves `true` only when Local.exe is running, its GraphQL port
+ * is reachable, AND an HTTP probe confirms the endpoint returns a real GraphQL response.
+ *
+ * Prevents false positives when another service (e.g. LiteLLM) is on the same port
+ * that a stale graphql-connection-info.json references. Never rejects.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function msc_isLocalGraphqlListening() {
+  // Gate 1: Local.exe process must be alive.
+  if (!msc_isLocalExeProcessRunning()) return false;
+
+  // Gate 2: The GraphQL port from the connection-info file must be reachable.
+  const info = msc_readLocalGraphqlInfo();
+  if (!info) return false;
+  try {
+    const portNum = Number(new URL(info.url).port) || 4000;
+    await new Promise((resolve, reject) => {
+      const sock = net.createConnection({ port: portNum, host: '127.0.0.1' });
+      sock.setTimeout(600);
+      sock.on('connect', () => { sock.destroy(); resolve(undefined); });
+      sock.on('error',   (e) => { sock.destroy(); reject(e); });
+      sock.on('timeout', () => { sock.destroy(); reject(new Error('timeout')); });
+    });
+    // Gate 3: Confirm the responding service is a real GraphQL server.
+    return await msc_validateLocalGraphqlEndpoint(info);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Poll for LocalWP's GraphQL server to become available.
+ * Reads graphql-connection-info.json and verifies the TCP socket is listening before resolving.
+ * Designed to be called right after msc_launchLocalMinimized so mutations don't fire early.
+ *
+ * @param {number} [maxAttempts=120] - number of polling cycles (120 × 500ms = 60 seconds total)
+ * @param {number} [intervalMs=500] - milliseconds between each poll
+ * @returns {Promise<{url: string, authToken: string} | null>}
+ */
+/**
+ * Three-gate check to confirm the server at `info.url` is actually Local's GraphQL API:
+ *  1. TCP socket connects (port is open)
+ *  2. A simple `{ __typename }` GraphQL introspection returns JSON with a `data` key
+ *
+ * This prevents false positives when another service (e.g. LiteLLM) is running on the
+ * same port as the stale graphql-connection-info.json references. LiteLLM returns
+ * HTTP 404 + {"detail":"Not Found"} for the /graphql path — no `data` key.
+ *
+ * @param {{ url: string, authToken: string }} info
+ * @returns {Promise<boolean>}
+ */
+async function msc_validateLocalGraphqlEndpoint(info) {
+  return new Promise((resolve) => {
+    try {
+      const parsed = new URL(info.url);
+      const body = JSON.stringify({ query: '{ __typename }' });
+      const req = http.request({
+        hostname: '127.0.0.1',
+        port: Number(parsed.port) || 4000,
+        path: parsed.pathname || '/graphql',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+          'Authorization': `Bearer ${info.authToken}`,
+          'apollo-require-preflight': 'true',
+        },
+      }, (res) => {
+        let raw = '';
+        res.on('data', (c) => { raw += c; });
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(raw);
+            // A valid GraphQL server returns { data: { ... } }
+            // LiteLLM returns { "detail": "Not Found" } for /graphql — no `data` key
+            resolve(json != null && typeof json === 'object' && 'data' in json);
+          } catch {
+            resolve(false);
+          }
+        });
+      });
+      req.setTimeout(2000, () => { req.destroy(); resolve(false); });
+      req.on('error', () => resolve(false));
+      req.write(body);
+      req.end();
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function msc_waitForLocalGraphql(maxAttempts = 120, intervalMs = 500) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Gate 1: Local.exe process must be running before we trust the connection-info file.
+    // Without this, a service already on port 4000 (e.g. LiteLLM) would satisfy the
+    // socket check before Local has even had a chance to write its own port to the file.
+    if (!msc_isLocalExeProcessRunning()) {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      continue;
+    }
+    const info = msc_readLocalGraphqlInfo();
+    if (info) {
+      try {
+        // Gate 2: TCP socket must be open.
+        const portNum = Number(new URL(info.url).port) || 4000;
+        await new Promise((resolve, reject) => {
+          const sock = net.createConnection({ port: portNum, host: '127.0.0.1' });
+          sock.setTimeout(350);
+          sock.on('connect', () => { sock.destroy(); resolve(undefined); });
+          sock.on('error', (e) => { sock.destroy(); reject(e); });
+          sock.on('timeout', () => { sock.destroy(); reject(new Error('socket timeout')); });
+        });
+        // Gate 3: HTTP probe confirms it's actually a GraphQL server (not LiteLLM/REST).
+        const isRealGraphql = await msc_validateLocalGraphqlEndpoint(info);
+        if (isRealGraphql) return info; // Local GraphQL is genuinely up!
+      } catch (_) { /* Port not yet listening — keep polling */ }
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return null; // Timed out
+}
+
+/**
+ * Call Local's internal GraphQL API to start or stop a site.
+ * Resolves with the response data object, or rejects on network / GraphQL error.
+ * @param {'startSite'|'stopSite'} mutation
+ * @param {string} siteId - LocalWP site id (e.g. "fNRcJtRcd")
+ * @returns {Promise<Record<string, unknown>>}
+ */
+function msc_callLocalGraphql(mutation, siteId) {
+  return new Promise((resolve, reject) => {
+    const gqlInfo = msc_readLocalGraphqlInfo();
+    if (!gqlInfo) return reject(new Error('Local GraphQL connection info not found — is Local GUI open?'));
+
+    const body = JSON.stringify({ query: `mutation { ${mutation}(id: "${siteId}") { id name status } }` });
+    const parsed = new URL(gqlInfo.url);
+    const options = {
+      hostname: parsed.hostname,
+      port: Number(parsed.port) || 4000,
+      path: parsed.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'Authorization': `Bearer ${gqlInfo.authToken}`,
+        'apollo-require-preflight': 'true',
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.errors && json.errors.length > 0) {
+            return reject(new Error(json.errors[0].message));
+          }
+          resolve(json.data || {});
+        } catch (e) {
+          reject(new Error(`GraphQL parse error: ${e.message}`));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('GraphQL request timeout')); });
+    req.write(body);
+    req.end();
+  });
+}
+
+/**
+ * WordPress path traversal: step back out of generic WP subdirectories (public, app, htdocs…)
+ * to find the real project name used as the LocalWP site slug.
+ * Example: D:\TalkShowLand_v1\app\public → "talkshowlandv1"
+ *
+ * @param {string} filePath — absolute folder path stored in the project registry
+ * @returns {string} lowercase alphanumeric slug (empty string if nothing useful found)
+ */
+function msc_wpSiteSlugFromPath(filePath) {
+  const WP_GENERIC_SUBDIRS = new Set(['public', 'app', 'htdocs', 'www', 'web', 'html']);
+  let folderName = path.basename(filePath);
+  if (WP_GENERIC_SUBDIRS.has(folderName.toLowerCase())) {
+    const parent = path.basename(path.dirname(filePath));
+    if (parent && WP_GENERIC_SUBDIRS.has(parent.toLowerCase())) {
+      const grandparent = path.basename(path.dirname(path.dirname(filePath)));
+      folderName = grandparent || folderName;
+    } else {
+      folderName = parent || folderName;
+    }
+  }
+  return folderName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
 /** No TCP/connect failures persisted to SQLite until elapsed — avoids false red “Offline” while Next/boot compiles. */
 const MSC_STARTUP_GRACE_MS = 20000;
 const MSC_STARTUP_MAX_CONSECUTIVE_HEALTH_FAILS = 6;
@@ -83,7 +546,7 @@ class MSC_ProjectRunner extends EventEmitter {
     super();
     this.mainWindow = mainWindow;
     this.store = store;
-    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess, healthPollTimer?: NodeJS.Timeout, healthStartedAt?: number, healthFailCount?: number, watchdogEnabled?: boolean, restartAttempts?: number[] }>} */
+    /** @type {Map<string, { dev?: import('child_process').ChildProcess, build?: import('child_process').ChildProcess, healthPollTimer?: NodeJS.Timeout, healthStartedAt?: number, healthFailCount?: number, watchdogEnabled?: boolean, restartAttempts?: number[], wpLocal?: boolean }>} */
     this.children = new Map();
     /** Serialize HTTP health checks across projects (one in flight). */
     this._healthProbeChain = Promise.resolve();
@@ -485,6 +948,12 @@ class MSC_ProjectRunner extends EventEmitter {
       throw new Error('Dev process already running for this project');
     }
 
+    // ── WordPress-Local: headless environment lift (bypasses PTY, port, package.json checks) ──
+    if (row.project_type === 'wordpress-local') {
+      return this._startWordPressLocal(row, rec);
+    }
+    // ─────────────────────────────────────────────────────────────────────────────────────────
+
     await this._runDevPreflight(row);
 
     const projectRoot = msc_normalizePersistedProjectPath(row.path);
@@ -611,6 +1080,25 @@ class MSC_ProjectRunner extends EventEmitter {
 
   stopDev(projectId) {
     const rec = this.children.get(projectId);
+
+    // ── WordPress-Local: headless environment teardown ──
+    // Route to WordPress stop handler if:
+    //  a) the project was started in this session (rec.wpLocal === true), OR
+    //  b) this is a wordpress-local project and the rec is missing (VPE restarted while
+    //     the site was running) — initialise a fresh rec so the handler can run cleanly.
+    if (rec?.wpLocal) {
+      return this._stopWordPressLocal(projectId, rec);
+    }
+    if (!rec) {
+      const row = this.store.getProject(projectId);
+      if (row && row.project_type === 'wordpress-local') {
+        const freshRec = {};
+        this.children.set(projectId, freshRec);
+        return this._stopWordPressLocal(projectId, freshRec);
+      }
+    }
+    // ───────────────────────────────────────────────────
+
     if (!rec?.dev) {
       this.store.clearProjectHealth(projectId);
       this.store.setProjectStopped(projectId);
@@ -636,10 +1124,408 @@ class MSC_ProjectRunner extends EventEmitter {
     return { ok: true, status: 'stopped' };
   }
 
+  /**
+   * LocalWP headless start.
+   *
+   * Strategy (tried in order):
+   *  1. Local GraphQL API  — preferred; works when Local GUI is open; reads auth
+   *     token from %APPDATA%\Roaming\Local\graphql-connection-info.json.
+   *  2. local.exe / Local.exe CLI — fallback; works with pre-v10 builds or when
+   *     Local.exe single-instance pass-through is active.
+   *  3. Graceful no-op — logs a message telling the user to start in Local GUI.
+   *
+   * In all paths the mu-plugin is written first so WordPress stops redirecting
+   * HTTP → HTTPS, and the nginx port from sites.json is stored on `rec` for the
+   * health poll and the OPEN button.
+   *
+   * @param {Record<string, unknown>} row
+   * @param {Record<string, unknown>} rec
+   */
+  _startWordPressLocal(row, rec) {
+    const localExePath = msc_findLocalExePath();
+    const localExe = localExePath ? `"${localExePath}"` : null;
+    const siteSlug =
+      (typeof row.slug === 'string' && row.slug.trim()) ||
+      msc_wpSiteSlugFromPath(String(row.path || '')) ||
+      String(row.name);
+    const id = String(row.id);
+
+    // Resolve the site's nginx port and domain from LocalWP's sites.json.
+    const siteEntry = msc_findLocalWpSiteBySlug(siteSlug);
+    const nginxPort = siteEntry ? msc_getLocalWpNginxPort(siteEntry) : null;
+    const domain = (siteEntry && typeof siteEntry.domain === 'string' && siteEntry.domain)
+      ? siteEntry.domain
+      : `${siteSlug}.local`;
+
+    // Write the http:// mu-plugin BEFORE starting so WordPress never redirects to https.
+    const wpRoot = msc_normalizePersistedProjectPath(row.path);
+    const muResult = msc_writeWpVpeMuPlugin(wpRoot, domain);
+    if (muResult.ok && !muResult.skipped) {
+      this._persistAndBroadcastLog(id, 'info',
+        `[vpe] wordpress-local: WP_HOME/WP_SITEURL override written → http://${domain}`);
+    } else if (!muResult.ok) {
+      this._persistAndBroadcastLog(id, 'warn',
+        `[vpe] wordpress-local: mu-plugin write failed (${muResult.error}) — browser may redirect to https`);
+    }
+
+    if (nginxPort) {
+      this._persistAndBroadcastLog(id, 'info',
+        `[vpe] wordpress-local: sites.json → nginx HTTP port ${nginxPort} (domain: ${domain})`);
+    }
+
+    // ── OPTIMISTIC STATE SEEDING (SYNCHRONOUS) ───────────────────────────────────
+    rec.wpLocal   = true;
+    rec.status    = 'running';
+    rec.nginxPort = nginxPort;
+    rec.wpDomain  = domain;
+    this.store.setProjectRunning(id);
+    this.store.setProjectHealth(id, 200, new Date().toISOString(), true);
+    this._emitProjectsRefresh();
+    this._persistAndBroadcastLog(id, 'info',
+      `[vpe] wordpress-local: starting "${siteSlug}" (port ${nginxPort ?? '?'}) via GraphQL → Local.exe fallback`);
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    const afterStart = () => {
+      this._startWpDomainHealthPoll(row, rec);
+      this.emit('start', { projectId: id, mode: 'wordpress-local' });
+    };
+
+    // ── STRATEGY 1: Local GraphQL API with resilient startup polling ─────────────────────────
+    // graphql-connection-info.json persists on disk across reboots, so we MUST probe the
+    // actual TCP socket — not just check file existence — to know if Local GUI is running.
+    // Cold-start timeout: 120 × 500 ms = 60 s (Local can take 30-45 s on first launch).
+    const siteEntry2 = siteEntry; // already resolved above
+    const localSiteId = siteEntry2 && siteEntry2.id ? String(siteEntry2.id) : null;
+
+    const doGraphQL = () => {
+      msc_callLocalGraphql('startSite', localSiteId)
+        .then((data) => {
+          if (!rec.wpLocal) return;
+          const status = data?.startSite?.status ?? 'unknown';
+          this._persistAndBroadcastLog(id, 'info',
+            `[vpe] wordpress-local: Local GraphQL startSite → status: ${status}`);
+          afterStart();
+        })
+        .catch((gqlErr) => {
+          if (!rec.wpLocal) return;
+          this._persistAndBroadcastLog(id, 'warn',
+            `[vpe] wordpress-local: GraphQL startSite failed (${gqlErr?.message ?? gqlErr}) — trying Local.exe CLI`);
+          this._startWordPressLocalViaCli(id, siteSlug, localExe, rec, afterStart);
+        });
+    };
+
+    // All async startup logic is isolated in a self-contained runner so any unhandled
+    // TypeError / null-deref is caught and funnelled through the CLI fallback path.
+    const runStartupAsync = async () => {
+      // Real socket probe — guards against stale graphql-connection-info.json.
+      const localAlreadyRunning = await msc_isLocalGraphqlListening();
+
+      if (localSiteId) {
+        if (localAlreadyRunning) {
+          this._persistAndBroadcastLog(id, 'info',
+            '[vpe] wordpress-local: Local GraphQL socket verified — sending startSite…');
+          doGraphQL();
+        } else {
+          this._persistAndBroadcastLog(id, 'info',
+            '[vpe] wordpress-local: Local GUI not detected — launching minimized…');
+          if (localExePath) {
+            this._persistAndBroadcastLog(id, 'info',
+              `[vpe] wordpress-local: Local.exe path → ${localExePath}`);
+          }
+          msc_launchLocalMinimized(localExePath);
+          // Poll up to 60 s for Local's GraphQL server to wake up.
+          const gqlInfo = await msc_waitForLocalGraphql(120, 500);
+          if (!rec.wpLocal) return;
+          if (gqlInfo) {
+            this._persistAndBroadcastLog(id, 'info',
+              '[vpe] wordpress-local: Local GraphQL ready — sending startSite…');
+            doGraphQL();
+          } else {
+            this._persistAndBroadcastLog(id, 'warn',
+              '[vpe] wordpress-local: Local GUI did not become ready within 60 s — trying CLI fallback');
+            this._startWordPressLocalViaCli(id, siteSlug, localExe, rec, afterStart);
+          }
+        }
+      } else {
+        // No LocalWP site id in sites.json — launch Local if not running, then try CLI.
+        if (!localAlreadyRunning) {
+          this._persistAndBroadcastLog(id, 'info',
+            '[vpe] wordpress-local: site not in sites.json — launching Local minimized…');
+          msc_launchLocalMinimized(localExePath);
+        }
+        this._persistAndBroadcastLog(id, 'warn',
+          '[vpe] wordpress-local: site not found in sites.json — skipping GraphQL, trying CLI');
+        this._startWordPressLocalViaCli(id, siteSlug, localExe, rec, afterStart);
+      }
+    };
+
+    runStartupAsync().catch((err) => {
+      if (!rec.wpLocal) return;
+      this._persistAndBroadcastLog(id, 'error',
+        `[vpe] wordpress-local: startup exception — ${err?.message ?? String(err)} — falling back to CLI`);
+      this._startWordPressLocalViaCli(id, siteSlug, localExe, rec, afterStart);
+    });
+
+    return { ok: true, status: 'running', projectKind: 'wordpress-local' };
+  }
+
+  /** Internal: CLI fallback for starting a LocalWP site via local.exe / Local.exe. */
+  _startWordPressLocalViaCli(id, siteSlug, localExe, rec, afterStart) {
+    if (!localExe) {
+      this._persistAndBroadcastLog(id, 'warn',
+        '[vpe] wordpress-local: local.exe not found. Open Local by Flywheel, start the site there — VPE will detect it.');
+      afterStart();
+      return;
+    }
+
+    const routerCmd = `${localExe} router start`;
+    this._persistAndBroadcastLog(id, 'info', '[vpe] wordpress-local: CLI step 1 — router start');
+
+    exec(routerCmd, { windowsHide: true }, (routerErr) => {
+      if (routerErr && (routerErr.code === 'ENOENT' || routerErr.code === 'EACCES')) {
+        this._persistAndBroadcastLog(id, 'warn',
+          `[vpe] wordpress-local: router start OS error (${routerErr.code}) — continuing`);
+      }
+
+      setTimeout(() => {
+        if (!rec.wpLocal) return;
+        const siteCmd = `${localExe} start-site ${siteSlug}`;
+        this._persistAndBroadcastLog(id, 'info', `[vpe] wordpress-local: CLI step 2 — start-site ${siteSlug}`);
+
+        exec(siteCmd, { windowsHide: true }, (err, stdout, stderr) => {
+          if (err && (err.code === 'ENOENT' || err.code === 'EACCES')) {
+            this._persistAndBroadcastLog(id, 'error',
+              `[VPE CRITICAL ERROR] local.exe inaccessible — ${err.message}`);
+            rec.wpLocal = false;
+            this.store.clearProjectHealth(id);
+            this.store.setProjectStopped(id);
+            this._emitProjectsRefresh();
+            return;
+          }
+          if (stdout && stdout.trim()) this._persistAndBroadcastLog(id, 'info', `[local.exe] ${stdout.trim()}`);
+          if (stderr && stderr.trim()) this._persistAndBroadcastLog(id, 'warn', `[local.exe stderr] ${stderr.trim()}`);
+          afterStart();
+        });
+      }, 1800);
+    });
+  }
+
+  /**
+   * Background network poll that validates the WordPress domain is reachable.
+   * Makes up to 10 requests at 3-second intervals against the `project_url`.
+   *
+   * Hardening additions:
+   *  • `rejectUnauthorized: false` — LocalWP issues self-signed Windows certificates
+   *    that Node's default TLS stack rejects. We trust the local loopback domain.
+   *  • HTTP fallback probe — if the https:// attempt fails with a connection error,
+   *    immediately retries against http:// (some LocalWP configs serve both ports).
+   *
+   * Any HTTP response (200/301/302/403/500) confirms the server stack is alive.
+   * On total failure after all attempts, logs a diagnostic warning but KEEPS the
+   * running state — the user must explicitly click STOP.
+   *
+   * @param {Record<string, unknown>} row
+   * @param {Record<string, unknown>} rec
+   */
+  _startWpDomainHealthPoll(row, rec) {
+    const rawUrl = String(row.project_url || '').trim();
+    const domainUrl =
+      rawUrl ||
+      `https://${
+        msc_wpSiteSlugFromPath(String(row.path || '')) ||
+        String(row.name).toLowerCase().replace(/\s+/g, '-')
+      }.local/`;
+
+    const MAX_ATTEMPTS = 10;
+    const INTERVAL_MS = 3000;
+    const PROBE_TIMEOUT_MS = 5000;
+    let attempt = 0;
+    const id = String(row.id);
+
+    /**
+     * Fire a single HTTP/S request against `targetUrl`.
+     * On success → persist health + stop poll.
+     * On error   → optionally run `onError()` callback.
+     */
+    const fireRequest = (targetUrl, onError) => {
+      let parsed;
+      try {
+        parsed = new URL(targetUrl);
+      } catch {
+        this._persistAndBroadcastLog(id, 'warn', `[vpe] wordpress-local: invalid URL "${targetUrl}" — skipping probe`);
+        if (onError) onError(new Error('invalid_url'));
+        return;
+      }
+
+      const isHttps = parsed.protocol === 'https:';
+      const mod = isHttps ? https : http;
+      const options = {
+        hostname: parsed.hostname,
+        port: parsed.port ? Number(parsed.port) : (isHttps ? 443 : 80),
+        path: parsed.pathname || '/',
+        method: 'GET',
+        timeout: PROBE_TIMEOUT_MS,
+        headers: { 'User-Agent': 'VPE-WPHealthProbe/1.0' },
+        // LocalWP self-signed Windows certificates must not be rejected.
+        rejectUnauthorized: false,
+      };
+
+      const req = mod.request(options, (res) => {
+        const code = res.statusCode || 200;
+        res.resume(); // Drain body to free socket.
+        if (!rec.wpLocal) return;
+        this.store.setProjectHealth(id, code, new Date().toISOString(), true);
+        this._persistAndBroadcastLog(
+          id,
+          'info',
+          `[vpe] wordpress-local: domain health confirmed — ${targetUrl} → HTTP ${code}`,
+        );
+        this._emitProjectsRefresh();
+      });
+
+      req.on('timeout', () => req.destroy());
+      req.on('error', (err) => {
+        if (onError) onError(err);
+      });
+      req.end();
+    };
+
+    const probe = () => {
+      if (!rec.wpLocal) return;
+      attempt++;
+
+      // Primary probe against the configured/derived URL (may be https://).
+      fireRequest(domainUrl, (primaryErr) => {
+        if (!rec.wpLocal) return;
+
+        // HTTP fallback: if primary is https and fails, also try http version.
+        // LocalWP can serve on plain HTTP; self-signed cert rejections are overridden
+        // above, but ERR_CONNECTION_REFUSED means the port itself isn't open yet.
+        const httpFallback = domainUrl.startsWith('https://')
+          ? domainUrl.replace(/^https:\/\//, 'http://')
+          : null;
+
+        const scheduleRetry = () => {
+          if (!rec.wpLocal) return;
+          if (attempt < MAX_ATTEMPTS) {
+            this._persistAndBroadcastLog(
+              id,
+              'info',
+              `[vpe] wordpress-local: domain probe ${attempt}/${MAX_ATTEMPTS} — not yet reachable, retrying in ${INTERVAL_MS / 1000}s…`,
+            );
+            rec.wpPollTimer = setTimeout(probe, INTERVAL_MS);
+          } else {
+            // Last-resort: try the direct nginx port if sites.json provided one.
+            // The mu-plugin is in place so WordPress won't redirect on this host.
+            const nginxPort = rec.nginxPort;
+            if (nginxPort) {
+              const directUrl = `http://localhost:${nginxPort}/`;
+              this._persistAndBroadcastLog(id, 'info',
+                `[vpe] wordpress-local: all domain probes failed — trying direct nginx port ${nginxPort}…`);
+              fireRequest(directUrl, () => {
+                this._persistAndBroadcastLog(id, 'warn',
+                  `[vpe] wordpress-local: site unreachable on domain and on direct port ${nginxPort}. ` +
+                  'Ensure Local by Flywheel is open and the site is running.');
+                this._emitProjectsRefresh();
+              });
+            } else {
+              this._persistAndBroadcastLog(id, 'warn',
+                `[vpe] wordpress-local: domain unreachable after ${MAX_ATTEMPTS} probes — ${domainUrl}. ` +
+                'Verify Local by Flywheel is running and the site is started.');
+              this._emitProjectsRefresh();
+            }
+          }
+        };
+
+        if (httpFallback) {
+          fireRequest(httpFallback, () => scheduleRetry());
+        } else {
+          scheduleRetry();
+        }
+      });
+    };
+
+    // First probe fires after the router + site warm-up completes (~4 s total with the
+    // 1.8 s delay in _startWordPressLocal + a small additional buffer here).
+    rec.wpPollTimer = setTimeout(probe, 2500);
+  }
+
+  /**
+   * LocalWP headless stop — exec `local.exe stop-site <slug>`.
+   * No PTY/tree-kill teardown required; marks the project stopped synchronously.
+   * @param {string} projectId
+   * @param {Record<string, unknown>} rec
+   */
+  _stopWordPressLocal(projectId, rec) {
+    const row = this.store.getProject(projectId);
+    const localExePath = msc_findLocalExePath();
+    const siteSlug = row
+      ? (typeof row.slug === 'string' && row.slug.trim()) ||
+        msc_wpSiteSlugFromPath(String(row.path || '')) ||
+        String(row.name)
+      : projectId;
+    const siteEntry2 = msc_findLocalWpSiteBySlug(siteSlug);
+
+    this._persistAndBroadcastLog(projectId, 'info',
+      `[vpe] wordpress-local: stopping environment — site "${siteSlug}"`);
+
+    // Remove the VPE mu-plugin override so the WordPress install is left clean.
+    if (row) {
+      const wpRoot = msc_normalizePersistedProjectPath(row.path);
+      const muResult = msc_removeWpVpeMuPlugin(wpRoot);
+      if (muResult.ok && !muResult.skipped) {
+        this._persistAndBroadcastLog(projectId, 'info',
+          '[vpe] wordpress-local: WP_HOME/WP_SITEURL override removed (mu-plugin deleted)');
+      } else if (!muResult.ok) {
+        this._persistAndBroadcastLog(projectId, 'warn',
+          `[vpe] wordpress-local: mu-plugin removal failed — ${muResult.error}`);
+      }
+    }
+
+    // Tell Local to stop the site — GraphQL preferred, CLI fallback.
+    const localSiteId2 = (siteEntry2 && siteEntry2.id) ? String(siteEntry2.id) : null;
+    if (localSiteId2) {
+      msc_callLocalGraphql('stopSite', localSiteId2)
+        .then((data) => {
+          const status = data?.stopSite?.status ?? 'unknown';
+          this._persistAndBroadcastLog(projectId, 'info',
+            `[vpe] wordpress-local: Local GraphQL stopSite → status: ${status}`);
+        })
+        .catch((gqlErr) => {
+          this._persistAndBroadcastLog(projectId, 'warn',
+            `[vpe] wordpress-local: GraphQL stopSite failed (${gqlErr.message}) — trying CLI`);
+          if (localExePath) {
+            exec(`"${localExePath}" stop-site ${siteSlug}`, { windowsHide: true }, () => {});
+          }
+        });
+    } else if (localExePath) {
+      exec(`"${localExePath}" stop-site ${siteSlug}`, { windowsHide: true }, (err) => {
+        if (err) this._persistAndBroadcastLog(projectId, 'warn', `[vpe] wordpress-local: stop-site — ${err.message}`);
+      });
+    } else {
+      this._persistAndBroadcastLog(projectId, 'info',
+        '[vpe] wordpress-local: local.exe not found — stop the site in Local by Flywheel manually');
+    }
+
+    rec.wpLocal = false;
+    rec.nginxPort = undefined;
+    rec.wpDomain  = undefined;
+    if (rec.wpPollTimer) {
+      clearTimeout(rec.wpPollTimer);
+      rec.wpPollTimer = undefined;
+    }
+    this.store.clearProjectHealth(projectId);
+    this.store.setProjectStopped(projectId);
+    this._emitProjectsRefresh();
+    this.emit('stop', { projectId, mode: 'wordpress-local' });
+    return { ok: true, status: 'stopped' };
+  }
+
   async toggleStatus(projectId) {
     const row = this.getRow(projectId);
     const rec = this.children.get(projectId);
-    if (rec?.dev) {
+    // wpLocal flag marks a running wordpress-local environment (no PTY dev process).
+    if (rec?.dev || rec?.wpLocal) {
       return this.stopDev(projectId);
     }
     return this.startDev(row);
@@ -695,11 +1581,68 @@ class MSC_ProjectRunner extends EventEmitter {
         clearTimeout(rec.healthPollTimer);
         rec.healthPollTimer = undefined;
       }
+      if (rec.wpPollTimer) {
+        clearTimeout(rec.wpPollTimer);
+        rec.wpPollTimer = undefined;
+      }
+      rec.wpLocal = false;
       rec.installBootstrap = false;
       if (rec.dev?.pid) treeKill(rec.dev.pid, 'SIGTERM', () => {});
       if (rec.build?.pid) treeKill(rec.build.pid, 'SIGTERM', () => {});
     }
     this.children.clear();
+  }
+
+  /**
+   * Stop every running WordPress-Local site via GraphQL (+ mu-plugin cleanup),
+   * then optionally minimize the Local by Flywheel window so it stays in the
+   * background without a visible window stealing focus.
+   *
+   * Called by STOP ALL so LocalWP sites are cleanly halted alongside PM2/PTY
+   * processes — `killAll()` only handles regular Node dev processes.
+   *
+   * @param {boolean} [minimizeLocal=true] — Minimize Local.exe after all sites stopped.
+   * @returns {Promise<void>}
+   */
+  async stopAllWordPressSites(minimizeLocal = true) {
+    const allProjects = this.store.listProjectsAlphabetical();
+    const wpRunning = allProjects.filter((p) => {
+      const rec = this.children.get(p.id);
+      return rec?.wpLocal === true;
+    });
+
+    for (const project of wpRunning) {
+      try {
+        const rec = this.children.get(project.id) || {};
+        this._stopWordPressLocal(project.id, rec);
+      } catch (err) {
+        console.warn(`[VPE] stopAllWordPressSites: failed to stop ${project.id}`, err?.message);
+      }
+    }
+
+    if (minimizeLocal && wpRunning.length > 0 && msc_isLocalExeProcessRunning()) {
+      try {
+        // Minimize all Local.exe windows without closing the app.
+        // SW_MINIMIZE = 6 via user32.dll ShowWindow.
+        const minScript = [
+          'Add-Type -TypeDefinition \'using System;using System.Runtime.InteropServices;',
+          'public class VpeWin32 {',
+          '  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmd);',
+          '}\';',
+          'Get-Process -Name Local -ErrorAction SilentlyContinue | ForEach-Object {',
+          '  if ($_.MainWindowHandle -ne [IntPtr]::Zero) {',
+          '    [VpeWin32]::ShowWindow($_.MainWindowHandle, 6) | Out-Null',
+          '  }',
+          '}',
+        ].join(' ');
+        execSync(`powershell -WindowStyle Hidden -Command "${minScript}"`,
+          { windowsHide: true, timeout: 5000, stdio: 'ignore' },
+        );
+        console.log('[VPE] stopAllWordPressSites: Local.exe minimized');
+      } catch (err) {
+        console.warn('[VPE] stopAllWordPressSites: could not minimize Local.exe —', err?.message);
+      }
+    }
   }
 }
 

@@ -731,7 +731,10 @@ function DashboardContent() {
             /* keep cached port */
           }
         }
-        const projectUrl = `http://localhost:${displayPort}`
+        const projectUrl = project.project_type === 'wordpress-local'
+          ? (project.project_url?.trim() ||
+              `http://${project.name.toLowerCase().replace(/\s+/g, '-')}.local/`)
+          : `http://localhost:${displayPort}`
         addToast(
           running ? 'Server started' : 'Server stopped',
           running ? 'success' : 'info',
@@ -799,11 +802,43 @@ function DashboardContent() {
     )
   }
 
-  const handleOpenProjectUrl = async (projectId: string) => {
+  const handleOpenProjectUrl = async (projectId: string, opts?: { wpAdmin?: boolean }) => {
     const project = projects.find((p) => p.id === projectId)
     if (!project) return
-    const url = `http://localhost:${project.port}`
     const api = getVpeApi()
+
+    // ── WordPress-Local: bypass localhost:PORT compiler; open .local domain directly ──
+    if (project.project_type === 'wordpress-local') {
+      const rawBase =
+        project.project_url?.trim() ||
+        `http://${project.name.toLowerCase().replace(/\s+/g, '-')}.local/`
+      // LocalWP self-signed HTTPS certs are rejected by browsers. Prefer http:// so the
+      // page loads without a certificate trust prompt. The health probe uses rejectUnauthorized:false
+      // internally, but the system browser enforces cert validation.
+      const base = rawBase.startsWith('https://')
+        ? rawBase.replace(/^https:\/\//, 'http://')
+        : rawBase
+      const url = opts?.wpAdmin
+        ? `${base.replace(/\/$/, '')}/wp-admin/`
+        : base
+      try {
+        if (api?.openProjectUrl) {
+          await api.openProjectUrl(url)
+        } else if (typeof window !== 'undefined') {
+          window.open(url, '_blank', 'noopener,noreferrer')
+        }
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === 'object' && 'message' in err
+            ? String((err as { message?: string }).message)
+            : 'Open failed'
+        addToast('Could not open browser', 'error', msg)
+      }
+      return
+    }
+    // ─────────────────────────────────────────────────────────────────────────────────
+
+    const url = `http://localhost:${project.port}`
     try {
       if (api?.openProjectUrl) {
         await api.openProjectUrl(url)
@@ -1418,6 +1453,8 @@ function DashboardContent() {
                 port: portNum,
                 thumbnail_url: data.thumbnailUrl ?? null,
                 project_type: data.projectTypePayload,
+                project_url: data.project_url ?? null,
+                slug: data.slug ?? null,
               })
               await refreshProjects()
             } else {
@@ -1451,6 +1488,7 @@ function DashboardContent() {
       />
 
       <ProjectSettingsModal
+        key={selectedProjectId}
         isOpen={settingsModalOpen}
         projectId={selectedProjectId}
         projectName={selectedProject}

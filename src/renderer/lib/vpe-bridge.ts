@@ -53,6 +53,10 @@ export interface AddProjectPayload {
   thumbnail_url?: string | null
   /** Omit or `auto` → classifier; concrete value persisted in registry. */
   project_type?: 'auto' | VpeShieldProjectType | string | null
+  /** WordPress-Local: domain URL (e.g. `http://sitename.local/`). */
+  project_url?: string | null
+  /** WordPress-Local: site slug for `local.exe` CLI. */
+  slug?: string | null
 }
 
 /**
@@ -217,6 +221,14 @@ export interface VpeApi {
     reservedPort: number
     /** JEDI_MOD_132 — non-blocking reclaim hints when folder or package.json is missing */
     reclaimWarnings?: string[]
+    /** True when `wp-config.php` was found in the target folder. */
+    is_wordpress?: boolean
+    /** Auto-derived `.local` domain URL for WordPress sites (e.g. `https://sitename.local/`). */
+    suggested_url?: string | null
+    /** Lowercase alphanumeric slug derived from the real project folder name (stepped back from /public). */
+    suggested_slug?: string | null
+    /** `file://` URL to the active WordPress theme screenshot.png — null when none found. */
+    suggested_thumbnail?: string | null
   }>
   toggleStatus: (
     projectId: string,
@@ -563,6 +575,10 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
   /** SQLite v14+ / v17+ — registry ordering (mirrored in DB). */
   sort_order?: number | null
   display_order?: number | null
+  /** LocalWP / wordpress-local: persisted custom domain (e.g. `http://sitename.local/`). */
+  project_url?: string | null
+  /** LocalWP: site identifier / folder slug for the `local.exe` CLI. */
+  slug?: string | null
 } {
   const pm =
     row.pkg_manager === 'yarn' || row.pkg_manager === 'pnpm'
@@ -626,5 +642,13 @@ export function msc_rowToDashboardProject(row: VpeProjectRow): {
       row.display_order === undefined || row.display_order === null
         ? null
         : Number(row.display_order),
+    project_url:
+      row.project_url == null || typeof row.project_url === 'undefined'
+        ? null
+        : String(row.project_url),
+    slug:
+      row.slug == null || typeof row.slug === 'undefined'
+        ? null
+        : String(row.slug),
   }
 }

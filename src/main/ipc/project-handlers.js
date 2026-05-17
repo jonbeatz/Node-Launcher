@@ -4,8 +4,9 @@
 process.env.VPE_VAULT_DELETION_LOCKED = String(process.env.VPE_VAULT_DELETION_LOCKED || '1');
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
-const { msc_normalizePersistedProjectPath } = require('../path-guard');
+const { msc_normalizePersistedProjectPath, msc_validateProjectPathForSave } = require('../path-guard');
 const { msc_vpePortableBackupFromStore, msc_verifyProjectPaths } = require('../db/persistent-store');
 const { pathToFileURL, fileURLToPath } = require('node:url');
 const { nativeImage } = require('electron');
@@ -19,6 +20,44 @@ const {
   msc_isVaultKeepFile,
   msc_isVaultNonUserNoiseFile,
 } = require('../vpe-vault-paths');
+
+/**
+ * WordPress theme screenshot harvester.
+ * Traverses `<wpRoot>/wp-content/themes/` and returns a `file://` URL pointing
+ * to the first `screenshot.png` or `screenshot.jpg` found in any active theme folder.
+ * Returns `null` if no usable screenshot is found.
+ *
+ * @param {string} wpRoot — absolute path to the WordPress installation root (where wp-config.php lives)
+ * @returns {string | null}
+ */
+function msc_detectWordPressThemeScreenshot(wpRoot) {
+  const themesDir = path.join(wpRoot, 'wp-content', 'themes');
+  try {
+    if (!fs.existsSync(themesDir) || !fs.statSync(themesDir).isDirectory()) return null;
+    const entries = fs.readdirSync(themesDir, { withFileTypes: true });
+    // Sort so default/active themes (commonly named first alphabetically or "twentyXX") are preferred.
+    const themeDirs = entries
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    for (const themeDir of themeDirs) {
+      for (const screenshotName of ['screenshot.png', 'screenshot.jpg', 'screenshot.jpeg']) {
+        const screenshotAbs = path.join(themesDir, themeDir.name, screenshotName);
+        try {
+          if (fs.existsSync(screenshotAbs) && fs.statSync(screenshotAbs).isFile()) {
+            // Use vpe-thumb:// instead of file:// — Electron's renderer CSP blocks file: URLs
+            // but allows our registered privileged vpe-thumb: scheme.
+            return pathToFileURL(screenshotAbs).href.replace(/^file:/, 'vpe-thumb:');
+          }
+        } catch (_) {
+          /* skip unreadable entry */
+        }
+      }
+    }
+  } catch (_) {
+    /* fs errors are non-fatal — caller receives null */
+  }
+  return null;
+}
 
 /** True when `targetAbs` is a subdirectory of `approvedRootAbs` (defense-in-depth before `rmSync`). */
 function msc_vpeResolvedPathInsideRoot(approvedRootAbs, targetAbs) {
@@ -69,6 +108,29 @@ function msc_vpePathInsideAnyVaultRoot(absTarget, vaultRoots) {
   return null;
 }
 
+/**
+ * WordPress path traversal: if the picked folder is a generic WP subdirectory
+ * (e.g. "public", "app", "htdocs"), step backward to find the real project name.
+ * Example: D:\TalkShowLand_v1\app\public → "talkshowlandv1"
+ *
+ * @param {string} filePath — absolute folder path chosen by the user
+ * @returns {string} lowercase alphanumeric slug (empty string if nothing useful found)
+ */
+function msc_wpSiteSlugFromPath(filePath) {
+  const WP_GENERIC_SUBDIRS = new Set(['public', 'app', 'htdocs', 'www', 'web', 'html']);
+  let folderName = path.basename(filePath);
+  if (WP_GENERIC_SUBDIRS.has(folderName.toLowerCase())) {
+    const parent = path.basename(path.dirname(filePath));
+    if (parent && WP_GENERIC_SUBDIRS.has(parent.toLowerCase())) {
+      const grandparent = path.basename(path.dirname(path.dirname(filePath)));
+      folderName = grandparent || folderName;
+    } else {
+      folderName = parent || folderName;
+    }
+  }
+  return folderName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
 function msc_vpeRmVaultDirLogged(absDir, projectId) {
   const abs = path.resolve(absDir);
   try {
@@ -105,9 +167,11 @@ const VPE_VAULT_IMAGE_EXTS = new Set([
 function msc_vpeThumbUrlFileMissing(row) {
   const tu = row && row.thumbnail_url;
   if (!tu || typeof tu !== 'string') return true;
-  if (!tu.startsWith('file:')) return false;
+  const isFileUrl = tu.startsWith('file:') || tu.startsWith('vpe-thumb:');
+  if (!isFileUrl) return false;
   try {
-    const fp = path.resolve(fileURLToPath(tu));
+    // Normalise vpe-thumb: → file: for fileURLToPath resolution
+    const fp = path.resolve(fileURLToPath(tu.replace(/^vpe-thumb:/, 'file:')));
     return !fs.existsSync(fp);
   } catch (_) {
     return true;
@@ -545,6 +609,13 @@ function msc_registerProjectIpc(ipcMain, c) {
   ipcMain.handle('vpe:inspect-project', async (_event, projectPath) => {
     const saveVal = msc_validateProjectPathForSave(projectPath);
     const root = saveVal.path;
+
+    // WordPress-Local detection: check for wp-config.php before any Node.js detection.
+    let is_wordpress = false;
+    try {
+      is_wordpress = fs.existsSync(path.join(root, 'wp-config.php'));
+    } catch { /* ignore FS errors */ }
+
     const det = saveVal.hasFullNodeProject
       ? msc_detectProjectScripts(root)
       : {
@@ -554,7 +625,30 @@ function msc_registerProjectIpc(ipcMain, c) {
           is_nextjs: false,
           node_modules_missing: true,
         };
-    const project_type = saveVal.hasFullNodeProject ? msc_classifyProjectType(root) : 'unknown';
+    const project_type = is_wordpress
+      ? 'wordpress-local'
+      : saveVal.hasFullNodeProject
+        ? msc_classifyProjectType(root)
+        : 'unknown';
+
+    // Auto-derive a `.local` domain from the real project folder name for WordPress sites.
+    // Uses msc_wpSiteSlugFromPath to step back out of generic subdirectories like "public"
+    // or "app" — prevents the fallback "public.local" bug when the user selects app/public.
+    let suggested_url = null;
+    let suggested_slug = null;
+    let suggested_thumbnail = null;
+    if (is_wordpress) {
+      const domainSlug = msc_wpSiteSlugFromPath(root);
+      if (domainSlug) {
+        // Use http:// — LocalWP self-signed certs cause ERR_CONNECTION_REFUSED in real browsers.
+        // The Local Nginx proxy handles SSL redirect internally when configured for SSL.
+        suggested_url = `http://${domainSlug}.local/`;
+        suggested_slug = domainSlug;
+      }
+      // Harvest the active theme screenshot as the card thumbnail.
+      suggested_thumbnail = msc_detectWordPressThemeScreenshot(root);
+    }
+
     const suggestedPort = await msc_findAvailablePort(
       msc_managedPortFloor(),
       null,
@@ -568,6 +662,11 @@ function msc_registerProjectIpc(ipcMain, c) {
       suggestedPort,
       reservedPort: MSC_VPE_RENDERER_PORT,
       reclaimWarnings: saveVal.reclaimWarnings,
+      is_wordpress,
+      suggested_url,
+      suggested_slug,
+      /** file:// URL to the active theme screenshot.png (null when none found). */
+      suggested_thumbnail,
     };
   });
 
@@ -734,8 +833,28 @@ function msc_registerProjectIpc(ipcMain, c) {
   });
 
   ipcMain.handle('vpe:add-project', async (event, payload) => {
-    const root = msc_validateProjectPath(payload.path);
-    const det = msc_detectProjectScripts(root);
+    // Read project_type FIRST — WordPress-Local sites have no package.json and must
+    // bypass the Node project validator entirely.
+    const incomingTypeRaw = Object.prototype.hasOwnProperty.call(payload, 'project_type')
+      ? String(payload.project_type ?? '').trim().toLowerCase()
+      : '';
+    const isWordPressLocal = incomingTypeRaw === 'wordpress-local';
+
+    let root;
+    let det;
+
+    if (isWordPressLocal) {
+      // WordPress-Local path: vault / vpe-local-data guards apply; package.json is NOT required.
+      const saveVal = msc_validateProjectPathForSave(payload.path);
+      root = saveVal.path;
+      // Stub Node detection — WP sites are launched via local.exe, not npm scripts.
+      det = { start_script: '', build_script: '', pkg_manager: 'npm', is_nextjs: false };
+    } else {
+      // Standard Node / Electron / Web path: full package.json + vault guards enforced.
+      root = msc_validateProjectPath(payload.path);
+      det = msc_detectProjectScripts(root);
+    }
+
     const id = payload.id || randomUUID();
     const rawPort = payload.port;
     const portNum =
@@ -758,9 +877,44 @@ function msc_registerProjectIpc(ipcMain, c) {
       }
     }
 
+    // Auto-harvest WordPress theme screenshot when no thumbnail was provided by the user.
+    let resolvedThumbUrl = payload.thumbnail_url ?? null;
+    if (isWordPressLocal && (!resolvedThumbUrl || typeof resolvedThumbUrl !== 'string' || !resolvedThumbUrl.trim())) {
+      resolvedThumbUrl = msc_detectWordPressThemeScreenshot(root);
+    }
+
+    // Draft thumbnail: the add-project modal's pickThumbnail returns a data: URL for preview
+    // (project not in DB yet → no vault URL available). Decode it and write a real vault file
+    // so the project card shows the correct thumbnail immediately after creation.
+    if (resolvedThumbUrl && typeof resolvedThumbUrl === 'string' && resolvedThumbUrl.startsWith('data:image/')) {
+      try {
+        const b64Match = resolvedThumbUrl.match(/^data:image\/(\w+);base64,(.+)$/s);
+        if (b64Match) {
+          const ext = b64Match[1] === 'jpeg' ? 'jpg' : (b64Match[1] || 'png');
+          const tmpPath = path.join(os.tmpdir(), `vpe-draft-thumb-${id}.${ext}`);
+          fs.writeFileSync(tmpPath, Buffer.from(b64Match[2], 'base64'));
+          try {
+            const vaultResult = await msc_writeVaultInternalThumbnail(tmpPath, payload.name, id);
+            const vaultFile = vaultResult && vaultResult.file ? vaultResult.file : vaultResult;
+            const vaultUrl = vaultResult && vaultResult.url
+              ? vaultResult.url
+              : pathToFileURL(String(vaultFile)).href;
+            resolvedThumbUrl = (typeof vaultUrl === 'string' && vaultUrl) ? vaultUrl : null;
+          } finally {
+            try { fs.unlinkSync(tmpPath); } catch (_) { /* ignore temp-file cleanup errors */ }
+          }
+        } else {
+          resolvedThumbUrl = null;
+        }
+      } catch (e) {
+        console.warn('[VPE] add-project: draft thumbnail decode failed:', e?.message ?? e);
+        resolvedThumbUrl = null;
+      }
+    }
+
     const thumbNorm = msc_normalizeThumbnailUrlForPersistence(
       { id, name: payload.name },
-      payload.thumbnail_url ?? null,
+      resolvedThumbUrl,
     );
 
     store.insertProject({
@@ -774,6 +928,8 @@ function msc_registerProjectIpc(ipcMain, c) {
       build_script: det.build_script,
       pkg_manager: det.pkg_manager,
       ...(project_type !== undefined ? { project_type } : {}),
+      ...(payload.project_url != null ? { project_url: String(payload.project_url) } : {}),
+      ...(payload.slug != null ? { slug: String(payload.slug) } : {}),
     });
     msc_emitProjectsUpdated();
     return { ok: true, id };

@@ -4,6 +4,103 @@
 
 ---
 
+## [2026-05-17] — WordPress-Local Full Bug Fix Sprint (v2.2.6-SOVEREIGN)
+
+### Summary
+Four separate bugs in the WordPress-Local (`wordpress-local` shield) flow were diagnosed and fixed in a single session. All fixes were verified live using the **playwright-electron MCP** (CDP at port 9225) and direct PowerShell **CDP WebSocket** calls when the MCP session dropped.
+
+### Bug 1 — Port-4000 False Positive (LiteLLM vs LocalWP GraphQL)
+**Root cause:** `msc_isLocalGraphqlListening()` and `msc_waitForLocalGraphql()` in `project-runner.js` performed only a TCP socket probe. When LiteLLM was running on port 4000 (VPE's API bridge), VPE mistook it for a live LocalWP GraphQL server, skipped launching `Local.exe`, sent `startSite` to LiteLLM, and received a 404 → `status: unknown`. The WordPress site never actually started.
+
+**Fix — Three-Gate Defense (`src/main/project-runner.js`):**
+| Gate | Helper | What it checks |
+|---|---|---|
+| 1 | `msc_isLocalExeProcessRunning()` | `tasklist` confirms `Local.exe` is in the process list |
+| 2 | TCP socket probe | Port 4000 is actively listening |
+| 3 | `msc_validateLocalGraphqlEndpoint(info)` | HTTP POST `{ __typename }` introspection — response must have a `data` key (LiteLLM returns `{"detail":"Not Found"}`) |
+
+All three gates must pass before VPE considers LocalWP ready. The `maxAttempts` in `msc_waitForLocalGraphql()` was also raised from 24 → 120 (60-second cold-start window).
+
+**Tools used:** `playwright-electron` MCP (CDP) + `user-browsermcp` for log inspection.
+
+### Bug 2 — Thumbnail Preview: Purple "D" / Broken Image in ADD NEW PROJECT Modal
+**Root cause:** `handleScanDirectory` in `add-project-modal.tsx` auto-populated `thumbnailUrl` with `info.suggested_thumbnail` — a `vpe-thumb:` URL pointing to the Divi (or other) WordPress theme screenshot. This caused the purple Divi "D" icon (or a broken white square for themes without a screenshot at that path) to appear in the modal thumbnail box before the user picked anything.
+
+**Fix (`src/renderer/components/add-project-modal.tsx`):**
+```diff
+- thumbnailUrl: projectData.thumbnailUrl ?? detectedThumbnailUrl ?? null,
++ thumbnailUrl: projectData.thumbnailUrl ?? null,   // camera icon until user picks
+```
+The Camera icon placeholder now shows until the user explicitly clicks **UPLOAD THUMBNAIL**. The main process (`vpe:add-project` handler line 882) still auto-harvests the theme screenshot when the project is actually saved, so cards get a thumbnail automatically.
+
+### Bug 3 — STOP ALL Did Not Stop LocalWP Sites
+**Root cause:** `msc_vpeStopAllEngines()` in `vpe-ipc.js` only called `pm2Manager.stopAll()` and `projectRunner.killAll()`, which handle PM2/PTY processes. WordPress-Local projects are not PTY processes — they are tracked by the `wpLocal = true` flag on the runtime record. The `_stopWordPressLocal()` method (GraphQL `stopSite` + mu-plugin removal) was never invoked from the STOP ALL path, leaving LocalWP sites running.
+
+**Fix — new `stopAllWordPressSites(minimizeLocal)` method (`src/main/project-runner.js`):**
+- Iterates `this.children` for records with `wpLocal === true`
+- Calls `_stopWordPressLocal(projectId, rec)` for each (sends GraphQL `stopSite`, removes VPE mu-plugin, sets project status to `stopped`)
+- After all sites are halted, minimizes the Local.exe window via Win32 `ShowWindow(hwnd, SW_MINIMIZE=6)` using PowerShell + `Add-Type`
+
+`msc_vpeStopAllEngines()` was updated to call `stopAllWordPressSites(true)` **before** the PM2/PTY sweep so WordPress sites are gracefully stopped first.
+
+**Verified:** IWWI site started → STOP ALL clicked → logs confirmed `Local GraphQL stopSite → status: halted` + `[VPE] stopAllWordPressSites: Local.exe minimized`.
+
+### Bug 4 — Project Settings State Cross-Contamination
+**Root cause:** `<ProjectSettingsModal>` in `page.tsx` had no `key` prop. React's `useState` initializes only on first mount, so switching settings from IWWI → IWWI-v2 without a full unmount could leave stale state (name, path, thumbnail, port) from the previous project.
+
+**Fix (`src/renderer/app/page.tsx`):**
+```diff
+- <ProjectSettingsModal
++ <ProjectSettingsModal
++   key={selectedProjectId}
+    isOpen={settingsModalOpen}
+```
+React now fully remounts the modal on every project change, guaranteeing clean state.
+
+### New Project Added: IWWI_v3
+- Path: `F:\Websitez\IndieWorldWideInc\Local_WP\IWWI_v3\app\public`
+- Type: `wordpress-local` · URL: `http://iwwiv3.local/`
+- Thumbnail: `C:\Users\JONBEATZ\Pictures\Vaderz-v2\test.jpg` → saved to `media\vault\IWWI_v3\_vpe_thumb.png`
+- Added directly via `window.vpeAPI.addProject()` through a CDP WebSocket call (IPC bypassed the UI scan which was hanging on the slow F: drive)
+
+### MCP & Tools Used
+| Tool | Role |
+|---|---|
+| `playwright-electron` MCP (CDP port 9225) | Navigate, snapshot, screenshot, evaluate JS in Electron renderer |
+| PowerShell CDP WebSocket (`System.Net.WebSockets.ClientWebSocket`) | Direct fallback when MCP session dropped after Electron crash; used to store `window.__vpe_test_thumb__` base64 and call `addProject` IPC |
+| `user-serkan-ozal.browser-devtools-mcp` | Attempted additional browser inspection |
+| `user-playwright` MCP | Attempted fallback; also unavailable after crash |
+| Shell `tasklist` / `Get-Process` | Verified `Local.exe` process presence for gate 1 of the three-gate fix |
+| Shell `netstat -ano` | Confirmed port 9225 CDP listening after restart |
+
+### Key Lesson — Port 4000 Conflict Pattern
+When `vpe-start-api.ps1` starts **LiteLLM** on port 4000, **any code that probes port 4000 to detect LocalWP** will produce a false positive. Always run the three-gate defense (process check → TCP → GraphQL introspection) before assuming LocalWP is up. If starting VPE while LiteLLM is running, the gates correctly distinguish between the two services.
+
+---
+
+## [2026-05-16] — End Project (operator): bridge + verify + handoff
+
+- **`vpe-end-api-bridge.ps1`**: port **4000** free; LiteLLM/ngrok stopped (or already down).
+- **`npm run typecheck`**: pass.
+- **`npm run lint`**: pass (no ESLint issues).
+- **Session note:** Fixed **`scripts/upload_build.ps1`** so JediBuild branch tags use the branch name only (e.g. **`VPE-JediBuild-v1.3`**, not **`…-v1.1`**); suffix **`-v1.N`** only when that tag already exists on GitHub.
+- **Git:** uncommitted — **`upload_build.ps1`**, **`VADER_STATION_LOG.md`**, **`data/vader.sqlite`** (+ WAL sidecars); no commit (operator did not ask).
+
+**Next session:** **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — mandatory reads, **`npm run start-project:smoke`**, then **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**; paste new ngrok **`…/v1`** into Cursor if the tunnel URL changed.
+
+---
+
+## [2026-05-15] — End Project (operator): bridge + verify + handoff
+
+- **`vpe-end-api-bridge.ps1`**: port **4000** already free; no LiteLLM/ngrok listeners to stop.
+- **`npm run typecheck`**: pass.
+- **`npm run lint`**: pass (Next.js notes deprecation of `next lint`; no ESLint issues).
+- **Git:** clean working tree; no commit (operator did not ask).
+
+**Next session:** **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — mandatory reads, **`npm run start-project:smoke`**, then **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**; paste new ngrok **`…/v1`** into Cursor if the tunnel URL changed.
+
+---
+
 ## [2026-05-15] — Master Consolidation & v2.2.6-SOVEREIGN Audit
 **Status:** ✅ MISSION COMPLETE — MASTER VERSION READY
 
@@ -24,15 +121,6 @@
 
 **Action Required (Operator Credentials)**
 - **Active Keys Needed:** Paste values for **InstaWP**, **Elementor**, and **Google Workspace** into your local **`.env`** to fully unlock the expansion pack.
-
----
-
-- **`vpe-end-api-bridge.ps1`**: port **4000** already free; teardown complete (no stray LiteLLM/ngrok for **4000**).
-- **`npm run typecheck`**: pass.
-- **`npm run lint`**: pass (Next.js notes deprecation of `next lint`; no ESLint issues).
-- **Git:** uncommitted docs/MCP work still on tree (see **`git status`**); no commit (operator did not ask).
-
-**Next session:** **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — mandatory reads, **`npm run start-project:smoke`**, then **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**; paste new ngrok **`…/v1`** into Cursor if the tunnel URL changed.
 
 ---
 
@@ -471,3 +559,30 @@ Replaced dual toggles with a single **`viewMode`**: **`cinema`** (large grid + j
 - **Shipped app version / branch:** root **`package.json`** + **[Checkpoint.md](.cursor/docs/guides/Checkpoint.md)** (authoritative for build lines)
 
 *Update this file when a major mission completes or API behavior changes; keep it brief.*
+
+## 2026-05-16 — WordPress-Local Port Binding & HTTP Redirect Fix
+
+### Investigation Report
+- **sites.json** read: %USERPROFILE%\AppData\Roaming\Local\sites.json (confirmed present)
+- **TalkShowLand_v1** entry: id=NRcJtRcd, path=D:\Cursor_Projectz\TalkShowLand_v1
+  - nginx HTTP port: **10070**, MySQL port: 10071
+  - domain: 	alkshowlandv1.local
+- **Root cause confirmed**: WordPress stores siteurl/home as https://talkshowlandv1.local in wp_options.
+  When VPE opens http://talkshowlandv1.local/, WordPress issues a 301 → https://talkshowlandv1.local.
+  The browser follows, hits port 443 where nothing listens, gets ERR_CONNECTION_REFUSED.
+- **local.exe** is NOT installed at the hardcoded path on this machine (no local-by-flywheel dir).
+  VPE now uses msc_findLocalExePath() with multi-path discovery + graceful fallback.
+
+### Changes Shipped (src/main/project-runner.js)
+| Helper | Purpose |
+|---|---|
+| msc_readLocalWpSitesJson() | Parses %APPDATA%\Roaming\Local\sites.json |
+| msc_findLocalWpSiteBySlug(slug) | Finds site entry by <slug>.local domain |
+| msc_getLocalWpNginxPort(entry) | Extracts nginx/apache HTTP port from services block |
+| msc_findLocalExePath() | Discovers local.exe across 5 candidate paths + Squirrel dirs |
+| msc_writeWpVpeMuPlugin(wpRoot, domain) | Writes wp-content/mu-plugins/vpe-local-urls.php with WP_HOME/WP_SITEURL forced to http:// |
+| msc_removeWpVpeMuPlugin(wpRoot) | Removes the plugin on stop; only deletes VPE-managed files |
+
+**Flow**: on START → mu-plugin written → local.exe router start + start-site (or graceful warning if binary missing) → health poll (domain → http fallback → direct nginx port fallback).
+**Flow**: on STOP → mu-plugin deleted → local.exe stop-site (if binary found).
+

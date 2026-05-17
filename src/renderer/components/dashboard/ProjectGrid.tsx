@@ -338,6 +338,7 @@ export function ProjectGrid({
                   isSelected={selectedProjectId === project.id}
                   projectPathMissing={project.project_path_missing === true}
                   repoRunnableForHttp={project.vpe_repo_runnable_for_http !== false}
+                  projectUrl={project.project_url ?? null}
                 />
               ))}
             </AnimatePresence>

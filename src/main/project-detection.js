@@ -101,7 +101,7 @@ function msc_detectProjectScripts(projectRoot) {
 }
 
 function msc_allowedShieldType(s) {
-  return ['v0', 'electron', 'web', 'node', 'unknown'].includes(
+  return ['v0', 'electron', 'web', 'node', 'unknown', 'wordpress-local'].includes(
     String(s || '').trim().toLowerCase(),
   );
 }

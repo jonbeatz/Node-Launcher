@@ -234,6 +234,7 @@ export function ProjectSettingsModal({
       'web',
       'node',
       'unknown',
+      'wordpress-local',
     ]
     const p = projectTypePersisted
     const lower =
@@ -867,6 +868,7 @@ export function ProjectSettingsModal({
               <option value="electron">Electron</option>
               <option value="web">Web (Next / React)</option>
               <option value="node">Node (plain manifest)</option>
+              <option value="wordpress-local">WordPress (Local by Flywheel)</option>
               <option value="unknown">Unknown (no usable manifest)</option>
             </select>
             <p className="mt-2 text-[11px] text-[#555555] leading-relaxed">

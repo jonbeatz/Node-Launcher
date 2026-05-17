@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const {
   msc_registerVpeVaultPrivilegedScheme,
   msc_registerVpeVaultProtocolHandler,
+  msc_registerVpeThumbProtocolHandler,
 } = require('./vpe-vault-protocol');
 const path = require('path');
 const fs = require('fs');
@@ -798,6 +799,11 @@ app.on('ready', () => {
     msc_registerVpeVaultProtocolHandler(() => msc_getDatabase());
   } catch (e) {
     console.error('[VPE]', 'vpe-vault protocol registration failed', e?.message ?? e);
+  }
+  try {
+    msc_registerVpeThumbProtocolHandler();
+  } catch (e) {
+    console.error('[VPE]', 'vpe-thumb protocol registration failed', e?.message ?? e);
   }
   msc_createWindow();
 });

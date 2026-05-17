@@ -2017,6 +2017,15 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
 
   const msc_vpeStopAllEngines = async () => {
     const pm = vpeRuntime.pm2Manager;
+    // 1. Stop all WordPress-Local sites via GraphQL + minimize Local.exe.
+    try {
+      if (typeof projectRunner.stopAllWordPressSites === 'function') {
+        await projectRunner.stopAllWordPressSites(true); // true = minimize Local.exe after
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    // 2. Stop PM2 processes (regular Node/Next.js projects).
     try {
       if (pm && typeof pm.stopAll === 'function') await pm.stopAll();
     } catch (_) {
@@ -2029,11 +2038,13 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
     } catch (_) {
       /* ignore */
     }
+    // 3. Kill any remaining PTY/child processes.
     try {
       projectRunner.killAll();
     } catch (_) {
       /* ignore */
     }
+    // 4. Flush all statuses to READY in the DB.
     for (const p of store.listProjectsAlphabetical()) {
       if (p.status === 'running') {
         try {

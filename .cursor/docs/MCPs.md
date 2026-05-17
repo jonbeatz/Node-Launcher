@@ -52,9 +52,13 @@ This document serves as a reference for all currently configured Model Context P
 
 ## playwright-electron
 
-**Description:** Browser automation framework allowing the AI to click, type, and scrape web pages headlessly.
-**Usage Example:** Use Playwright to navigate to my site and take a screenshot of the homepage.
+**Description:** Controls the VPE **Electron** app directly via Playwright's Electron driver, connected through Chrome DevTools Protocol (CDP). Supports navigate, ARIA snapshots, screenshots, element interaction (`click`, `fill`, `hover`), and `browser_evaluate` for JS execution in the renderer process.
+**Usage Example:** Use playwright-electron to click START on the IWWI project card and capture the resulting dashboard state.
 **Status:** ✅ Active
+
+> **CDP Port:** VPE's Electron dev session runs CDP on port **9225** (not the default 9222). This is configured in `.cursor/mcp.json` under the `playwright-electron` server as `--cdp-endpoint http://127.0.0.1:9225`. The port is set via `VPE_REMOTE_DEBUG_PORT=9225` in the dev environment. If the MCP fails to connect, run `netstat -ano | findstr 9225` to confirm the listener is up, and kill any zombie Electron processes holding the port.
+>
+> **PowerShell CDP Fallback:** If the MCP session drops (e.g., after an Electron crash), you can communicate directly with the Electron renderer via `System.Net.WebSockets.ClientWebSocket` in PowerShell. Connect to the `ws://127.0.0.1:9225/json` endpoint, get the WebSocket debugger URL, then send `Runtime.evaluate` commands. This was used during the 2026-05-17 WordPress bug sprint to inject base64 thumbnails and call `window.vpeAPI.addProject()` when the MCP was unavailable.
 
 ## console-ninja
 
