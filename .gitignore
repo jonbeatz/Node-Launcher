@@ -53,7 +53,8 @@ Thumbs.db
 *.pid
 
 # Data and dev profiles
-# .playwright-mcp/
+# MCP test session artifacts (screenshots, ARIA snapshots) — never commit
+.playwright-mcp/
 # Do not ignore /data/ — `data/vader.sqlite` is tracked for operator backup (catalog).
 
 # VPE repo-local runtime (Electron userData, cache, session — regenerates; keep out of commits)
