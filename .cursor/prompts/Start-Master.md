@@ -17,7 +17,7 @@ The old stack was a **phased boot checklist** for agents and for you:
 5. **Harden** Shield, hardware I/O habits, tray, smoke checks.
 6. **Run** dev/build and verify UI + console.
 
-Some paths said **`Node-Launcher`** / **`pnpm`** / **`projects.json`** / **`cache/thumbnails`** — this repo is **`Node-Launcher-v2`**, **npm-first** in **`package.json`**, **SQLite** catalog, and **vault + `vpe-vault:`** for thumbs. This file reflects **current** layout.
+Some paths said **`Node-Launcher`** / **`pnpm`** / **`projects.json`** / **`cache/thumbnails`** — this repo is **`Node-Launcher-v3`**, **npm-first** in **`package.json`**, **SQLite** catalog, and **vault + `vpe-vault:`** for thumbs. This file reflects **current** layout.
 
 ---
 
@@ -83,10 +83,10 @@ Do not recreate this tree from scratch unless you are explicitly scaffolding a *
 
 ## Phase G — Run commands (this repo)
 
-From repo root (**`D:\Cursor_Projectz\Node-Launcher-v2`** or your clone):
+From repo root (**`D:\Cursor_Projectz\Node-Launcher-v3`** or your clone):
 
 ```powershell
-cd D:\Cursor_Projectz\Node-Launcher-v2
+cd D:\Cursor_Projectz\Node-Launcher-v3
 npm install
 npm run vader:dev
 ```

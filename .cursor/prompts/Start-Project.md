@@ -15,7 +15,7 @@ When the operator says **Start Project**, **start project**, **cold session**, *
 
 ## Mandatory document reads (full context)
 
-Read these **in order** (repo root = `Node-Launcher-v2`):
+Read these **in order** (repo root = `Node-Launcher-v3`):
 
 | # | Path | Why |
 |---|------|-----|

@@ -14,7 +14,7 @@
 - **Persistence:** Settings and project states are managed via `persistent-store.js`.
 
 ## 3. MEDIA VAULT & PROTOCOLS
-- **Root Path:** The engine uses `msc_projectVaultRootDir()` / **`msc_projectVaultRootDirSovereign()`** (Windows v2 baseline: `Node-Launcher-v2/media/vault`), overridable via `VPE_VAULT_ROOT`.
+- **Root Path:** The engine uses `msc_projectVaultRootDir()` / **`msc_projectVaultRootDirSovereign()`** (Windows v3 baseline: `Node-Launcher-v3/media/vault`), overridable via `VPE_VAULT_ROOT`.
 - **Custom Protocol:** Thumbnails are served via the privileged **`vpe-vault:`** / related handlers (see `vpe-vault-protocol.js`) to bypass Chromium `file://` limits.
 - **The Guard:** `vpe-vault-rm-guard.js` intercepts dangerous deletes; exemptions exist for controlled forge/diagnostic paths.
 

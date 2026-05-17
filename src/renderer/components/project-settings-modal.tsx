@@ -58,9 +58,9 @@ function mscSafeVaultFolderNameForHint(name: string): string {
 function mscSovereignVaultCardPathHint(projectDisplayName: string): string {
   const leaf = mscSafeVaultFolderNameForHint(projectDisplayName)
   if (typeof navigator !== 'undefined' && /win/i.test(navigator.platform || '')) {
-    return `d:\\Cursor_Projectz\\Node-Launcher-v2\\media\\vault\\${leaf}`
+    return `d:\\Cursor_Projectz\\Node-Launcher-v3\\media\\vault\\${leaf}`
   }
-  return `media/vault/${leaf} (sovereign root; Windows uses Node-Launcher-v2 path above)`
+  return `media/vault/${leaf} (sovereign root; Windows uses Node-Launcher-v3 path above)`
 }
 
 /** JEDI_MOD_125 — bust img cache on first preview load (vpe-vault / file / http). */

@@ -3,9 +3,9 @@ Write-Host "🦾 VADER PROTOCOL v2.5 ACTIVE" -ForegroundColor Magenta
 
 # --- CONFIGURATION ---
 $repo = "jonbeatz/Node-Launcher"
-$distFolder = "D:\Cursor_Projectz\Node-Launcher-v2\dist"
+$distFolder = "D:\Cursor_Projectz\Node-Launcher-v3\dist"
 $unpackedFolder = "$distFolder\win-unpacked"
-$templatePath = "D:\Cursor_Projectz\Node-Launcher-v2\.cursor\docs\release_notes_template.md"
+$templatePath = "D:\Cursor_Projectz\Node-Launcher-v3\.cursor\docs\release_notes_template.md"
 
 # 1. RELEASE PREFIX — JediBuild lanes use the git branch name (VPE-JediBuild-v1.3 → …-v1.1, …-v1.2 on GitHub).
 #    Other branches keep the historical main-line prefix so Upload Build still works everywhere.

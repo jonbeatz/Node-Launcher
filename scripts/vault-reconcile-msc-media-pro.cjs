@@ -15,7 +15,7 @@
  *
  * Optional:
  *   cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/vault-reconcile-msc-media-pro.cjs -- --db="C:\\path\\vader.sqlite"
- *   VPE_VAULT_ROOT=... overrides vault root (default sovereign: Node-Launcher-v2 on Windows)
+ *   VPE_VAULT_ROOT=... overrides vault root (default sovereign: Node-Launcher-v3 on Windows)
  *   VPE_REPO_SCAN_ROOT=... overrides repo discovery root (default: D:\\Cursor_Projectz on Windows, else parent of cwd)
  */
 
@@ -45,7 +45,7 @@ function sovereignVaultRoot() {
   const env = process.env.VPE_VAULT_ROOT;
   if (env && String(env).trim()) return path.resolve(String(env).trim());
   if (process.platform === 'win32') {
-    return path.resolve('d:/Cursor_Projectz/Node-Launcher-v2/media/vault');
+    return path.resolve('d:/Cursor_Projectz/Node-Launcher-v3/media/vault');
   }
   return path.join(process.cwd(), 'media', 'vault');
 }

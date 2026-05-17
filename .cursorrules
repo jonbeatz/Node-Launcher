@@ -144,7 +144,7 @@ Runtime persistence is **SQLite** (`projects` table and related columns). The JS
 - **Context**: When this phrase is used, the agent must execute the automated deployment script.
 - **Commands to Run**: 
   1. Verify the `dist` folder exists and contains an `.exe`.
-  2. Execute: `powershell.exe -ExecutionPolicy Bypass -File "D:\Cursor_Projectz\Node-Launcher-v2\scripts\upload_build.ps1"`
+  2. Execute: `powershell.exe -ExecutionPolicy Bypass -File "D:\Cursor_Projectz\Node-Launcher-v3\scripts\upload_build.ps1"`
 - **Expected Outcome**: The script will zip the `win-unpacked` folder, auto-increment the patch counter on GitHub tags (e.g. `VPE-JediBuild-v1.3-v1.2` when your branch is `VPE-JediBuild-v1.3`, or `VPE-JediBuild-main-v1.2` on other branches), and push the release to GitHub.
 
 **`path` (Sovereign):** The registry **`path`** is the **user repo root** string the UI and **`vpe:save-settings`** trust for persistence. **`msc_normalizePersistedProjectPath`** applies vault + `vpe-local-data` guards only — **no save-time gate** on folder existence or **`package.json`** (reclaimed / half-linked rows allowed). Stricter validation applies only for **spawn** / tooling paths.
