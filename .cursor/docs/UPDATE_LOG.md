@@ -4,6 +4,17 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 
 ---
 
+## [2026-05-18] — Packaged dist Playwright smoke (v3.0.0)
+
+### Changes
+- **`e2e/electron/packaged-dist-smoke.spec.ts`** — spawns **`dist/win-unpacked/Vader Project Engine.exe`** with **`VPE_ALLOW_CDP=1`**, checks title, SQLite main logs, IPC DB round-trip, sidebar/grid visibility.
+- **`playwright.packaged.config.ts`**, **`package.json`** script **`test:e2e:packaged`**.
+
+### Verification
+- **`npm run test:e2e:packaged`** — 4/4 pass (requires existing **`dist/win-unpacked/`** from **`build:win`**).
+
+---
+
 ## [2026-05-18] — Final build hygiene, doc archive & release pipeline (v3.0.0)
 
 ### Changes

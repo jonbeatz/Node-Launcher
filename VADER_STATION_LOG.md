@@ -4,6 +4,20 @@
 
 ---
 
+## [2026-05-18] — Packaged dist Playwright smoke (v3.0.0)
+
+### Summary
+Added **`npm run test:e2e:packaged`** — CDP harness against **`dist/win-unpacked/Vader Project Engine.exe`** (not the dev **`electron`** CLI). Asserts window title, main-process SQLite boot logs (no **`better-sqlite3`** load failures), one **`addProject` / `getProjects`** IPC round-trip, and station layout test ids.
+
+### Validation
+- **`npm run test:e2e:packaged`** — 4/4 pass (after **`npm run build:win`**)
+
+### Operator notes
+- Uses isolated **`VPE_E2E_USER_DATA`**; does not replace full visual QA or installer/ZIP verification on a clean machine.
+- **`addProject`** path must be a Node repo root (**`package.json`**), not **`win-unpacked`**.
+
+---
+
 ## [2026-05-18] — Renderer build, lint, E2E & release pipeline (v3.0.0)
 
 ### Summary

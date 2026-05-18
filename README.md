@@ -95,11 +95,12 @@ Then **`npm run vader:dev`** (or **`npm run dev`**) to relaunch.
 | Smoke | **`npm run start-project:smoke`** |
 | Lint | **`npm run lint`** |
 | Static export | **`npm run build:renderer`** → **`src/renderer/out/index.html`** |
-| Electron e2e | **`npm run test:e2e:electron`** (requires **`npx playwright install chromium`** once) |
+| Electron e2e (dev CLI) | **`npm run test:e2e:electron`** (requires **`npx playwright install chromium`** once; runs after **`build:renderer`**) |
 | Windows package | **`npm run build:win`** |
+| Packaged dist e2e | **`npm run test:e2e:packaged`** — launches **`dist/win-unpacked/Vader Project Engine.exe`**, CDP smoke (title, SQLite logs, IPC, layout islands). Requires **`build:win`** first. |
 | Release ZIP | **`.\scripts\upload_build.ps1`** → **`dist/Node-Launcher-v3.0-JEDI-MASTER.zip`** |
 
-**CDP note:** Playwright Electron tests set **`VPE_REMOTE_DEBUG_PORT`**; that env var takes precedence over **`.vpe-runtime.json`** **`cdpPort`**.
+**CDP note:** Playwright Electron tests set **`VPE_REMOTE_DEBUG_PORT`** and **`VPE_ALLOW_CDP=1`** (packaged smoke only); that env var takes precedence over **`.vpe-runtime.json`** **`cdpPort`**.
 
 ---
 

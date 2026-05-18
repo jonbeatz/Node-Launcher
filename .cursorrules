@@ -50,7 +50,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 ### 3.1 v2.0.0+ Modular Architecture (Vader Station Core)
 - **Renderer:** **`ProjectGrid`** (`src/renderer/components/dashboard/ProjectGrid.tsx`) — filters, view modes, grid/list body. **`StationSidebar`** wraps **`AppSidebar`** (`src/renderer/components/layout/StationSidebar.tsx`).
 - **Main IPC:** Domain registrars **`src/main/ipc/project-handlers.js`**, **`vault-handlers.js`**, **`system-handlers.js`**; shared context + boot scrub in **`src/main/vpe-ipc.js`**.
-- **Quality / schema:** **`npm run test:migrations`** (in-memory SQLite via store migrations); reference **`test/fixtures/sqlite-v13-schema.sql`**. Playwright heartbeat: **`e2e/electron/vader-station-heartbeat.spec.ts`**.
+- **Quality / schema:** **`npm run test:migrations`** (in-memory SQLite via store migrations); reference **`test/fixtures/sqlite-v13-schema.sql`**. Playwright: dev static shell **`test:e2e:electron`**; packaged **`dist/win-unpacked`** smoke **`test:e2e:packaged`** (**`e2e/electron/packaged-dist-smoke.spec.ts`**).
 - **Support & observability:** **`src/main/lib/logger.js`** (INFO/WARN/ERROR + `<USER_PATH>` redaction). **`src/main/lib/support-bundle.js`** — Desktop JSON diagnostics; **`vpe:generate-support-bundle`** from Settings → **Database & State Actions**.
 - **API assets:** **`ngrok.exe`**, **`vpe-start-api.ps1`**, **`litellm_config.yaml`**, **`gcp_key.json`** — **only** under **`google-api/`** (no second copy at repo root; **`scripts/vpe-verify-ngrok-path.ps1`** only verifies PATH).
 
