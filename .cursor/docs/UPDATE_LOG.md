@@ -38,10 +38,9 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 - All doc headers, signatures, and version references updated from `MSC Media Engine · v2.2.6-SOVEREIGN` → `VPE Jedi-Master · v3.0`.
 - Files updated: `README.md`, `VADER_STATION_LOG.md`, `REPAIR_PROTOCOLS.md`, `TRUTH.md`, `Project-Bible.md`, `Start-Master.md`, `VADER_MASTER_MANIFEST.md`, `Goalz.md`.
 
-#### 7. Absolute Portability & Sovereign Roots (`main.js`, `persistent-store.js`, `kill-dev-ports.cjs`)
-- **Zero Hardcoding:** Removed all remaining hardcoded workspace tags and drive-letter fallbacks.
-- **Dynamic App Root:** Introduced/Enforced `msc_getSovereignAppRoot()` across the engine. All data paths (`vpe-local-data`, `vader.sqlite`, icons, backups) now anchor dynamically to the application's physical location (Packaged: next to `.exe`; Dev: repo root; Node: `cwd`).
-- **Dynamic Process Killing:** The `workspaceTag` in `kill-dev-ports.cjs` is now derived dynamically from the folder name, ensuring orphans are cleared even if the repository is renamed or moved.
+#### 8. Production Native Binaries & Version Detection (`main.js`, `package.json`)
+- **Native Binary Binding:** Fixed "DLL initialization routine failed" error by explicitly configuring `asarUnpack` for `better-sqlite3` and running `electron-rebuild` to align native binaries with the Electron runtime.
+- **Reliable Version Detection:** Refactored `msc_vpeDetectLocalFirstUserData()` in `main.js` to use `app.getVersion()` instead of reading `package.json` from the disk. This fixes the "LEGACY ENGINE DETECTED" error in packaged production builds.
 
 ### ✅ Verification
 
@@ -50,6 +49,8 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 | `npx tsc --noEmit -p src/renderer/tsconfig.json` | ✅ Exit 0 |
 | `node --check src/main/main.js` | ✅ Exit 0 |
 | Absolute Path Leak Scan | ✅ Clean |
+| Packaged App Version Detection | ✅ Fixed (app.getVersion) |
+| better-sqlite3 DLL Initialization | ✅ Fixed (asarUnpack + rebuild) |
 | VPE boots, vault lock logs `3.0.0` | ✅ |
 | App footer shows "Powered by the VPE Jedi-Master · v3.0" | ✅ |
 | Sidebar lower region clean (no version text) | ✅ |

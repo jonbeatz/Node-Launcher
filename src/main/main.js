@@ -61,11 +61,7 @@ function msc_getSovereignAppRoot() {
  */
 function msc_vpeDetectLocalFirstUserData() {
   const root = msc_getSovereignAppRoot();
-  const pkgPath = path.join(root, 'package.json');
-  let appVer = '0.0.0';
-  try {
-    appVer = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '0.0.0').trim();
-  } catch (_) {}
+  const appVer = app.getVersion();
 
   msc_ironCurtainVersionAudit(appVer);
 
