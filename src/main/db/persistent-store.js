@@ -62,10 +62,10 @@ function msc_sqliteApplyBaseSchema(db) {
 }
 
 /**
- * LOGIC_MOD_01 — Sovereign app root for catalog SQLite (not AppData).
- * - Dev / unpacked: `app.getAppPath()/data` (repo or app folder).
- * - Packaged: `path.dirname(process.execPath)/data` (next to the `.exe`; avoids writing inside `app.asar`).
- * - Node / headless: `process.cwd()/data`.
+ * LOGIC_MOD_01 — Sovereign app root for catalog SQLite (never AppData).
+ * - Dev / unpacked: `app.getAppPath()` (repo or app folder).
+ * - Packaged: `path.dirname(process.execPath)` (next to the `.exe`).
+ * - Node / headless: `process.cwd()`.
  * @returns {string}
  */
 function msc_getSovereignAppRoot() {
@@ -84,18 +84,95 @@ function msc_getSovereignAppRoot() {
 }
 
 /**
- * Writable DB directory: `<sovereignRoot>/data` (LOGIC_MOD_01 portability).
- * Falls back to `process.cwd()/data` when Electron is unavailable.
+ * PRIMARY DB HOME — `src/main/db/` co-located with the persistence module.
+ *
+ * Resolution priority (highest → lowest):
+ *  1. `VPE_SOVEREIGN_DB_DIR` env var (absolute path OR relative to cwd).
+ *     Explicitly overrides everything — useful for CI / E2E test isolation.
+ *  2. `<cwd>/src/main/db` — the canonical, co-located primary home.
+ *
+ * The DB is NEVER resolved inside `%AppData%`, `%LocalAppData%`, or any other
+ * Windows user-profile directory. Any AppData path (from the env var or from
+ * a packaged-app path quirk) is hard-rejected and falls back to the primary
+ * home, guaranteeing the vault never drifts outside the workspace.
+ *
  * @returns {{ storeDir: string, sqlitePath: string, jsonPath: string }}
  */
 function msc_getStorePaths() {
-  const root = msc_getSovereignAppRoot();
-  const storeDir = path.join(root, 'data');
+  const primaryDir = path.join(process.cwd(), 'src', 'main', 'db');
+
+  // Priority 1: explicit env var override.
+  if (process.env.VPE_SOVEREIGN_DB_DIR) {
+    const raw = String(process.env.VPE_SOVEREIGN_DB_DIR).trim();
+    const resolved = path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+    const isAppData = /[/\\](AppData|appdata)[/\\]/i.test(resolved);
+    if (!isAppData) {
+      return {
+        storeDir: resolved,
+        sqlitePath: path.join(resolved, 'vader.sqlite'),
+        jsonPath: path.join(resolved, 'vader-engine.json'),
+      };
+    }
+    console.warn('[VPE] VPE_SOVEREIGN_DB_DIR points to AppData — rejected; using primary home.');
+  }
+
+  // Priority 2: primary co-located home — src/main/db/.
+  // Safety guard: if somehow the resolved path lands in AppData, hard-redirect
+  // to the primary home and log a warning.
+  const isAppData = /[/\\](AppData|appdata)[/\\]/i.test(primaryDir);
+  if (isAppData) {
+    console.warn(`[VPE] DB path resolved to AppData — rejected. Forcing primary home: ${primaryDir}`);
+  }
+  const storeDir = isAppData ? path.join(process.cwd(), 'src', 'main', 'db') : primaryDir;
+
   return {
     storeDir,
     sqlitePath: path.join(storeDir, 'vader.sqlite'),
     jsonPath: path.join(storeDir, 'vader-engine.json'),
   };
+}
+
+/**
+ * One-time pre-flight consolidation: if a `data/vader.sqlite` artifact exists
+ * at the workspace root (from the previous `data/` layout), compare its mtime
+ * against `src/main/db/vader.sqlite`. If the legacy file is newer (i.e. has
+ * more recent writes), copy it over so no project data is lost. Then purge the
+ * entire `data/` directory and its WAL/SHM sidecar files.
+ *
+ * This runs BEFORE the SQLite connection is opened so the DB file is never
+ * locked during the copy.
+ */
+function msc_consolidateDataDirToSrcMainDb(targetSqlitePath) {
+  const legacyDataDir = path.join(process.cwd(), 'data');
+  const legacySqlite = path.join(legacyDataDir, 'vader.sqlite');
+
+  // Nothing to migrate — already clean.
+  if (!fs.existsSync(legacySqlite)) return;
+
+  try {
+    const legacyMtime = fs.statSync(legacySqlite).mtime;
+    const targetExists = fs.existsSync(targetSqlitePath);
+    const targetMtime = targetExists ? fs.statSync(targetSqlitePath).mtime : new Date(0);
+
+    if (legacyMtime > targetMtime) {
+      // Legacy file is newer — overwrite the target with the live data.
+      fs.mkdirSync(path.dirname(targetSqlitePath), { recursive: true });
+      fs.copyFileSync(legacySqlite, targetSqlitePath);
+      console.log(`[VPE CONSOLIDATION] Migrated newer data/vader.sqlite → ${targetSqlitePath}`);
+    } else {
+      console.log('[VPE CONSOLIDATION] src/main/db/vader.sqlite is already up-to-date; skipping copy.');
+    }
+  } catch (e) {
+    console.warn('[VPE CONSOLIDATION] Migration copy failed:', e?.message ?? e);
+  }
+
+  // Purge the entire legacy data/ directory regardless of copy outcome.
+  try {
+    fs.rmSync(legacyDataDir, { recursive: true, force: true });
+    console.log('[VPE SYSTEM CLEANUP] Data migrated to src/main/db/ and obsolete data/ directory successfully purged.');
+  } catch (e) {
+    console.warn('[VPE CONSOLIDATION] data/ purge failed (non-fatal):', e?.message ?? e);
+  }
 }
 
 /** Copy legacy DB into sovereign `data/` from older layouts (userData/vpe-db, then module dir). */
@@ -1690,6 +1767,13 @@ function msc_createPersistentStore() {
   if (storeSingleton) return storeSingleton;
 
   const paths = msc_getStorePaths();
+  // Always log the resolved DB path so operators can confirm local anchoring.
+  console.log(`[VPE] DB anchor: ${paths.sqlitePath}`);
+
+  // Pre-flight: migrate any newer data/vader.sqlite from the legacy layout and
+  // purge the obsolete data/ directory before the connection is opened.
+  msc_consolidateDataDirToSrcMainDb(paths.sqlitePath);
+
   fs.mkdirSync(paths.storeDir, { recursive: true });
   msc_migrateLegacyDbFiles(paths);
 

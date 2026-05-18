@@ -4,6 +4,69 @@
 
 ---
 
+## [2026-05-18] — Thumbnail Vault ENOENT Fix, file:// Routing & Duplicate Path UX (v2.2.6-SOVEREIGN)
+
+### Summary
+Three precision hotfixes to the `vpe:add-project` / `vpe:save-settings` thumbnail pipeline and the duplicate-path validation toast. After these fixes, custom thumbnails supplied at project creation render on the dashboard card immediately — no manual re-save required. Full MCP end-to-end test passed: `ThumbVerify` project created with `mytest.jpg`, vault file confirmed on disk at `media/vault/ThumbVerify/_vpe_thumb.png` (4.5 MB), `<img src>` in live DOM resolves to `vpe-vault://...?pulse=...`, zero `ENOENT` errors in session log. TypeScript clean (Exit 0).
+
+### Root Causes & Fixes
+
+**1. ENOENT Self-Copy Crash — `thumbAlreadyVaulted` Sentinel (`project-handlers.js`)**
+- Branch A (data:image decode) wrote the vault file and stored the returned `file://` vault URL in `resolvedThumbUrl`. Branch B's guard `!startsWith('vpe-vault:')` passed on that `file://` URL, resolved the vault path as the *source*, and called `msc_writeVaultInternalThumbnail(vaultPath, ...)` → self-copy → OS `ENOENT`. The project registered in DB but the card thumbnail never rendered.
+- Fix: Added `let thumbAlreadyVaulted = false;` sentinel. Branch A sets it `true` after a successful vault write. Branch B entry guard is now `!thumbAlreadyVaulted && ...` — whichever branch stages first, the other is skipped.
+
+**2. Raw `file://` / Windows Path Thumbnails Never Staged (`project-handlers.js`)**
+- External absolute paths like `C:\Users\...\mytest.jpg` or `file:///C:/...` passed through un-staged into SQLite. Chromium's sandbox blocks loading such paths from `<img>`, so cards showed a broken placeholder.
+- Fix: Branch B now detects these patterns, resolves to `srcFilePath`, calls `msc_writeVaultInternalThumbnail(srcFilePath, ...)`, and stores the resulting `vpe-vault://` URL. Same staging logic also added to `vpe:save-settings` (handler promoted to `async`).
+
+**3. "Error invoking remote method" Duplicate-Path Toast (`project-handlers.js` + `page.tsx`)**
+- The duplicate-path guard `throw`-ed, which Electron wrapped with "Error invoking remote method 'vpe:add-project':" — noisy and confusing.
+- Fix: Guard now `return`s `{ ok: false, code: 'DUPLICATE_PATH', error: '...' }`. Renderer checks `result.ok === false` and shows a clean `'Path already registered'` toast naming the conflicting project.
+
+**4. CDP Base Port `9226` → `9227` (`kill-dev-ports.cjs`)**
+- `playwright-electron` MCP configured for `9227`, VPE was always landing on `9226`. MCP never connected.
+- Fix: `CDP_BASE_PORT = 9227` — VPE now binds `9227` on first boot, MCP connects cleanly.
+
+### Verification
+- `addProject` with raw `C:\...\mytest.jpg` thumbnail: `{ ok: true }`, no ENOENT.
+- Vault: `media/vault/ThumbVerify/_vpe_thumb.png` — 4,572,188 bytes physically on disk.
+- DB `thumbnail_url`: `vpe-vault://verify-thumb-.../_vpe_thumb.png?pulse=...`.
+- DOM `<img src>` on ThumbVerify card: `vpe-vault://...` confirmed via `browser_evaluate`.
+- `npx tsc --noEmit` — Exit 0.
+- CDP 9227 live — `playwright-electron` MCP connected successfully.
+
+---
+
+## [2026-05-18] — LocalWP Minimize Fix, Stop All Termination & Thumbnail Workflow (v2.2.6-SOVEREIGN)
+
+### Summary
+Fixed three VPE bugs reported from user testing: (1) LocalWP not minimizing on launch because Electron ignores PowerShell `-WindowStyle Minimized`; (2) Stop All minimizing Local.exe instead of terminating it; (3) TalkShowLand-v1 showing the Divi WordPress theme screenshot instead of the user-selected `use1.jpg`. Full workflow test (thumbnail set → START → STOP → STOP ALL) verified via `playwright-electron` MCP with CDP 9226.
+
+### Root Causes & Fixes
+
+**1. LocalWP Not Minimizing on Launch**
+- `msc_launchLocalMinimized` used PowerShell `Start-Process -WindowStyle Minimized`, which Electron apps universally ignore — the Electron framework always restores its own window state on startup.
+- Fix (`src/main/project-runner.js`): Added two delayed `ShowWindow(hwnd, SW_MINIMIZE)` calls via user32.dll at +4 s and +8 s after launch. First pass catches the initial window show; second pass catches any post-splashscreen restore. Same technique already used in `stopAllWordPressSites`.
+
+**2. Stop All Left Local.exe Running (Minimize Instead of Kill)**
+- `msc_vpeStopAllEngines` called `stopAllWordPressSites(true)` which minimized Local.exe after stopping WordPress sites. User expectation: Stop All should close Local.exe entirely.
+- Fix (`src/main/vpe-ipc.js`): Changed `stopAllWordPressSites(true)` → `stopAllWordPressSites(false)` and added `taskkill /IM Local.exe /F` after all WP sites are stopped. Verified: Local.exe terminates on Stop All.
+
+**3. TalkShowLand-v1 Showing Divi Theme Thumbnail**
+- When TalkShowLand-v1 was registered, `msc_detectWordPressThemeScreenshot` auto-detected `wp-content/themes/Divi/screenshot.jpg` and set it as the thumbnail. The user's `use1.jpg` was never applied because `vpe:pick-thumbnail` (native dialog) couldn't run in the previous automated session.
+- Fix: Copied `C:\Users\JONBEATZ\Pictures\Vaderz-v2\use1.jpg` to `media/vault/TalkShowLand-v1/_vpe_thumb.png`, then called `vpe:save-settings` with `vpe-vault://<projectId>/_vpe_thumb.png` to update the DB. Thumbnail now persisted and rendering correctly.
+
+**4. Error Popup "Unable to find Electron app at…const Database=…" (Not a VPE Bug)**
+- Previous session ran `npx electron -e "const Database=require('better-sqlite3')…"` to query SQLite. Electron treated the code string as a file path to launch, causing the "how to run an app" splash. No code change needed.
+
+### Verification
+- `playwright-electron` MCP → browser_snapshot: **Pass** — 9 projects, TalkShowLand-v1 card shows `use1.jpg`.
+- TalkShowLand-v1 START → RUNNING (wordpress-local) → STOP → READY: **All pass**.
+- STOP ALL with TalkShowLand-v1 running → `Local.exe TERMINATED`: **Pass**.
+- CDP **9227** live throughout session (base port changed to 9227 in subsequent session — see entry above).
+
+---
+
 ## [2026-05-18] — MCP Reliability, Port Conflict Resolution & Full Workflow Verification (v2.2.6-SOVEREIGN)
 
 ### Summary

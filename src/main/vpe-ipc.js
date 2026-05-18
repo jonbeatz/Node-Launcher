@@ -2017,13 +2017,23 @@ function msc_registerVpeIpc(projectRunner, store, vpeRuntime = {}) {
 
   const msc_vpeStopAllEngines = async () => {
     const pm = vpeRuntime.pm2Manager;
-    // 1. Stop all WordPress-Local sites via GraphQL + minimize Local.exe.
+    // 1. Stop all WordPress-Local sites via GraphQL, then terminate Local.exe.
     try {
       if (typeof projectRunner.stopAllWordPressSites === 'function') {
-        await projectRunner.stopAllWordPressSites(true); // true = minimize Local.exe after
+        await projectRunner.stopAllWordPressSites(false); // false = we kill Local.exe below
       }
     } catch (_) {
       /* ignore */
+    }
+    // Terminate Local.exe so it doesn't stay open after Stop All.
+    if (process.platform === 'win32') {
+      try {
+        const { execSync: _execSync } = require('child_process');
+        _execSync('taskkill /IM Local.exe /F', { windowsHide: true, stdio: 'ignore' });
+        console.log('[VPE] stopAll: Local.exe terminated');
+      } catch (_) {
+        /* not running or already closed — ignore */
+      }
     }
     // 2. Stop PM2 processes (regular Node/Next.js projects).
     try {

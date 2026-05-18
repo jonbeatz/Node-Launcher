@@ -33,6 +33,15 @@ The **`media/vault`** tree is write-protected by **`vpe-vault-rm-guard.js`**. On
 - **`npm run vpe:delete-project`:** Sets **`global.__vpeVaultHardDeleteActive = true`** for the duration of a controlled vault purge.
 - **Forge bypass:** Files prefixed with **`_FORGE_TEMP_`** bypass the guard for diagnostics.
 
+### Thumbnail not appearing on card after project creation
+
+If a newly registered project shows a broken placeholder instead of the custom thumbnail:
+
+1. **Check if the source path was a raw file path** — `vpe:add-project` and `vpe:save-settings` both stage `file://` URLs and raw Windows/POSIX paths to the vault automatically (Branch B). If the thumbnail was a `data:image/` base64 blob from the UI picker, Branch A handles it.
+2. **Verify the `thumbAlreadyVaulted` sentinel is working** — if you see `CRITICAL FAIL: copyfile '...vault/...' → '...vault/...'` (source equals destination), this is the Branch A → Branch B self-copy ENOENT bug. It means `thumbAlreadyVaulted` was not set. This was permanently fixed in the 2026-05-18 patch; if it reappears, check `project-handlers.js` for the sentinel flag.
+3. **Re-save via Project Settings** as an immediate workaround: open Settings for the project → UPLOAD CUSTOM (picks a new image through the native dialog) → SAVE CHANGES. The vault staging path from `vpe:save-settings` will write `_vpe_thumb.png` correctly.
+4. **Deep vault reconcile** if multiple cards are affected: `npm run vault:reconcile-msc -- --deep`.
+
 ### Missing thumbnails / stale vault (primary recovery)
 
 1. Prefer stopping stray **`node.exe`** (see **§1**) so the catalog and vault are not locked by a ghost process.

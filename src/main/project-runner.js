@@ -254,6 +254,32 @@ function msc_launchLocalMinimized(localExePath) {
     exec(psCmd, { windowsHide: true }, (err) => {
       if (err) console.warn('[VPE] LocalWP minimized launch warning:', err.message);
     });
+    // Local.exe ignores -WindowStyle Minimized and shows multiple windows during startup
+    // (splash, update checker, main window). Poll every 500ms for 20s and force-minimize
+    // every visible window using SW_FORCEMINIMIZE (11) which works even on unresponsive threads.
+    const minScript = [
+      'Add-Type -TypeDefinition \'using System;using System.Runtime.InteropServices;',
+      'public class VpeWin32Launch {',
+      '  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmd);',
+      '}\' -ErrorAction SilentlyContinue;',
+      'Get-Process -Name Local -ErrorAction SilentlyContinue | ForEach-Object {',
+      '  if ($_.MainWindowHandle -ne [IntPtr]::Zero) {',
+      '    [VpeWin32Launch]::ShowWindow($_.MainWindowHandle, 11) | Out-Null',
+      '  }',
+      '}',
+    ].join(' ');
+    const runMin = () => exec(
+      `powershell -WindowStyle Hidden -Command "${minScript}"`,
+      { windowsHide: true, timeout: 5000 },
+      () => {},
+    );
+    // Poll every 500ms for the first 20s — catches splash screen, main window, and any restore.
+    let minPollCount = 0;
+    const minPollId = setInterval(() => {
+      runMin();
+      minPollCount += 1;
+      if (minPollCount >= 40) clearInterval(minPollId);
+    }, 500);
   } else {
     exec(`"${localExePath}"`, { windowsHide: true }, () => {});
   }

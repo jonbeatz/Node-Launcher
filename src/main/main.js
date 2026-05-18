@@ -104,13 +104,29 @@ msc_installVaultDeletionRmGuard();
 /** CDP / remote debugging: dev-only or explicit opt-in (packaged builds stay closed by default). */
 const MSC_VPE_CDP_ALLOWED = isDev === true || String(process.env.VPE_ALLOW_CDP || '') === '1';
 if (MSC_VPE_CDP_ALLOWED) {
-  const MSC_VPE_REMOTE_DEBUG_PORT = String(
-    process.env.VPE_REMOTE_DEBUG_PORT || '9222',
-  ).replace(/[^\d]/g, '') || '9222';
+  // Dynamic port: kill-dev-ports.cjs probes for a free port and writes it to
+  // .vpe-runtime.json at the workspace root before Electron starts. We read it
+  // here (synchronously, pre-ready) so main.js never has a hardcoded port number.
+  let MSC_VPE_REMOTE_DEBUG_PORT = String(
+    process.env.VPE_REMOTE_DEBUG_PORT || '9226',
+  ).replace(/[^\d]/g, '') || '9226';
+
+  try {
+    const runtimeFile = path.join(__dirname, '..', '..', '.vpe-runtime.json');
+    if (fs.existsSync(runtimeFile)) {
+      const rt = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
+      if (rt && rt.cdpPort && String(rt.cdpPort).match(/^\d+$/)) {
+        MSC_VPE_REMOTE_DEBUG_PORT = String(rt.cdpPort);
+      }
+    }
+  } catch (_) {
+    // If the runtime file is missing or malformed, fall back to env var / default.
+  }
+
   app.commandLine.appendSwitch('remote-debugging-port', MSC_VPE_REMOTE_DEBUG_PORT);
   app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1');
   console.log(
-    `[VPE Main] Remote debugging enabled at http://127.0.0.1:${MSC_VPE_REMOTE_DEBUG_PORT} (dev or VPE_ALLOW_CDP=1)`,
+    `[VPE Main] Remote debugging enabled at http://127.0.0.1:${MSC_VPE_REMOTE_DEBUG_PORT} (cdp port from .vpe-runtime.json)`,
   );
 } else {
   console.log(
@@ -874,27 +890,23 @@ app.on('before-quit', (event) => {
   console.log('[VPE LIFECYCLE] App close detected — running master teardown...');
 
   (async () => {
-    // ── STEP 1: Stop all running WordPress-Local sites ──────────────────────
+    // ── STEP 1: Notify VPE project runner to stop its own WP tracking ───────
+    // LocalWP manages its own process lifecycle; we do NOT force-kill Local.exe
+    // here. This keeps teardown fast and avoids freezing if LocalWP is mid-save.
+    // The user may close or minimize LocalWP independently.
     try {
       if (projectRunner && typeof projectRunner.stopAllWordPressSites === 'function') {
-        await projectRunner.stopAllWordPressSites(false); // false = don't minimize, we'll kill
+        // Pass true = minimize Local rather than kill; if Local is already gone, no-op.
+        const wpStopPromise = projectRunner.stopAllWordPressSites(true);
+        // Race against a 3 s deadline so a hung LocalWP can't block app exit.
+        await Promise.race([
+          wpStopPromise,
+          new Promise((r) => setTimeout(r, 3000)),
+        ]);
         console.log('[VPE LIFECYCLE] WordPress sites stopped.');
       }
     } catch (e) {
       console.warn('[VPE LIFECYCLE] WordPress teardown error:', e?.message ?? e);
-    }
-
-    // ── STEP 2: Forcibly terminate Local.exe ────────────────────────────────
-    try {
-      const { execSync: _execSync } = require('child_process');
-      _execSync('taskkill /IM Local.exe /F', {
-        windowsHide: true,
-        stdio: 'ignore',
-        timeout: 5000,
-      });
-      console.log('[VPE LIFECYCLE] Local.exe terminated.');
-    } catch (_) {
-      // Non-zero exit = Local was already closed; silently ignore.
     }
 
     // ── STEP 3: Stop PM2 processes ───────────────────────────────────────────
@@ -927,6 +939,13 @@ app.on('before-quit', (event) => {
 });
 
 app.on('will-quit', () => {
+  // Clean up the runtime port file so stale port info never persists across
+  // sessions. The next boot of kill-dev-ports.cjs will create a fresh one.
+  try {
+    const rtFile = path.join(__dirname, '..', '..', '.vpe-runtime.json');
+    if (fs.existsSync(rtFile)) fs.unlinkSync(rtFile);
+  } catch (_) { /* ignore cleanup errors */ }
+
   const store = msc_getDatabase();
   try {
     msc_vpeWalCheckpointIfSqlite(store);

@@ -51,6 +51,7 @@ Thumbs.db
 *.tmp
 *.temp
 *.pid
+.vpe-runtime.json
 
 # Data and dev profiles
 # MCP test session artifacts (screenshots, ARIA snapshots) — never commit

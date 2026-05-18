@@ -811,7 +811,7 @@ function DashboardContent() {
     if (project.project_type === 'wordpress-local') {
       const rawBase =
         project.project_url?.trim() ||
-        `http://${project.name.toLowerCase().replace(/\s+/g, '-')}.local/`
+        `http://${project.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.local/`
       // LocalWP self-signed HTTPS certs are rejected by browsers. Prefer http:// so the
       // page loads without a certificate trust prompt. The health probe uses rejectUnauthorized:false
       // internally, but the system browser enforces cert validation.
@@ -1446,7 +1446,7 @@ function DashboardContent() {
           const portNum = parseInt(data.port, 10) || 3000
           try {
             if (api?.addProject) {
-              await api.addProject({
+              const result = await api.addProject({
                 id: data.id,
                 name: data.name,
                 path: data.path,
@@ -1456,6 +1456,18 @@ function DashboardContent() {
                 project_url: data.project_url ?? null,
                 slug: data.slug ?? null,
               })
+              // Handle structured validation errors returned as { ok: false }
+              // (e.g. duplicate path) — display a clean toast without the
+              // "Error invoking remote method" Electron IPC wrapper noise.
+              if (result && typeof result === 'object' && (result as { ok?: boolean }).ok === false) {
+                const r = result as { ok: false; error?: string; duplicate?: { name?: string } }
+                addToast(
+                  'Path already registered',
+                  'error',
+                  r.error ?? 'This directory is already in use by another project.',
+                )
+                return
+              }
               await refreshProjects()
             } else {
               const newProject: Project = {

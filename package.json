@@ -23,7 +23,7 @@
     "vader:deploy": "npm run vader:clean-sync && npm run build:win",
     "vpe:take-state-snapshot": "node scripts/vpe-prebuild-snapshot.cjs",
     "vpe:check-readiness": "node scripts/vpe-syntax-guard.cjs",
-    "dev:main": "cross-env VPE_REMOTE_DEBUG_PORT=9226 electron . --remote-debugging-port=9226",
+    "dev:main": "cross-env VPE_SOVEREIGN_DB_DIR=src/main/db electron .",
     "start": "electron .",
     "typecheck": "tsc --noEmit -p src/renderer/tsconfig.json",
     "dev:renderer": "next dev src/renderer -p 3000",

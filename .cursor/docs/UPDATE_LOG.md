@@ -4,6 +4,56 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 
 ---
 
+## [2026-05-18] — Thumbnail Vault Staging: ENOENT Self-Copy Fix, file:// Routing & Duplicate Path UX
+
+### 🛠 Fixes & Root Issues Resolved
+
+#### 1. ENOENT Self-Copy Crash on Add Project with Thumbnail (`src/main/ipc/project-handlers.js`)
+
+- **Root Issue:** `vpe:add-project` staged thumbnails through two sequential branches:
+  - **Branch A** decoded a `data:image/` base64 preview, called `msc_writeVaultInternalThumbnail(tmpPath, ...)`, and stored the returned **`file://` URL** (e.g. `file:///D:/.../media/vault/PUBLIC/_vpe_thumb.png?t=...`) back into `resolvedThumbUrl`.
+  - **Branch B** ran next and checked `!resolvedThumbUrl.startsWith('vpe-vault:')` — which passed because the URL now started with `file:`. Branch B then resolved the vault path as `srcFilePath` and called `msc_writeVaultInternalThumbnail(vaultPath, 'PUBLIC', id)`, attempting to **copy the vault file to itself** → OS-level `ENOENT: no such file or directory, copyfile 'vault/PUBLIC/_vpe_thumb.png' → 'vault/PUBLIC/_vpe_thumb.png'`.
+  - The project was still registered successfully in SQLite (the crash was swallowed by `catch`), but the card rendered a broken placeholder — no thumbnail appeared on the dashboard without a manual re-save via Project Settings.
+- **Fix:** Added a `let thumbAlreadyVaulted = false;` sentinel before both branches. Branch A sets it to `true` immediately after a successful vault write. Branch B's entry guard is now `!thumbAlreadyVaulted && ...` — once any branch stages the image, the other skips unconditionally regardless of the URL format stored in `resolvedThumbUrl`.
+
+#### 2. `file://` / Raw Path Thumbnails Never Staged to Vault (`src/main/ipc/project-handlers.js`)
+
+- **Root Issue:** Both `vpe:add-project` and `vpe:save-settings` only handled `data:image/` base64 blobs. When a raw Windows path (e.g. `C:\Users\JONBEATZ\Pictures\Vaderz-v2\mytest.jpg`) or `file://` URL was supplied — common when calling `addProject` programmatically via MCPs or agents — the path passed through un-staged and was stored in SQLite as-is. Chromium's renderer sandbox blocks loading external `file://` paths from the `img` tag, so the card showed a broken placeholder.
+- **Fix (add-project Branch B):** After Branch A, a new Branch B detects any `file://` URL, raw Windows absolute path (`C:\...`), or POSIX absolute path (`/...`) that isn't already a `vpe-vault:` or `vpe-thumb:` URL, resolves it to a local `srcFilePath`, verifies the file exists, calls `msc_writeVaultInternalThumbnail(srcFilePath, ...)`, and stores the returned vault URL. Sets `thumbAlreadyVaulted = true` on success.
+- **Fix (save-settings):** Added the identical file-path vault staging block to `vpe:save-settings` — runs before `msc_normalizeThumbnailUrlForPersistence`. Promoted the handler from a sync callback to `async` (it was the only sync IPC handler that needed `await`).
+
+#### 3. "Add Project Failed" Toast Showed Raw IPC Error Prefix (`src/main/ipc/project-handlers.js` + `src/renderer/app/page.tsx`)
+
+- **Root Issue:** The duplicate-path guard inside `vpe:add-project` used `throw new Error(...)`. Electron's IPC system wraps thrown errors with `"Error invoking remote method 'vpe:add-project':"` — producing a noisy, confusing toast message in the renderer.
+- **Fix (main):** The guard now `return`s a structured `{ ok: false, code: 'DUPLICATE_PATH', error: '...', duplicate: { id, name, path } }` response instead of throwing. The error message names the conflicting project: `"TSL-v2" already uses this directory. Each workspace path can only be registered once — choose a different folder or edit the existing project.`
+- **Fix (renderer):** After `await api.addProject(...)`, `page.tsx` checks `result.ok === false` and shows a `'Path already registered'` toast with the clean message. The existing `catch` block still handles genuine exceptions (non-IPC errors).
+
+#### 4. CDP Base Port Changed to `9227` (`scripts/kill-dev-ports.cjs`)
+
+- **Root Issue:** `CDP_BASE_PORT = 9226` but the global `playwright-electron` MCP in `~/.cursor/mcp.json` was configured to connect to `http://127.0.0.1:9227`. Every VPE session landed on `9226` and the MCP could not connect.
+- **Fix:** Changed `CDP_BASE_PORT` from `9226` → `9227`. The port scanner now probes `9227–9236`, and VPE reliably starts on `9227`, matching the MCP config.
+
+### ✅ Verification (MCP end-to-end test)
+
+| Check | Evidence | Result |
+|---|---|---|
+| `addProject` with raw `file://` thumbnail | `{"ok":true}` — no ENOENT in log | ✅ |
+| Vault file on disk | `media/vault/ThumbVerify/_vpe_thumb.png` — 4,572,188 bytes | ✅ |
+| DB stores `vpe-vault://` protocol | `vpe-vault://verify-thumb-.../_vpe_thumb.png?pulse=...` | ✅ |
+| Live DOM `<img src>` on card | `vpe-vault://...` — no `file://`, no placeholder | ✅ |
+| Duplicate-path toast (UI) | `'Path already registered'` — no IPC prefix noise | ✅ |
+| `npx tsc --noEmit` | Exit 0 | ✅ |
+
+### 📝 Files Changed
+
+| File | Change |
+|---|---|
+| `src/main/ipc/project-handlers.js` | `thumbAlreadyVaulted` flag; Branch B file-path vault staging; duplicate-path returns `{ ok:false }` instead of throw; `vpe:save-settings` promoted to `async` + vault staging block |
+| `src/renderer/app/page.tsx` | Handle `{ ok: false }` from `addProject`; show `'Path already registered'` toast |
+| `scripts/kill-dev-ports.cjs` | `CDP_BASE_PORT` changed `9226` → `9227` |
+
+---
+
 ## [2026-05-18] - MCP Reliability, Port Conflict Resolution & Workflow Verification
 
 ### 🛠 Fixes & Root Issues Resolved

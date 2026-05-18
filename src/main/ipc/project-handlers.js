@@ -710,7 +710,7 @@ function msc_registerProjectIpc(ipcMain, c) {
     projectRunner.runBuild(projectId),
   );
 
-  ipcMain.handle('vpe:save-settings', (event, payload) => {
+  ipcMain.handle('vpe:save-settings', async (event, payload) => {
     const {
       id,
       name,
@@ -720,6 +720,8 @@ function msc_registerProjectIpc(ipcMain, c) {
       build_script,
       thumbnail_url,
       project_type: projectTypeIncoming,
+      project_url: projectUrlIncoming,
+      slug: slugIncoming,
     } = payload;
     if (!id) throw new Error('VPE: Missing project id');
 
@@ -787,11 +789,49 @@ function msc_registerProjectIpc(ipcMain, c) {
       );
     }
 
+    // Stage file:// URLs and raw local paths to vault before normalization —
+    // mirrors the same guard in vpe:add-project so thumbnails supplied
+    // programmatically or from an agent always resolve via vpe-vault://.
+    if (hasThumbPayload && savedThumbnail && typeof savedThumbnail === 'string' &&
+        !savedThumbnail.startsWith('vpe-vault:') &&
+        !savedThumbnail.startsWith('vpe-thumb:') &&
+        !savedThumbnail.startsWith('data:') &&
+        !savedThumbnail.startsWith('http')) {
+      try {
+        let srcFilePath = null;
+        if (savedThumbnail.startsWith('file:')) {
+          srcFilePath = fileURLToPath(savedThumbnail.replace(/^file:\/\/localhost\//i, 'file:///'));
+        } else if (/^[A-Za-z]:[/\\]/.test(savedThumbnail) || savedThumbnail.startsWith('\\\\')) {
+          srcFilePath = savedThumbnail;
+        } else if (savedThumbnail.startsWith('/')) {
+          srcFilePath = savedThumbnail;
+        }
+        if (srcFilePath && fs.existsSync(srcFilePath)) {
+          const vaultResult = await msc_writeVaultInternalThumbnail(srcFilePath, name, id);
+          if (vaultResult && vaultResult.url) {
+            savedThumbnail = vaultResult.url;
+            console.log(`[VPE] save-settings: thumbnail staged to vault → ${savedThumbnail}`);
+          }
+        }
+      } catch (e) {
+        console.warn('[VPE] save-settings: file-path thumbnail vault staging failed:', e?.message ?? e);
+      }
+    }
+
     if (hasThumbPayload && savedThumbnail != null && typeof savedThumbnail === 'string') {
       savedThumbnail = msc_normalizeThumbnailUrlForPersistence(
         { id, name },
         savedThumbnail,
       );
+    }
+
+    let project_url = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'project_url')) {
+      project_url = projectUrlIncoming == null ? null : String(projectUrlIncoming).trim() || null;
+    }
+    let slug = undefined;
+    if (Object.prototype.hasOwnProperty.call(payload, 'slug')) {
+      slug = slugIncoming == null ? null : String(slugIncoming).trim() || null;
     }
 
     store.updateProject({
@@ -806,6 +846,8 @@ function msc_registerProjectIpc(ipcMain, c) {
       ...(project_type !== undefined ? { project_type } : {}),
       ...(is_archived !== undefined ? { is_archived } : {}),
       ...(notes !== undefined ? { notes } : {}),
+      ...(project_url !== undefined ? { project_url } : {}),
+      ...(slug !== undefined ? { slug } : {}),
     });
     const updatedRow =
       typeof store.getProject === 'function' ? store.getProject(id) : null;
@@ -856,11 +898,60 @@ function msc_registerProjectIpc(ipcMain, c) {
     }
 
     const id = payload.id || randomUUID();
+
+    // ── Duplicate path guard ──────────────────────────────────────────────────
+    // Prevent registering a project whose resolved path is already in the catalog.
+    // This avoids port / config collisions between projects that point to the same
+    // workspace directory.
+    if (root) {
+      const normalizedRoot = root.replace(/\\/g, '/').toLowerCase().replace(/\/$/, '');
+      const existingProjects = typeof store.getProjects === 'function' ? store.getProjects() : [];
+      const duplicate = existingProjects.find((p) => {
+        if (!p.path) return false;
+        const n = String(p.path).replace(/\\/g, '/').toLowerCase().replace(/\/$/, '');
+        return n === normalizedRoot;
+      });
+      if (duplicate) {
+        // Return a structured response instead of throwing so the renderer
+        // can display a user-friendly toast without the ugly
+        // "Error invoking remote method" Electron IPC prefix.
+        return {
+          ok: false,
+          code: 'DUPLICATE_PATH',
+          error: `"${duplicate.name}" already uses this directory. Each workspace path can only be registered once — choose a different folder or edit the existing project.`,
+          duplicate: {
+            id: duplicate.id,
+            name: duplicate.name,
+            path: duplicate.path,
+          },
+        };
+      }
+    }
+
+    // ── Port collision guard ──────────────────────────────────────────────────
+    // If the caller supplies a port, check it doesn't collide with any existing
+    // project. If it does (or is the renderer port), auto-assign a free one.
     const rawPort = payload.port;
-    const portNum =
-      rawPort != null && Number.isFinite(Number(rawPort))
-        ? Number(rawPort)
-        : await msc_findAvailablePort(msc_managedPortFloor(), id, det.is_nextjs);
+    let portNum;
+    if (rawPort != null && Number.isFinite(Number(rawPort))) {
+      const requestedPort = Number(rawPort);
+      const allPorts = new Set(
+        (typeof store.getProjects === 'function' ? store.getProjects() : [])
+          .map((p) => Number(p.port))
+          .filter((n) => Number.isFinite(n) && n > 0),
+      );
+      if (allPorts.has(requestedPort) || requestedPort === msc_managedPortFloor() - 1) {
+        // Requested port is already taken — find a free one instead.
+        portNum = await msc_findAvailablePort(msc_managedPortFloor(), id, det.is_nextjs);
+        console.warn(
+          `[VPE] add-project: requested port ${requestedPort} already in use — reassigned to ${portNum}`,
+        );
+      } else {
+        portNum = requestedPort;
+      }
+    } else {
+      portNum = await msc_findAvailablePort(msc_managedPortFloor(), id, det.is_nextjs);
+    }
 
     let project_type = undefined;
     if (Object.prototype.hasOwnProperty.call(payload, 'project_type')) {
@@ -883,9 +974,20 @@ function msc_registerProjectIpc(ipcMain, c) {
       resolvedThumbUrl = msc_detectWordPressThemeScreenshot(root);
     }
 
-    // Draft thumbnail: the add-project modal's pickThumbnail returns a data: URL for preview
-    // (project not in DB yet → no vault URL available). Decode it and write a real vault file
-    // so the project card shows the correct thumbnail immediately after creation.
+    // ── Thumbnail staging: route ANY local image source through the vault ────
+    // The renderer runs in Chromium's sandbox which blocks raw `file://` URLs for
+    // external assets. All thumbnails must be copied into `media/vault/<name>/`
+    // and referenced via the `vpe-vault://` custom protocol.
+    //
+    // IMPORTANT: msc_writeVaultInternalThumbnail returns a `file://` URL pointing
+    // into the vault.  Branch B must NOT treat that as a new external source —
+    // doing so would pass the vault path as both src and dest (ENOENT self-copy).
+    // We guard this with `thumbAlreadyVaulted` set to true after any vault write.
+    let thumbAlreadyVaulted = false;
+
+    // Branch A: `data:image/` base64 preview (from the Add Project modal's
+    //           pickThumbnail — the vault URL isn't available before the project
+    //           is inserted, so the modal passes a base64 blob).
     if (resolvedThumbUrl && typeof resolvedThumbUrl === 'string' && resolvedThumbUrl.startsWith('data:image/')) {
       try {
         const b64Match = resolvedThumbUrl.match(/^data:image\/(\w+);base64,(.+)$/s);
@@ -900,6 +1002,7 @@ function msc_registerProjectIpc(ipcMain, c) {
               ? vaultResult.url
               : pathToFileURL(String(vaultFile)).href;
             resolvedThumbUrl = (typeof vaultUrl === 'string' && vaultUrl) ? vaultUrl : null;
+            thumbAlreadyVaulted = true; // image is now in vault — Branch B must skip
           } finally {
             try { fs.unlinkSync(tmpPath); } catch (_) { /* ignore temp-file cleanup errors */ }
           }
@@ -908,6 +1011,46 @@ function msc_registerProjectIpc(ipcMain, c) {
         }
       } catch (e) {
         console.warn('[VPE] add-project: draft thumbnail decode failed:', e?.message ?? e);
+        resolvedThumbUrl = null;
+      }
+    }
+
+    // Branch B: `file://` URL or raw Windows/POSIX absolute path supplied
+    //           programmatically (e.g. via vpeAPI.addProject from an agent or
+    //           power-user script). Copy the source image into the vault so
+    //           Chromium can serve it through the vpe-vault:// protocol handler.
+    //           Skip if Branch A already vaulted the image.
+    if (!thumbAlreadyVaulted &&
+        resolvedThumbUrl && typeof resolvedThumbUrl === 'string' &&
+        !resolvedThumbUrl.startsWith('vpe-vault:') &&
+        !resolvedThumbUrl.startsWith('vpe-thumb:') &&
+        !resolvedThumbUrl.startsWith('data:') &&
+        !resolvedThumbUrl.startsWith('http')) {
+      try {
+        let srcFilePath = null;
+        if (resolvedThumbUrl.startsWith('file:')) {
+          // file:///C:/... or file://localhost/C:/...
+          srcFilePath = fileURLToPath(resolvedThumbUrl.replace(/^file:\/\/localhost\//i, 'file:///'));
+        } else if (/^[A-Za-z]:[/\\]/.test(resolvedThumbUrl) || resolvedThumbUrl.startsWith('\\\\')) {
+          // Raw Windows absolute path e.g. C:\Users\...\mytest.jpg
+          srcFilePath = resolvedThumbUrl;
+        } else if (resolvedThumbUrl.startsWith('/')) {
+          // POSIX absolute path
+          srcFilePath = resolvedThumbUrl;
+        }
+        if (srcFilePath && fs.existsSync(srcFilePath)) {
+          const vaultResult = await msc_writeVaultInternalThumbnail(srcFilePath, payload.name, id);
+          if (vaultResult && vaultResult.url) {
+            resolvedThumbUrl = vaultResult.url;
+            thumbAlreadyVaulted = true;
+            console.log(`[VPE] add-project: thumbnail staged to vault → ${resolvedThumbUrl}`);
+          }
+        } else if (srcFilePath) {
+          console.warn(`[VPE] add-project: thumbnail source not found, skipping: ${srcFilePath}`);
+          resolvedThumbUrl = null;
+        }
+      } catch (e) {
+        console.warn('[VPE] add-project: file-path thumbnail vault staging failed:', e?.message ?? e);
         resolvedThumbUrl = null;
       }
     }
