@@ -1,92 +1,99 @@
-# Vader Station: Automated Build Deployer v2.5 - SOVEREIGN FINAL
-Write-Host "🦾 VADER PROTOCOL v2.5 ACTIVE" -ForegroundColor Magenta
+# VPE Jedi-Master: Automated Build Deployer v3.0
+Write-Host "🦾 VPE JEDI-MASTER PROTOCOL v3.0 ACTIVE" -ForegroundColor Magenta
 
 # --- CONFIGURATION ---
-$repo = "jonbeatz/Node-Launcher"
-$distFolder = "D:\Cursor_Projectz\Node-Launcher-v3\dist"
-$unpackedFolder = "$distFolder\win-unpacked"
-$templatePath = "D:\Cursor_Projectz\Node-Launcher-v3\.cursor\docs\release_notes_template.md"
+$repo       = "jonbeatz/Node-Launcher"
+$repoRoot   = Split-Path -Parent $PSScriptRoot
+$distFolder = Join-Path $repoRoot "dist"
+$unpackedFolder = Join-Path $distFolder "win-unpacked"
+$templatePath   = Join-Path $repoRoot ".cursor\docs\release_notes_template.md"
 
-# 1. RELEASE PREFIX — JediBuild lanes use the git branch name (VPE-JediBuild-v1.3 → …-v1.1, …-v1.2 on GitHub).
-#    Other branches keep the historical main-line prefix so Upload Build still works everywhere.
-$repoRoot = Split-Path -Parent $PSScriptRoot
+# 1. READ VERSION FROM package.json  (e.g. "3.0.0" → display "3.0")
+$pkgJson = Get-Content (Join-Path $repoRoot "package.json") -Raw | ConvertFrom-Json
+$pkgVersion = $pkgJson.version          # e.g. "3.0.0"
+# Convert semver to display form: "3.0.0" → "3.0", "3.1.0" → "3.1"
+$verParts   = $pkgVersion -split '\.'
+$displayVer = "$($verParts[0]).$($verParts[1])"   # major.minor only
+
+# 2. GIT BRANCH — always named VPE-Jedi-Master-v<major.minor>
 $gitBranch = (& git -C $repoRoot branch --show-current 2>$null | ForEach-Object { $_.Trim() })
 if ([string]::IsNullOrWhiteSpace($gitBranch)) { $gitBranch = 'detached' }
-if ($gitBranch -match '^VPE-JediBuild-v') {
-    $cleanPrefix = $gitBranch
-} else {
-    $cleanPrefix = "VPE-JediBuild-main"
+
+# Canonical release prefix always matches the versioned branch name
+$cleanPrefix = "VPE-Jedi-Master-v$displayVer"
+Write-Host "🌿 Git branch : $gitBranch" -ForegroundColor DarkGray
+Write-Host "📦 Release tag: $cleanPrefix  (package.json v$pkgVersion)" -ForegroundColor DarkGray
+
+# 3. GITHUB TAG DEDUP — if the tag already exists, append a build counter
+Write-Host "🔍 Checking GitHub for existing releases..." -ForegroundColor Gray
+$ghTags = gh release list --limit 100 | ForEach-Object { ($_ -split "`t")[0] }
+
+$releaseTag = $cleanPrefix
+if ($ghTags -contains $releaseTag) {
+    $count = 2
+    while ($ghTags -contains "$cleanPrefix-b$count") { $count++ }
+    $releaseTag = "$cleanPrefix-b$count"
+    Write-Host "⚠️  Tag $cleanPrefix exists — using $releaseTag" -ForegroundColor Yellow
 }
-Write-Host "🌿 Git branch: $gitBranch  →  release prefix: $cleanPrefix" -ForegroundColor DarkGray
+Write-Host "🚀 TARGET TAG: $releaseTag" -ForegroundColor Cyan
 
-# 2. GITHUB TAG SYNC
-Write-Host "🔍 Scrutinizing GitHub for existing releases..." -ForegroundColor Gray
-$ghTags = gh release list --limit 50 | ForEach-Object { ($_ -split "`t")[0] }
-
-    $vaderVersion = "$cleanPrefix"
-    # If the tag already exists, add a suffix to avoid conflict
-    if ($ghTags -contains $vaderVersion) {
-        $count = 1
-        while ($true) {
-            $vaderVersion = "$cleanPrefix-v1.$count"
-            if ($ghTags -contains $vaderVersion) {
-                $count++
-            } else {
-                break
-            }
-        }
-    }
-
-Write-Host "🚀 TARGET VERSION: $vaderVersion" -ForegroundColor Cyan
-
-# 3. ABSOLUTE CLEANUP (Vader Protocol: No Clutter)
+# 4. CLEAN OLD ZIPS
 if (Test-Path "$distFolder\*.zip") {
-    Write-Host "🧹 Nuking all old zips in dist..." -NoNewline
+    Write-Host "🧹 Removing old zips from dist..." -NoNewline
     Get-ChildItem "$distFolder\*.zip" | Remove-Item -Force
     Write-Host " [DONE]" -ForegroundColor Green
 }
 
-# 4. CREATE THE ZIP
-$vaderZipPath = "$distFolder\$vaderVersion.zip"
+# 5. CREATE THE ZIP — Node-Launcher-v3.0-JEDI-MASTER.zip
+$zipName    = "Node-Launcher-v$displayVer-JEDI-MASTER.zip"
+$vaderZipPath = Join-Path $distFolder $zipName
 if (Test-Path $unpackedFolder) {
-    Write-Host "📦 ZIPPING AS: $vaderVersion.zip" -ForegroundColor Yellow
+    Write-Host "📦 ZIPPING AS: $zipName" -ForegroundColor Yellow
     Compress-Archive -Path "$unpackedFolder\*" -DestinationPath $vaderZipPath -Force
-    Write-Host "✅ Zip Created." -ForegroundColor Green
+    Write-Host "✅ Zip created: $vaderZipPath" -ForegroundColor Green
 } else {
-    Write-Error "❌ win-unpacked folder missing! Build the app first."; exit 1
+    Write-Error "❌ win-unpacked folder missing! Run 'npm run build:win' first."; exit 1
 }
 
-# 5. PREPARE RELEASE NOTES (Template Injection)
-$tempNotes = "$distFolder\temp_notes.md"
+# 6. RELEASE NOTES (template injection)
+$tempNotes = Join-Path $distFolder "temp_notes.md"
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
-
 if (Test-Path $templatePath) {
-    Write-Host "📝 Injecting data into Release Template..." -ForegroundColor Cyan
-    $notesContent = Get-Content $templatePath
-    $notesContent = $notesContent -replace '\{\{VERSION\}\}', $vaderVersion
-    $notesContent = $notesContent -replace '\{\{BRANCH\}\}', $gitBranch
-    $notesContent = $notesContent -replace '\{\{TIMESTAMP\}\}', $timestamp
-    $notesContent | Out-File -FilePath $tempNotes -Encoding utf8
+    Write-Host "📝 Injecting release template..." -ForegroundColor Cyan
+    $notes = (Get-Content $templatePath) `
+        -replace '\{\{VERSION\}\}',   $releaseTag `
+        -replace '\{\{BRANCH\}\}',    $gitBranch `
+        -replace '\{\{TIMESTAMP\}\}', $timestamp
+    $notes | Out-File -FilePath $tempNotes -Encoding utf8
 } else {
-    Write-Warning "⚠️ Template not found. Using fallback notes."
-    "Automated Build: $vaderVersion`nTimestamp: $timestamp" | Out-File $tempNotes -Encoding utf8
+    Write-Warning "⚠️ Template not found — using fallback notes."
+    "VPE Jedi-Master Build: $releaseTag`nTimestamp: $timestamp" | Out-File $tempNotes -Encoding utf8
 }
 
-# 6. ASSET HUNT (Locate the EXE)
-$vaderExe = Get-ChildItem -Path $distFolder -Filter "*.exe" | Where-Object { $_.Name -notmatch "setup" } | Select-Object -First 1
+# 7. LOCATE EXE
+$vaderExe = Get-ChildItem -Path $distFolder -Filter "*.exe" |
+    Where-Object { $_.Name -notmatch "setup|Setup" } |
+    Select-Object -First 1
 
-# 7. UPLOAD TO GITHUB
-Write-Host "📤 UPLOADING TO GITHUB..." -ForegroundColor Cyan
-gh release create $vaderVersion --title "Build: $vaderVersion" --notes-file $tempNotes
+# 8. UPLOAD TO GITHUB
+Write-Host "📤 UPLOADING TO GITHUB: $releaseTag" -ForegroundColor Cyan
+gh release create $releaseTag `
+    --title "VPE Jedi-Master v$displayVer" `
+    --notes-file $tempNotes
 
 if ($LASTEXITCODE -eq 0) {
-    gh release upload $vaderVersion "$($vaderExe.FullName)" "$vaderZipPath"
-    Write-Host "✨ MISSION ACCOMPLISHED: $vaderVersion" -ForegroundColor Green
+    if ($vaderExe) {
+        gh release upload $releaseTag "$($vaderExe.FullName)" "$vaderZipPath"
+    } else {
+        gh release upload $releaseTag "$vaderZipPath"
+        Write-Warning "⚠️ No EXE found — uploaded ZIP only."
+    }
+    Write-Host "✨ MISSION ACCOMPLISHED: $releaseTag  ($zipName)" -ForegroundColor Green
 } else {
-    Write-Error "❌ GitHub Release creation failed."
+    Write-Error "❌ GitHub release creation failed."
 }
 
-# 8. CLEANUP TEMP FILES
+# 9. CLEANUP
 if (Test-Path $tempNotes) { Remove-Item $tempNotes }
 
-Write-Host "Powered by the MSC Media Engine 🦾✨" -ForegroundColor Gray
+Write-Host "Powered by the VPE Jedi-Master 🦾✨  v$displayVer" -ForegroundColor Gray

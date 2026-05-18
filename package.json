@@ -1,7 +1,7 @@
 {
   "name": "vader-project-engine",
-  "version": "2.2.6-SOVEREIGN",
-  "description": "Vader Project Engine — Station Prime (v2.2.6-SOVEREIGN)",
+  "version": "3.0.0",
+  "description": "Vader Project Engine — Jedi-Master (v3.0)",
   "author": "MSC Media",
   "main": "src/main/main.js",
   "scripts": {

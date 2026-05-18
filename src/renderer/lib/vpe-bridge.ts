@@ -467,9 +467,9 @@ export function msc_getVpeShippedVersion(): string {
   return v != null && String(v).trim() !== '' ? String(v).trim() : '0.0.0'
 }
 
-/** MSC footer line; middle dot matches Vader Protocol status chrome. */
+/** VPE Jedi-Master footer line — version tracks package.json major.minor. */
 export function msc_mscEngineFooterLine(): string {
-  return `Powered by the MSC Media Engine · v${msc_getVpeShippedVersion()}`
+  return `Powered by the VPE Jedi-Master · v${msc_getVpeShippedVersion()}`
 }
 
 /** Registry / vault enumeration can stall on huge D:-drive vaults — cap wait via renderer-side race (main handler remains unchanged). */
