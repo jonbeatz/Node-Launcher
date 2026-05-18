@@ -4,6 +4,40 @@
 
 ---
 
+## [2026-05-18] — MCP Reliability, Port Conflict Resolution & Full Workflow Verification (v2.2.6-SOVEREIGN)
+
+### Summary
+Resolved the root causes of persistent port errors and MCP connectivity failures during dev sessions. The `playwright-electron` MCP was silently misconfigured (CDP port 9222 vs. expected 9225/9226), `agent-browser` had an invalid MCP config causing Cursor to error on startup, and port 3000/CDP port stale socket locks from previous Electron sessions caused `EADDRINUSE` failures on every dev restart. All issues fixed, VPE dev startup is now clean and deterministic.
+
+### Root Causes & Fixes
+
+**1. CDP Port Mismatch (playwright-electron MCP never connected)**
+- `dev:main` started Electron with `--remote-debugging-port=9222` but the `playwright-electron` MCP was hardcoded to connect to `http://127.0.0.1:9225` in `~/.cursor/mcp.json`. They were never talking to each other.
+- Fix: Changed `dev:main` to use port `9226` (clean, no stale socket history) with `cross-env VPE_REMOTE_DEBUG_PORT=9226`. Updated global `~/.cursor/mcp.json` `playwright-electron` entry to `http://127.0.0.1:9226`.
+
+**2. Stale Port Locks from Zombie Electron Processes**
+- Previous dev sessions left headless Electron processes running with port locks. The old kill logic used `netstat | findstr` (unreliable on Windows for all socket states). New script uses `Get-NetTCPConnection` + `taskkill` and also kills headless Electron processes by name.
+- Fix: New `scripts/kill-dev-ports.cjs` runs as a pre-step to both `dev` and `vader:dev` npm scripts.
+
+**3. `agent-browser` Invalid MCP Config**
+- `.cursor/mcp.json` had `"agent-browser": { command: "npx", args: ["-y", "agent-browser", "serve"] }`. The `serve` subcommand does not exist — `agent-browser` is a standalone CLI automation tool, not an MCP server. Cursor reported it as erroring on every startup.
+- Fix: Removed the entry. Correct usage is direct CLI: `npx agent-browser --cdp 9226 snapshot | click | screenshot | fill`.
+
+**4. Electron Splash Popup (debugging artifact)**
+- The popup `$ node_modules\electron\dist\electron.exe path-to-app` appeared because the agent ran `npx electron db_query.js` to query SQLite directly. `electron` is a full GUI launcher; without `ELECTRON_RUN_AS_NODE=1` it shows the default "how to run an app" splash screen. Not a VPE bug.
+
+### Verification
+- `npm run start-project:smoke` → Exit 0 (tsc + migrations pass).
+- VPE starts cleanly on port 3000 (renderer) + CDP 9226 (main). `DevTools listening on ws://127.0.0.1:9226/...` — no bind errors.
+- `agent-browser --cdp 9226 snapshot` confirmed full UI accessibility tree.
+- **Full workflow test (TalkShowLand-v1):** project added via `vpeAPI.addProject()`, vault folder created at `media/vault/TalkShowLand-v1`, `vpe-thumb:///F:/...` thumbnail loading via the fixed drive-letter protocol handler, START → "Server started on http://talkshowland-v1.local/" toast, STOP → all projects cleanly stopped.
+- All vault paths confirmed in `d:\Cursor_Projectz\Node-Launcher-v2\media\vault\` (no temp DB or stale Node-Launcher references).
+
+### Commit
+`4e24783` — `fix: MCP reliability + port conflict resolution (v2.2.6-SOVEREIGN)`
+
+---
+
 ## [2026-05-18] — vpe-thumb:// Drive-Letter Protocol Fix (v2.2.6-SOVEREIGN)
 
 ### Summary

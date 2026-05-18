@@ -2,9 +2,33 @@
 
 This document serves as the authoritative build and branch history for the Vader Project Engine.
 
-## 📦 Active Branch: VPE-JediBuild-v1.3
+## 📦 Active Branch: VPE-JediBuild-v1.4
 
 ### Build History & Milestones
+
+#### [2026-05-18] - MCP Reliability, Port Conflict Resolution & Workflow Verification (v2.2.6-SOVEREIGN)
+
+- **Status:** COMMITTED & PUSHED (`4e24783`)
+- **Branch:** `VPE-JediBuild-v1.4`
+- **Files Changed:**
+  - `package.json` — `dev:main` CDP port changed `9222` → `9226`; `cross-env VPE_REMOTE_DEBUG_PORT=9226` added; `kill-dev-ports.cjs` pre-step wired into `dev` and `vader:dev` scripts
+  - `scripts/kill-dev-ports.cjs` — new file; PowerShell `Get-NetTCPConnection`-based port cleaner + headless Electron process killer; runs before every dev start
+  - `.cursor/mcp.json` — removed invalid `agent-browser` MCP server entry (`serve` subcommand does not exist; tool is CLI-only)
+  - `~/.cursor/mcp.json` (global) — `playwright-electron` `--cdp-endpoint` updated from `9225` → `9226`
+- **Bugs Fixed:**
+  1. **Stale port locks on dev restart** — `EADDRINUSE :3000` and CDP bind failure on `9222/9225` caused by zombie Electron processes from previous sessions. New kill script uses `Get-NetTCPConnection` (reliable) and clears both ports + headless Electron processes automatically.
+  2. **playwright-electron MCP never connected** — CDP port was 9222 in VPE but 9225 in MCP config. Now both use 9226.
+  3. **agent-browser Cursor startup error** — `npx agent-browser serve` is not a valid command. Removed the broken MCP entry; tool works as a shell CLI.
+  4. **Electron splash popup during testing** — caused by running `npx electron script.js` without `ELECTRON_RUN_AS_NODE=1`. Not a VPE bug; documented correct pattern.
+- **Workflow Verified:**
+  - `npm run start-project:smoke` → Exit 0
+  - VPE boots clean: CDP on `ws://127.0.0.1:9226/...`, renderer on `:3000`, no bind errors
+  - `agent-browser --cdp 9226` snapshot/click/screenshot confirmed working against live VPE
+  - TalkShowLand-v1 (`F:\Websitez\Yolando\TalkShowLand\Local_WP\TalkShowLand_v1\app\public`) added, started on `http://talkshowland-v1.local/`, stopped — full cycle clean
+  - All vault data confirmed in `Node-Launcher-v2\media\vault\` (no stale path references)
+- **MCP Notes:** `playwright-electron` runs on CDP port **9226** (set via `VPE_REMOTE_DEBUG_PORT=9226` in `dev:main`). After Cursor restart, MCP will auto-connect to 9226. `agent-browser` used directly via Shell for UI automation during this session.
+
+---
 
 #### [2026-05-18] - Zero-Hardcoding Path Refactor & Ghost Vault Fix (v2.2.6-SOVEREIGN Patch)
 

@@ -4,6 +4,41 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 
 ---
 
+## [2026-05-18] - MCP Reliability, Port Conflict Resolution & Workflow Verification
+
+### 🛠 Fixes & Root Issues Resolved
+
+- **Persistent Port Conflicts (`EADDRINUSE :3000` / CDP bind error)**
+  - **Root Issue:** Old dev sessions left headless Electron processes holding ports 3000 and the CDP debug port. The previous cleanup used `netstat | findstr` which doesn't reliably match all socket states on Windows (especially `TIME_WAIT` zombie sockets and processes killed hard by the OS).
+  - **Fix:** New `scripts/kill-dev-ports.cjs` uses PowerShell `Get-NetTCPConnection` for accurate PID resolution, `taskkill /F /PID` for each owner, and also kills headless (no main window) Electron processes by name. Runs automatically before every `dev` and `vader:dev` npm start.
+
+- **playwright-electron MCP Never Connecting**
+  - **Root Issue:** `dev:main` launched Electron with `--remote-debugging-port=9222` but the `playwright-electron` MCP in `~/.cursor/mcp.json` was configured to `http://127.0.0.1:9225`. The two were always on different ports.
+  - **Fix:** Changed `dev:main` to `cross-env VPE_REMOTE_DEBUG_PORT=9226 electron . --remote-debugging-port=9226` (9226 chosen as a fresh port with no stale socket history). Updated the global `playwright-electron` MCP entry to `http://127.0.0.1:9226`.
+
+- **`agent-browser` MCP Startup Error**
+  - **Root Issue:** `.cursor/mcp.json` contained `"agent-browser": { command: "npx", args: ["-y", "agent-browser", "serve"] }`. The `serve` subcommand does not exist — `agent-browser` (v0.27.0) is a standalone CLI automation tool, not an MCP server. Cursor logged an error for this entry on every startup.
+  - **Fix:** Removed the invalid entry from `.cursor/mcp.json`. The tool is fully usable via Shell commands: `npx agent-browser --cdp 9226 snapshot|click|fill|screenshot|eval`.
+
+- **Electron Splash Popup during Testing**
+  - **Root Issue:** During a previous debugging session, the agent ran `npx electron db_query.js` to query SQLite directly. Since `db_query.js` has no `BrowserWindow` setup, Electron displayed its default splash screen showing `$ node_modules\electron\dist\electron.exe path-to-app`. Not a VPE bug.
+  - **Fix (process):** For plain Node.js scripts that need Electron's native modules, always use `npm run test:migrations` pattern which sets `ELECTRON_RUN_AS_NODE=1`.
+
+### 📝 Updates & Improvements
+
+- **`scripts/kill-dev-ports.cjs` (new file):** Pre-dev port cleanup script. Clears ports 3000 and 9226 using `Get-NetTCPConnection` + `taskkill`. Also sweeps headless Electron processes from previous dev sessions. Invoked automatically by both `dev` and `vader:dev` npm scripts.
+- **`package.json` `dev:main`:** Updated from `--remote-debugging-port=9222` to `cross-env VPE_REMOTE_DEBUG_PORT=9226 electron . --remote-debugging-port=9226`.
+- **`agent-browser` CLI confirmed working:** Connects to VPE via `--cdp 9226` for full UI automation (snapshot, click, fill, screenshot, eval). Used to complete full workflow test without playwright-electron.
+- **TalkShowLand-v1 workflow verified:** Project added (`F:\Websitez\Yolando\TalkShowLand\Local_WP\TalkShowLand_v1\app\public`), vault folder at `media/vault/TalkShowLand-v1`, START → RUNNING on `http://talkshowland-v1.local/`, STOP → clean — all confirmed via `agent-browser --cdp 9226`.
+
+### 💡 Helpful Info & Notes
+
+- `agent-browser` is a CLI tool (not an MCP server). Chain commands with `&&`: `npx agent-browser --cdp 9226 snapshot && npx agent-browser --cdp 9226 click @ref`. Refs from `snapshot` persist across `&&`-chained calls in the same daemon session.
+- The `vpe:e2e-vault-copy-from-path` IPC only registers when `VPE_E2E=1`. To test thumbnail upload programmatically, restart with `cross-env VPE_E2E=1 npm run vader:dev`.
+- Setting a custom thumbnail for any project still requires clicking **UPLOAD CUSTOM** in Project Settings (native OS file dialog — cannot be automated without `VPE_E2E=1`).
+
+---
+
 ## [2026-05-12] - CI Fixes, MCP Overhaul, and Documentation
 
 ### 🛠 Fixes & Root Issues Resolved
