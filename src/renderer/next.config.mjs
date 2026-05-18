@@ -7,6 +7,7 @@ export default function msc_createNextConfig(phase) {
   const isProdBuild = phase === 'phase-production-build';
   return {
     output: 'export',
+    trailingSlash: true,
     images: {
       unoptimized: true,
     },

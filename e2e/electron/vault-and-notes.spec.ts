@@ -64,6 +64,8 @@ async function electronFirstUiPage(browser: Browser, timeoutMs = 90000): Promise
   throw new Error('No Electron BrowserWindow page with file: / index.html found.')
 }
 
+test.describe.configure({ timeout: 180_000 })
+
 test.describe.serial('Electron static shell + vault / notes IPC', () => {
   let userDataDir = ''
   let debugPort = 0

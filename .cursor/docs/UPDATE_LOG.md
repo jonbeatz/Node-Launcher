@@ -4,6 +4,20 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 
 ---
 
+## [2026-05-18] — Final build hygiene, doc archive & release pipeline (v3.0.0)
+
+### Changes
+- **Docs:** Archived **`Goalz.md`** / **`VADER_MASTER_MANIFEST.md`** → **`.cursor/prompts/_archive/`**; completed plans → **`.cursor/plans/_archive/`**; older **`VADER_STATION_LOG.md`** entries → **`.cursor/docs/archive/VADER_STATION_LOG_ARCHIVE.md`**. Vision consolidated in **`TRUTH.md` §8**.
+- **Design:** Removed **`_design_references/v0-Design/`**; mock screenshots under **`.archive/design/`** (gitignored). Kept **`_design_references/VPE.ico`** for release icon copy.
+- **Scripts:** Retired **`fix-wp-urls.py`**, **`check-db.py`** → **`scripts/_archive/`** (active: **`fix-wp-urls.cjs`**).
+- **Renderer:** **`trailingSlash: true`** in **`next.config.mjs`**; removed unused **`detectedThumbnailUrl`** in **`add-project-modal.tsx`**.
+- **Main / E2E:** **`VPE_REMOTE_DEBUG_PORT`** overrides **`.vpe-runtime.json`** for CDP; heartbeat e2e asserts **`[VPE SUCCESS]`** + Jedi-Master footer (not legacy **`[VPE STANDBY]`** app log).
+
+### Verification
+- **`npm run build:renderer`**, **`npm run lint`** (zero warnings), **`npm run test:e2e:electron`** (4/4), **`npm run build:win`**, **`.\scripts\upload_build.ps1`** → **`dist/Node-Launcher-v3.0-JEDI-MASTER.zip`**, GitHub **VPE-Jedi-Master-v3.0**.
+
+---
+
 ## [2026-05-18] — VPE Jedi-Master v3.0 Baseline Synchronization & UI Refinement
 
 ### 🛠 Changes
@@ -36,7 +50,7 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 
 #### 6. Documentation Sync (all core docs)
 - All doc headers, signatures, and version references updated from `MSC Media Engine · v2.2.6-SOVEREIGN` → `VPE Jedi-Master · v3.0`.
-- Files updated: `README.md`, `VADER_STATION_LOG.md`, `REPAIR_PROTOCOLS.md`, `TRUTH.md`, `Project-Bible.md`, `Start-Master.md`, `VADER_MASTER_MANIFEST.md`, `Goalz.md`.
+- Files updated: `README.md`, `VADER_STATION_LOG.md`, `REPAIR_PROTOCOLS.md`, `TRUTH.md`, `Project-Bible.md`, `Start-Master.md` (later archived: `Goalz.md`, `VADER_MASTER_MANIFEST.md` → `.cursor/prompts/_archive/`).
 
 #### 8. Production Native Binaries & Version Detection (`main.js`, `package.json`)
 - **Native Binary Binding:** Fixed "DLL initialization routine failed" error by explicitly configuring `asarUnpack` for `better-sqlite3` and running `electron-rebuild` to align native binaries with the Electron runtime.

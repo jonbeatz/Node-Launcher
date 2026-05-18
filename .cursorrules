@@ -20,7 +20,7 @@ If documentation conflicts occur, follow this hierarchy strictly:
 4. `.cursor/docs/guides/PRD.md` (Feature & Requirement Truth, when present)
 5. `package.json` (Authority for executable scripts only)
 
-**Documentation layout (v2.2.6-SOVEREIGN):** The canonical reference docs live directly under **`.cursor/docs/`**: **`TRUTH.md`** (constitution), **`Project-Bible.md`** (architecture + script lexicon), **`REPAIR_PROTOCOLS.md`** (nuke/vault guides). **`VADER_STATION_LOG.md`** lives at **repo root**. (Legacy subfolders like `core/`, `guides/`, and loose root files like `API-SetUp-Master.md` have been archived or merged into the TRUTH/Bible trio).
+**Documentation layout (v3.0.0 Jedi-Master):** Canonical docs under **`.cursor/docs/`**: **`TRUTH.md`**, **`Project-Bible.md`**, **`REPAIR_PROTOCOLS.md`**. **`VADER_STATION_LOG.md`** at repo root (older entries: **`.cursor/docs/archive/VADER_STATION_LOG_ARCHIVE.md`**). Retired prompts/plans: **`.cursor/prompts/_archive/`**, **`.cursor/plans/_archive/`**. Design mocks: **`.archive/design/`** (gitignored); ship icon only **`_design_references/VPE.ico`**.
 
 **Session bootstrap (cold start):** Full station + API context: **`.cursor/prompts/Start-Project.md`** (mandatory doc reads, **`npm run start-project:smoke`**, API bridge). VPE codebase / Electron UI work **after** that ritual: **`.cursor/prompts/Start-Master.md`**. If the operator only says **Start Project**, **do not** auto-start **`npm run dev`** / **`npm run vader:dev`** — they ask for the **VPE UI** explicitly.
 

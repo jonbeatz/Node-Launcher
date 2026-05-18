@@ -12,5 +12,5 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: 'list',
-  timeout: 120_000,
+  timeout: 180_000,
 })

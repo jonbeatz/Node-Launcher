@@ -31,7 +31,7 @@ Some paths said **`Node-Launcher`** / **`pnpm`** / **`projects.json`** / **`cach
 | 4 | **[`../docs/Project-Bible.md`](../docs/Project-Bible.md)** — architecture + **§7 Command Lexicon** |
 | 5 | **[`../docs/REPAIR_PROTOCOLS.md`](../docs/REPAIR_PROTOCOLS.md)** — nuke / vault reconcile |
 
-Optional: **`Goalz.md`**, **`VADER_STATION_LOG.md`**. Legacy paths like **`.cursor/docs/core/VPE_ENGINE_CAPABILITIES.md`** or **`Vader-Project-Engine.md`** may be absent on this branch—do **not** block on them.
+Optional: **`VADER_STATION_LOG.md`** (archive: **`.cursor/docs/archive/VADER_STATION_LOG_ARCHIVE.md`**). Personal compass: **`TRUTH.md` §8**. Legacy paths like **`.cursor/docs/core/VPE_ENGINE_CAPABILITIES.md`** may be absent—do **not** block on them.
 
 ---
 

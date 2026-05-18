@@ -2,7 +2,7 @@
 
 [![Build: CI](https://github.com/jonbeatz/Node-Launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/jonbeatz/Node-Launcher/actions/workflows/ci.yml)
 
-> **VPE Jedi-Master — `package.json` `3.0.0`** (Jedi-Master v3.0 baseline; narrative in [`VADER_STATION_LOG.md`](VADER_STATION_LOG.md); operator commands in [`.cursor/docs/Project-Bible.md`](.cursor/docs/Project-Bible.md) **§7**)
+> **VPE Jedi-Master — `package.json` `3.0.0`** (Jedi-Master v3.0 baseline; recent narrative in [`VADER_STATION_LOG.md`](VADER_STATION_LOG.md), older entries in [`.cursor/docs/archive/VADER_STATION_LOG_ARCHIVE.md`](.cursor/docs/archive/VADER_STATION_LOG_ARCHIVE.md); operator commands in [`.cursor/docs/Project-Bible.md`](.cursor/docs/Project-Bible.md) **§7**)
 
 The **Vader Project Engine (VPE)** is a tactical desktop command center for the **My Studio Channel (MSC)** workflow—process-aware, PM2-backed, and tuned for the **Vader** workstation (AMD Ryzen 9700x / Gigabyte B650).
 
@@ -87,6 +87,19 @@ Then **`npm run vader:dev`** (or **`npm run dev`**) to relaunch.
 - **`npm run vader:sync`** — dev then post-dev forge pipeline.
 - **`npm run vader:deploy`** — **`vader:clean-sync`** + **`build:win`**.
 - **`npm run vader:force-forge`** — build pipeline without starting dev first.
+
+### Final build verification (v3.0)
+
+| Step | Command |
+|------|---------|
+| Smoke | **`npm run start-project:smoke`** |
+| Lint | **`npm run lint`** |
+| Static export | **`npm run build:renderer`** → **`src/renderer/out/index.html`** |
+| Electron e2e | **`npm run test:e2e:electron`** (requires **`npx playwright install chromium`** once) |
+| Windows package | **`npm run build:win`** |
+| Release ZIP | **`.\scripts\upload_build.ps1`** → **`dist/Node-Launcher-v3.0-JEDI-MASTER.zip`** |
+
+**CDP note:** Playwright Electron tests set **`VPE_REMOTE_DEBUG_PORT`**; that env var takes precedence over **`.vpe-runtime.json`** **`cdpPort`**.
 
 ---
 

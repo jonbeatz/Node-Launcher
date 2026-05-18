@@ -103,20 +103,24 @@ if (MSC_VPE_CDP_ALLOWED) {
   // Dynamic port: kill-dev-ports.cjs probes for a free port and writes it to
   // .vpe-runtime.json at the workspace root before Electron starts. We read it
   // here (synchronously, pre-ready) so main.js never has a hardcoded port number.
-  let MSC_VPE_REMOTE_DEBUG_PORT = String(
-    process.env.VPE_REMOTE_DEBUG_PORT || '9226',
-  ).replace(/[^\d]/g, '') || '9226';
+  const envCdpPort = String(process.env.VPE_REMOTE_DEBUG_PORT || '').trim();
+  let MSC_VPE_REMOTE_DEBUG_PORT =
+    envCdpPort.replace(/[^\d]/g, '') || '9226';
 
-  try {
-    const runtimeFile = path.join(__dirname, '..', '..', '.vpe-runtime.json');
-    if (fs.existsSync(runtimeFile)) {
-      const rt = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
-      if (rt && rt.cdpPort && String(rt.cdpPort).match(/^\d+$/)) {
-        MSC_VPE_REMOTE_DEBUG_PORT = String(rt.cdpPort);
+  // Dev preflight writes `.vpe-runtime.json` (kill-dev-ports.cjs). E2E and explicit
+  // VPE_REMOTE_DEBUG_PORT must win so Playwright attaches to the spawned port.
+  if (!envCdpPort) {
+    try {
+      const runtimeFile = path.join(__dirname, '..', '..', '.vpe-runtime.json');
+      if (fs.existsSync(runtimeFile)) {
+        const rt = JSON.parse(fs.readFileSync(runtimeFile, 'utf8'));
+        if (rt && rt.cdpPort && String(rt.cdpPort).match(/^\d+$/)) {
+          MSC_VPE_REMOTE_DEBUG_PORT = String(rt.cdpPort);
+        }
       }
+    } catch (_) {
+      // If the runtime file is missing or malformed, keep env/default port.
     }
-  } catch (_) {
-    // If the runtime file is missing or malformed, fall back to env var / default.
   }
 
   app.commandLine.appendSwitch('remote-debugging-port', MSC_VPE_REMOTE_DEBUG_PORT);

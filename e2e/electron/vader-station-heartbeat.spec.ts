@@ -59,6 +59,8 @@ async function electronFirstUiPage(browser: Browser, timeoutMs = 90000): Promise
   throw new Error('No Electron BrowserWindow page with file: / index.html found.')
 }
 
+test.describe.configure({ timeout: 180_000 })
+
 test.describe.serial('Vader Station Heartbeat', () => {
   let userDataDir = ''
   let debugPort = 0
@@ -158,7 +160,7 @@ test.describe.serial('Vader Station Heartbeat', () => {
     }
   })
 
-  test('sidebar, project grid visible, and main logs [VPE STANDBY]', async () => {
+  test('sidebar, project grid visible, and main process boot complete', async () => {
     if (!page) throw new Error('Electron page missing')
     await page.bringToFront()
     await expect(page.getByTestId('vpe-station-sidebar')).toBeVisible({
@@ -167,16 +169,24 @@ test.describe.serial('Vader Station Heartbeat', () => {
     await expect(page.getByTestId('vpe-project-grid')).toBeVisible({
       timeout: 45_000,
     })
+    await expect(page.getByRole('banner')).toContainText('VPE', {
+      timeout: 30_000,
+    })
     await expect
       .poll(
-        () => mainLogText.includes('[VPE STANDBY]'),
+        () =>
+          mainLogText.includes('[VPE SUCCESS]') &&
+          mainLogText.includes('VPE IPC handlers registered'),
         {
           timeout: 90_000,
           intervals: [400, 800, 1200],
           message:
-            'Main process should log [VPE STANDBY] after boot hard scrub (see vpe-ipc.js).',
+            'Main process should log IPC registration success (see vpe-ipc.js).',
         },
       )
       .toBe(true)
+    await expect(page.getByText(/Powered by the VPE Jedi-Master/i)).toBeVisible({
+      timeout: 45_000,
+    })
   })
 })

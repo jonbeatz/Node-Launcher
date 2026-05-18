@@ -99,7 +99,6 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
     let detectedShield: VpeShieldProjectType = 'unknown'
     let detectedProjectUrl: string | null = null
     let detectedSlug: string | null = null
-    let detectedThumbnailUrl: string | null = null
     try {
       if (window.vpeAPI?.inspectProject) {
         const info = await window.vpeAPI.inspectProject(pickedPath)
@@ -132,10 +131,6 @@ export function AddProjectModal({ isOpen, onClose, onSubmit }: AddProjectModalPr
               .replace(/\.local\/?$/, '') || null
           } else {
             detectedSlug = base.replace(/[^a-z0-9]/gi, '').toLowerCase() || null
-          }
-          // Capture the theme screenshot so the final setProjectData below picks it up.
-          if (info.suggested_thumbnail) {
-            detectedThumbnailUrl = info.suggested_thumbnail
           }
         } else if (pt === 'node' || info?.detection?.pkg_manager) {
           // Confirmed Node.js project via package.json detection — keep 'node' shield.

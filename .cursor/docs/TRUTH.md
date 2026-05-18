@@ -56,5 +56,13 @@ The `contextBridge` in `src/preload/preload.js` exposes two distinct APIs:
 
 **Signature:** Powered by the VPE Jedi-Master · v3.0
 
+## 8. Product vision (consolidated)
+
+Personal north-star and legacy architecture notes from **`Goalz.md`** and **`VADER_MASTER_MANIFEST.md`** are folded into this file and **`Project-Bible.md`**. Archived copies: **`.cursor/prompts/_archive/Goalz.md`**, **`.cursor/prompts/_archive/VADER_MASTER_MANIFEST.md`**.
+
+- **Vision:** Desktop command center for local Node/Next work — PM2-backed, MSC-branded, Studio Dark (`#121212` / `#1c1c1c` / `#e02b20`).
+- **Layers:** Engine (repo `src/`), brain (`%LocalAppData%\VaderProjectEngine\user-data\`), sovereign vault (`media/vault` / `VPE_VAULT_ROOT`).
+- **Non-negotiable:** Vader Shield (preload only), Iron Curtain floor **v2.2.5**, internal thumbs **`_vpe_thumb.png`** via **`vpe-vault:`**.
+
 ---
 *Authorized by Jon Beatz | My Studio Channel (MSC)*

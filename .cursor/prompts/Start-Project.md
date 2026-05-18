@@ -104,6 +104,6 @@ When **Start API**, **Vertex**, **ngrok**, **smoke**, or **Start Project** behav
 - **`.cursor/docs/Project-Bible.md`** §7–§8 (commands + bridge)
 - **`package.json`** script **`start-project:smoke`**
 - **`README.md`**, **`VADER_STATION_LOG.md`**
-- **`google-api/README.md`**, **`.cursor/hooks/start-api.ps1`**, **`Goalz.md`**, **`Start-Master.md`**, **`End-Project.md`**, **`.cursor/docs/Cursor-LiteLLM-Bridge.md`**, **`google-api/vpe-ping-api.ps1`**, **`google-api/vpe-print-cursor-settings.ps1`**, **`google-api/vpe-verify-public-url.ps1`**, **`google-api/vpe-end-api-bridge.ps1`**
+- **`google-api/README.md`**, **`.cursor/hooks/start-api.ps1`**, **`Start-Master.md`**, **`End-Project.md`**, **`.cursor/docs/Cursor-LiteLLM-Bridge.md`**, **`google-api/vpe-ping-api.ps1`**, **`google-api/vpe-print-cursor-settings.ps1`**, **`google-api/vpe-verify-public-url.ps1`**, **`google-api/vpe-end-api-bridge.ps1`**
 
 Secrets: **`.\google-api\gcp_key.json`** holds the GCP keys required for LiteLLM.

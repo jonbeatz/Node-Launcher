@@ -73,7 +73,10 @@ src/renderer/.next/
 # intentional repo content (keep tracked)
 # - `.cursor/`, `vpe-backups/`, media/icon.ico, media/_vpe_archive/ (if present), vault placeholders (.gitkeep, .vpe_keep)
 # - media/vault raster assets (.jpg/.jpeg/.png/.webp), vpe-version.lock, and src/main/db/*.sqlite (+ engine JSON) are tracked (operator policy)
-# - _design_references/: layout / UI reference snapshots (see .cursorignore for indexer only)
+# - _design_references/: release icon only (VPE.ico); mock screenshots in .archive/design/
+.archive/
+# E2E vault fixtures (created by playwright electron tests)
+media/vault/E2E*/
 
 # Google API workspace — tracked: config + launcher scripts; secrets stay local
 google-api/*

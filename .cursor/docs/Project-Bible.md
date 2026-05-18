@@ -27,8 +27,10 @@
 ## 5. THE "GREAT LIBRARY" (DOCS)
 - **`Project-Bible.md`** (this file): Architecture, workflow, and **what we fixed** (see §8).
 - **`TRUTH.md`**: IPC map and technical specifications (when present in `.cursor/docs/`).
-- **`VADER_STATION_LOG.md`**: Version history and milestone narratives (repo root).
+- **`VADER_STATION_LOG.md`**: Recent version history (repo root); older entries in **`.cursor/docs/archive/VADER_STATION_LOG_ARCHIVE.md`**.
 - **`REPAIR_PROTOCOLS.md`**: SOPs for nuke, forge, and vault recovery.
+- **Archived prompts:** **`.cursor/prompts/_archive/Goalz.md`**, **`VADER_MASTER_MANIFEST.md`** (superseded by §8 in **`TRUTH.md`**).
+- **Archived plans:** **`.cursor/plans/_archive/`** (completed hygiene / audit checklists).
 
 ## 6. MASTER WORKFLOW RULES
 1. **Never merge bridges:** Keep `vpeAPI` and `mscLegacyAPI` separate to avoid UI breakage.
