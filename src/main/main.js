@@ -488,6 +488,37 @@ function msc_vpeEnforceVaultVersionLock() {
 }
 msc_vpeEnforceVaultVersionLock();
 
+/**
+ * One-time cleanup of legacy workspace folders that are no longer the active
+ * app root. Operates silently — any error (folder already deleted, permissions,
+ * etc.) is swallowed so the boot sequence is never interrupted.
+ *
+ * Targets:
+ *   D:\Cursor_Projectz\Node-Launcher      (original folder — now replaced by -v2)
+ *   D:\Cursor_Projectz\Node-Launcher-v3   (intermediate revision — never deployed)
+ *
+ * The active repo (`Node-Launcher-v2`) is intentionally excluded.
+ */
+function msc_vpeCleanupLegacyWorkspaceFolders() {
+  if (process.env.VPE_SKIP_LEGACY_CLEANUP === '1') return;
+  const legacyPaths = [
+    path.join('d:', 'Cursor_Projectz', 'Node-Launcher'),
+    path.join('d:', 'Cursor_Projectz', 'Node-Launcher-v3'),
+  ];
+  for (const legacyDir of legacyPaths) {
+    try {
+      if (!fs.existsSync(legacyDir)) continue;
+      const stat = fs.statSync(legacyDir);
+      if (!stat.isDirectory()) continue;
+      fs.rmSync(legacyDir, { recursive: true, force: true });
+      console.log('[VPE] Legacy workspace removed:', legacyDir);
+    } catch (e) {
+      console.warn('[VPE] Legacy workspace cleanup skipped:', legacyDir, '-', e?.message ?? e);
+    }
+  }
+}
+msc_vpeCleanupLegacyWorkspaceFolders();
+
 /** v1.7.6 — before `ready`; pairs with `msc_registerVpeVaultProtocolHandler` on startup. */
 msc_registerVpeVaultPrivilegedScheme();
 

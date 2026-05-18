@@ -4,6 +4,72 @@
 
 ---
 
+## [2026-05-18] — Zero-Hardcoding Path Refactor (v2.2.6-SOVEREIGN)
+
+### Summary
+Permanent architectural decoupling of vault, thumbnail, and database path logic from any hardcoded drive/folder strings. The engine now anchors all internal paths dynamically to the live app root.
+
+### Changes
+
+**`src/main/vpe-vault-paths.js`**
+- Deleted hardcoded `d:\Cursor_Projectz\Node-Launcher\media\vault` (Windows) from `msc_projectVaultRootDir()`.
+- Deleted hardcoded `d:/Cursor_Projectz/Node-Launcher-v3/media/vault` from `msc_projectVaultRootDirSovereign()`.
+- Introduced `msc_resolveVaultAppRoot()`: packaged → `path.dirname(process.execPath)`; dev → `app.getAppPath()`; headless → `process.cwd()`. Both root functions now call this helper — `VPE_VAULT_ROOT` env override still respected.
+
+**`src/main/db/persistent-store.js`**
+- Removed `SEED_PROJECTS` hardcoded `C:/Users/Vader/Projects/...` entries (were never inserted into non-empty DBs; cleared to empty array).
+- Added `msc_runLegacyPathHealingMigration(db)`: transactional boot-time scan of `path` + `thumbnail_url` columns; rewrites any cell still containing `Node-Launcher-v3` or bare `Node-Launcher` (excluding `-v2`) to the current `msc_getSovereignAppRoot()`. Logs count of fixed rows; non-fatal on any error.
+- Wired into `msc_createPersistentStore()` immediately after `msc_seedSqlite`.
+- Exported `msc_runLegacyPathHealingMigration` for test access.
+
+**`src/main/vpe-thumbnail-url.js`**
+- No changes required — all path resolution already delegated to `msc_projectVaultSovereignInternalThumbAbs` which flows through the now-dynamic vault root.
+
+**`src/main/main.js`**
+- Added `msc_vpeCleanupLegacyWorkspaceFolders()`: silently deletes `D:\Cursor_Projectz\Node-Launcher` and `D:\Cursor_Projectz\Node-Launcher-v3` on first boot after this update. Wrapped in per-path `try/catch`; skippable via `VPE_SKIP_LEGACY_CLEANUP=1`.
+
+### Verification
+- `npm run start-project:smoke` → **exit 0** after every change (`user_version=19`, `projects_cols=23`).
+- Grep confirms zero hardcoded path strings remain in the three target utility files.
+
+---
+
+## [2026-05-18] — Ghost Vault Folder Fix: Add Project Double-Folder Race
+
+### Root Cause
+`vpe:pick-thumbnail` (`src/main/ipc/vault-handlers.js`) called `msc_writeVaultInternalThumbnail()` unconditionally on every thumbnail pick — including **draft/add mode** where the project is not yet in the DB. If the user clicked Upload Thumbnail while the auto-detected name was `PUBLIC` (last path segment of the scanned folder), the handler created `media/vault/PUBLIC/` immediately on disk. The user then renamed the project to e.g., `TSL-v2` and submitted. `vpe:add-project` correctly created `media/vault/TSL-v2/` — leaving the ghost `PUBLIC/` folder behind.
+
+### Fix (`src/main/ipc/vault-handlers.js`)
+Restructured the handler to branch on draft vs. existing immediately after the file dialog:
+- **Draft** (`row === null`): read image bytes → return `data:image/...;base64,...`. Zero vault I/O. Modal holds data URL until submit; `vpe:add-project` decodes it once under the final confirmed name.
+- **Existing project** (`row !== null`): unchanged — writes to vault, updates DB row, returns `vpe-vault:` href.
+
+**Next session:** `VPE-JediBuild-v1.3` working tree has all above changes staged but not committed. Run `npm run start-project:smoke` at session start to confirm green baseline.
+
+---
+
+## [2026-05-17] — End Project (operator): bridge + verify + handoff
+
+- **`vpe-end-api-bridge.ps1`**: stopped LiteLLM (PID on **4000**) and **ngrok**; port **4000** free for next session.
+- **`npm run typecheck`**: pass.
+- **`npm run lint`**: pass (one warning: unused `detectedThumbnailUrl` in `add-project-modal.tsx` — harmless leftover from thumbnail fix).
+- **Git:** clean working tree on **`VPE-JediBuild-v1.3`**; latest push **`2947970`** (WordPress fixes + vault thumbnails + `.playwright-mcp/` gitignore).
+- **Session shipped:** three-gate LocalWP GraphQL, STOP ALL + Local.exe minimize, add-project camera thumbnail, settings modal `key` isolation; docs updated (`UPDATE_LOG`, `MCPs`, `Checkpoint`).
+
+**Next session:** **[`.cursor/prompts/Start-Project.md`](.cursor/prompts/Start-Project.md)** — mandatory reads, **`npm run start-project:smoke`**, then **`.\google-api\vpe-start-api.ps1 -StartNgrok`** + **`vpe-ping-api.ps1`** unless **verify-only**; paste new ngrok **`…/v1`** into Cursor if the tunnel URL changed. For WordPress work: run **`vpe-end-api-bridge`** before LocalWP tests if LiteLLM was on **:4000**. **Do not** autostart **`npm run vader:dev`** unless you want the VPE UI.
+
+**Resume prompt (paste into new chat):**
+```
+Start Project
+
+Session context: WordPress-Local bug sprint complete on VPE-JediBuild-v1.3 (commit 2947970).
+Verified: three-gate LocalWP detection, STOP ALL + Local minimize, add-project camera thumbnail, settings modal key isolation.
+Projects: IWWI, IWWI-v2, IWWI_v3, PUBLIC (wordpress-local). playwright-electron CDP port 9225.
+Do NOT run npm run vader:dev unless I ask for the VPE UI.
+```
+
+---
+
 ## [2026-05-17] — WordPress-Local Full Bug Fix Sprint (v2.2.6-SOVEREIGN)
 
 ### Summary

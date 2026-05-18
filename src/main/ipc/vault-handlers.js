@@ -97,10 +97,10 @@ function msc_registerVaultIpc(ipcMain, c) {
     /** @type {ReturnType<typeof store.getProject> | null} */
     let row = projectIdRaw ? store.getProject(projectIdRaw) : null;
 
-    const displayName = row ? String(row.name) : draftName;
-    if (!displayName) {
+    // Existing projects require a name to locate their vault folder.
+    if (row && !String(row.name || '').trim()) {
       throw new Error(
-        'VPE: Cannot store thumbnail — register the project first, or scan a folder so the vault name exists.',
+        'VPE: Cannot store thumbnail — project record has no display name.',
       );
     }
 
@@ -116,9 +116,38 @@ function msc_registerVaultIpc(ipcMain, c) {
     const src = result.filePaths[0];
     await new Promise((resolve) => setTimeout(resolve, 100));
 
+    /**
+     * DRAFT MODE — project does not exist in the DB yet (Add Project modal).
+     *
+     * Do NOT call `msc_writeVaultInternalThumbnail` here. Doing so would create a
+     * vault folder using whatever name happens to be in state at the time the user
+     * clicks "Upload Thumbnail" (e.g. the auto-detected folder name "PUBLIC"), even
+     * if the user later renames the project to something else before submitting.
+     * That ghost folder then persists alongside the correctly-named folder created
+     * at `vpe:add-project` time.
+     *
+     * Instead, read the source image and return a data: URL. The modal holds this
+     * in component state. When the user submits, `vpe:add-project` decodes the
+     * data: URL and writes the vault folder once, under the final confirmed name.
+     */
+    if (!row) {
+      try {
+        const buf = await fs.promises.readFile(src);
+        const mime = src.toLowerCase().endsWith('.jpg') || src.toLowerCase().endsWith('.jpeg')
+          ? 'image/jpeg'
+          : 'image/png';
+        return `data:${mime};base64,${buf.toString('base64')}`;
+      } catch (err) {
+        const m = err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
+        throw new Error(m);
+      }
+    }
+
+    // EXISTING PROJECT — write directly to vault using the verified DB name.
+    const displayName = String(row.name);
     let outPathObject;
     try {
-      outPathObject = await msc_writeVaultInternalThumbnail(src, displayName, row?.id);
+      outPathObject = await msc_writeVaultInternalThumbnail(src, displayName, row.id);
     } catch (err) {
       const m =
         err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err);
@@ -128,47 +157,37 @@ function msc_registerVaultIpc(ipcMain, c) {
     const outPath = outPathObject && outPathObject.file ? outPathObject.file : outPathObject;
     const hrefBase = outPathObject && outPathObject.url ? outPathObject.url : pathToFileURL(outPath).href;
 
-    if (row) {
-      const pt =
-        row.project_type == null || String(row.project_type).trim() === ''
-          ? null
-          : String(row.project_type).trim();
+    const pt =
+      row.project_type == null || String(row.project_type).trim() === ''
+        ? null
+        : String(row.project_type).trim();
 
-      const thumbnailPersist =
-        typeof msc_normalizeThumbnailUrlForPersistence === 'function'
-          ? msc_normalizeThumbnailUrlForPersistence(row, hrefBase)
-          : hrefBase;
+    const thumbnailPersist =
+      typeof msc_normalizeThumbnailUrlForPersistence === 'function'
+        ? msc_normalizeThumbnailUrlForPersistence(row, hrefBase)
+        : hrefBase;
 
-      store.updateProject({
-        id: row.id,
-        name: row.name,
-        path: row.path,
-        port: row.port,
-        thumbnail_url: thumbnailPersist ?? hrefBase,
-        start_script: row.start_script,
-        build_script: row.build_script,
-        pkg_manager: row.pkg_manager,
-        project_type: pt,
-        is_archived: row.is_archived === true || row.is_archived === 1,
-        notes: row.notes != null ? String(row.notes) : null,
-      });
-      msc_bumpVaultThumbPulse(row.id, Date.now());
-      try {
-        msc_emitProjectsUpdated();
-      } catch (_) {
-        /* */
-      }
-      const merged = { ...row, thumbnail_url: thumbnailPersist ?? hrefBase };
-      return msc_rendererVaultThumbnailHref(merged, Date.now());
-    }
-
-    /** Draft / add-project modal: `file:` is blocked from `http://localhost` in dev — return PNG data URL for preview only. */
+    store.updateProject({
+      id: row.id,
+      name: row.name,
+      path: row.path,
+      port: row.port,
+      thumbnail_url: thumbnailPersist ?? hrefBase,
+      start_script: row.start_script,
+      build_script: row.build_script,
+      pkg_manager: row.pkg_manager,
+      project_type: pt,
+      is_archived: row.is_archived === true || row.is_archived === 1,
+      notes: row.notes != null ? String(row.notes) : null,
+    });
+    msc_bumpVaultThumbPulse(row.id, Date.now());
     try {
-      const buf = await fs.promises.readFile(outPath);
-      return `data:image/png;base64,${buf.toString('base64')}`;
+      msc_emitProjectsUpdated();
     } catch (_) {
-      return `${hrefBase}?pulse=${encodeURIComponent(String(Date.now()))}`;
+      /* */
     }
+    const merged = { ...row, thumbnail_url: thumbnailPersist ?? hrefBase };
+    return msc_rendererVaultThumbnailHref(merged, Date.now());
   });
 
   ipcMain.handle('vpe:vault-add-file', async (event, projectId) => {

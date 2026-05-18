@@ -105,6 +105,39 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 
 ---
 
+## [2026-05-18] — Zero-Hardcoding Path Refactor & Ghost Vault Folder Fix
+
+### 🛠 Fixes & Root Issues Resolved
+
+#### 1. Hardcoded Drive Paths in Vault Resolution (`src/main/vpe-vault-paths.js`)
+
+- **Root Issue:** `msc_projectVaultRootDir()` contained `path.join('d:', 'Cursor_Projectz', 'Node-Launcher', 'media', 'vault')` and `msc_projectVaultRootDirSovereign()` contained `path.resolve('d:/Cursor_Projectz/Node-Launcher-v3/media/vault')`. Any machine or folder rename would silently redirect vault reads/writes to stale paths, creating ghost directories outside the active repo.
+- **Fix:** Introduced `msc_resolveVaultAppRoot()` — a priority-chain resolver: packaged EXE → `path.dirname(process.execPath)`, dev/unpacked → `app.getAppPath()`, headless/Node → `process.cwd()`. Both `msc_projectVaultRootDir()` and `msc_projectVaultRootDirSovereign()` now call this helper. `VPE_VAULT_ROOT` env override still wins at the top of each function. No hardcoded drive letters or folder names remain.
+
+#### 2. Stale Absolute Paths in SQLite Projects Table (`src/main/db/persistent-store.js`)
+
+- **Root Issue:** After renaming the working folder from `Node-Launcher` / `Node-Launcher-v3` to `Node-Launcher-v2`, existing SQLite rows in the `projects` table still contained absolute paths with the old folder names in the `path` and `thumbnail_url` columns. These caused broken path resolution on every project operation.
+- **Fix:** Added `msc_runLegacyPathHealingMigration(db)` — a transactional boot-time scan that rewrites any cell still referencing `Node-Launcher-v3` or bare `Node-Launcher` (explicitly skips `-v2`) to the current `msc_getSovereignAppRoot()`. Non-fatal: any error is logged and swallowed so boot is never interrupted. Wired into `msc_createPersistentStore()` after `msc_seedSqlite`.
+- **Bonus:** Removed `SEED_PROJECTS` hardcoded `C:/Users/Vader/Projects/...` placeholder array — it was never inserted into non-empty DBs and was dead weight. Replaced with an empty array.
+
+#### 3. Legacy Workspace Cleanup (`src/main/main.js`)
+
+- **Root Issue:** Old repo folders (`D:\Cursor_Projectz\Node-Launcher`, `D:\Cursor_Projectz\Node-Launcher-v3`) still existed on disk, causing confusion in path traces and consuming space.
+- **Fix:** Added `msc_vpeCleanupLegacyWorkspaceFolders()` — called once at boot after the vault version lock. Silently deletes the two legacy folders if they exist using `fs.rmSync({ recursive: true, force: true })`. Per-path `try/catch` prevents boot interruption on any error. Skippable via `VPE_SKIP_LEGACY_CLEANUP=1`.
+
+#### 4. Ghost "PUBLIC" Vault Folder on Add Project (`src/main/ipc/vault-handlers.js`)
+
+- **Root Issue:** The `vpe:pick-thumbnail` IPC handler called `msc_writeVaultInternalThumbnail()` unconditionally, **before** checking whether the project existed in the DB. When a user clicked "Upload Thumbnail" during Add Project setup while the auto-detected name was still the default (e.g., `PUBLIC` — derived from the scanned folder path), the handler created `media/vault/PUBLIC/` and wrote the thumbnail there. The user then renamed the project to e.g., `TSL-v2` and submitted. `vpe:add-project` correctly created `media/vault/TSL-v2/` — but the ghost `PUBLIC/` folder persisted alongside it.
+- **Fix:** Restructured `vpe:pick-thumbnail` to branch immediately after the file dialog:
+  - **Draft mode** (`row === null` — project not in DB): reads the source image bytes directly, returns a `data:image/...;base64,...` URL. Zero vault folders are created. The modal holds the data URL in React state until submit. `vpe:add-project` decodes it once, writing the vault folder under the final confirmed name only.
+  - **Existing project** (`row !== null`): unchanged behavior — calls `msc_writeVaultInternalThumbnail` with the verified DB name, updates the DB row, returns a `vpe-vault:` URL.
+- **Also removed:** The old unreachable fallback `readFile(outPath)` block that returned a `data:` URL after an unnecessary write (was dead code in draft path).
+
+### ✅ Verification
+- `npm run start-project:smoke` → **exit 0** after every change (`typecheck` pass, `user_version=19 projects_cols=23`).
+
+---
+
 ## [2026-05-17] — WordPress-Local Bug Sprint: Port Conflict, Thumbnail, STOP ALL & State Isolation
 
 ### 🛠 Fixes & Root Issues Resolved

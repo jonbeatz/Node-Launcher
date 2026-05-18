@@ -165,14 +165,7 @@ function msc_migrateLegacyDbFiles(paths) {
 
 const MSC_VPE_RENDERER_PORT = msc_launcherRendererPort();
 
-const SEED_PROJECTS = [
-  ['1', 'MSC_PRIMARY_GATE', 'C:/Users/Vader/Projects/msc-primary-gate', 8080, 'stopped', null, 'dev', 'build', 'npm'],
-  ['2', 'MEDIA_PRO_RENDER_V4', 'C:/Users/Vader/Projects/media-pro-render', 9000, 'stopped', null, 'dev', 'build', 'yarn'],
-  ['3', 'VADER_BACKUP_NODE', 'C:/Users/Vader/Projects/vader-backup', 4443, 'stopped', null, 'dev', 'build', 'yarn'],
-  ['4', 'MSC_CONTENT_API', 'C:/Users/Vader/Projects/msc-content-api', 3010, 'stopped', null, 'dev', 'build', 'pnpm'],
-  ['5', 'MSC_AUTH_SERVICE', 'C:/Users/Vader/Projects/msc-auth-service', 3002, 'stopped', null, 'dev', 'build', 'npm'],
-  ['6', 'MSC_MEDIA_GATE', 'C:/Users/Vader/Projects/msc-media-gate', 3003, 'stopped', null, 'dev', 'build', 'pnpm'],
-];
+const SEED_PROJECTS = [];
 
 function rowFromTuple(tuple) {
   return {
@@ -1616,6 +1609,83 @@ function msc_persistentStoreVersionAudit(db, targetVer) {
   }
 }
 
+/**
+ * Self-healing boot migration: rewrites any project rows that still contain
+ * absolute paths referencing old folder names (`Node-Launcher`, `Node-Launcher-v3`).
+ *
+ * Strategy — string-replace the old parent segment with the current app root
+ * so only the old folder-name prefix is swapped, leaving the project sub-path
+ * (e.g. `\MSC-Projectz\my-site`) intact.
+ *
+ * Operates inside a single transaction for atomicity; logs a summary but never
+ * throws — a migration failure must not prevent the app from booting.
+ *
+ * @param {import('better-sqlite3').Database} db
+ */
+function msc_runLegacyPathHealingMigration(db) {
+  try {
+    const appRoot = msc_getSovereignAppRoot();
+
+    /**
+     * Each entry describes one legacy segment to find and the replacement
+     * to use. Order matters: more-specific names must come before less-specific
+     * ones so "Node-Launcher-v2" is not accidentally caught by "Node-Launcher".
+     * We deliberately skip "Node-Launcher-v2" because that IS the current repo
+     * — rows pointing there are already correct.
+     */
+    const REPLACEMENTS = [
+      { find: 'Node-Launcher-v3', replace: appRoot },
+      // bare "Node-Launcher" only — must not match "Node-Launcher-v2" or "Node-Launcher-v3"
+      { find: 'Node-Launcher', replace: appRoot, excludeSuffix: ['-v2', '-v3'] },
+    ];
+
+    const cols = ['path', 'thumbnail_url'];
+    let totalFixed = 0;
+
+    db.transaction(() => {
+      for (const { find, replace, excludeSuffix } of REPLACEMENTS) {
+        for (const col of cols) {
+          // Build a LIKE pattern that matches rows containing the fragment
+          const likePattern = `%${find}%`;
+
+          // Fetch candidate rows first so we can apply JS-side exclusion logic
+          const rows = db
+            .prepare(`SELECT id, ${col} FROM projects WHERE ${col} LIKE ?`)
+            .all(likePattern);
+
+          for (const row of rows) {
+            const original = row[col];
+            if (!original || typeof original !== 'string') continue;
+
+            // When excludeSuffix is set, skip if the found fragment is immediately
+            // followed by one of the excluded suffixes (e.g. "-v2", "-v3")
+            if (excludeSuffix) {
+              const idx = original.indexOf(find);
+              if (idx !== -1) {
+                const after = original.slice(idx + find.length);
+                if (excludeSuffix.some((s) => after.startsWith(s))) continue;
+              }
+            }
+
+            // Replace all occurrences of the legacy path segment in this cell
+            const updated = original.split(find).join(replace);
+            if (updated === original) continue;
+
+            db.prepare(`UPDATE projects SET ${col} = ? WHERE id = ?`).run(updated, row.id);
+            totalFixed += 1;
+          }
+        }
+      }
+    })();
+
+    if (totalFixed > 0) {
+      console.log(`[VPE] Path-healing migration: rewrote ${totalFixed} stale path reference(s) → ${appRoot}`);
+    }
+  } catch (e) {
+    console.warn('[VPE] Path-healing migration skipped (non-fatal):', e?.message ?? e);
+  }
+}
+
 function msc_createPersistentStore() {
   if (storeSingleton) return storeSingleton;
 
@@ -1633,6 +1703,7 @@ function msc_createPersistentStore() {
 
     msc_sqliteMigrateSchemaAndPorts(rawDb);
     msc_seedSqlite(rawDb);
+    msc_runLegacyPathHealingMigration(rawDb);
 
     msc_persistentStoreVersionAudit(rawDb, VPE_SQLITE_USER_VERSION);
 
@@ -1727,6 +1798,7 @@ module.exports = {
   msc_createPersistentStore,
   msc_getPersistentStore,
   msc_getSovereignAppRoot,
+  msc_runLegacyPathHealingMigration,
   msc_getStorePaths,
   msc_vpePortableBackupFromStore,
   msc_vpeSanitizeSortOrder,

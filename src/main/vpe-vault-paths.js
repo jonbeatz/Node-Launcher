@@ -47,31 +47,53 @@ function msc_safeVaultFolderName(name) {
   return s.slice(0, 120);
 }
 
-/** Default: `d:\\Cursor_Projectz\\Node-Launcher\\media\\vault` (Windows); else `cwd/media/vault`. */
+/**
+ * Resolve the application root dynamically so the vault always lives
+ * next to whichever directory the app is running from — no hardcoded
+ * drive letters or folder names.
+ *
+ * Priority:
+ *   1. `VPE_VAULT_ROOT` env override (explicit operator pin)
+ *   2. Packaged binary   → directory that contains the `.exe`
+ *   3. Dev / unpacked    → `app.getAppPath()` (repo root)
+ *   4. Node / headless   → `process.cwd()` (test runner, migration scripts)
+ */
+function msc_resolveVaultAppRoot() {
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.isPackaged === 'boolean' && app.isPackaged) {
+      return path.dirname(process.execPath);
+    }
+    if (app && typeof app.getAppPath === 'function') {
+      return app.getAppPath();
+    }
+  } catch {
+    /* electron not available in headless context */
+  }
+  return process.cwd();
+}
+
+/** Primary vault root — always relative to the live app root. Overridable via `VPE_VAULT_ROOT`. */
 function msc_projectVaultRootDir() {
   const env = process.env.VPE_VAULT_ROOT;
   if (env && String(env).trim()) {
     return path.resolve(String(env).trim());
   }
-  if (process.platform === 'win32') {
-    return path.join('d:', 'Cursor_Projectz', 'Node-Launcher', 'media', 'vault');
-  }
-  return path.join(process.cwd(), 'media', 'vault');
+  return path.join(msc_resolveVaultAppRoot(), 'media', 'vault');
 }
 
 /**
- * JEDI_MOD_125 — Canonical vault root for internal thumbnails + `vpe-vault:` (aligns with Node-Launcher-v3 on Windows).
- * Still overridable via `VPE_VAULT_ROOT`.
+ * Sovereign (canonical) vault root — identical strategy, kept as a separate
+ * export so callers that specifically want the sovereign path are explicit.
+ * Both functions now resolve to the same dynamic root; the distinction is
+ * preserved for API compatibility only.
  */
 function msc_projectVaultRootDirSovereign() {
   const env = process.env.VPE_VAULT_ROOT;
   if (env && String(env).trim()) {
     return path.resolve(String(env).trim());
   }
-  if (process.platform === 'win32') {
-    return path.resolve('d:/Cursor_Projectz/Node-Launcher-v3/media/vault');
-  }
-  return path.join(process.cwd(), 'media', 'vault');
+  return path.join(msc_resolveVaultAppRoot(), 'media', 'vault');
 }
 
 /**
