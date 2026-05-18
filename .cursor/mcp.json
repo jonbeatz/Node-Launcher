@@ -88,14 +88,6 @@
         "GOOGLE_TOKEN_PATH": "REPLACE_ME_WITH_PATH_TO_TOKEN_JSON"
       }
     },
-    "agent-browser": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "agent-browser",
-        "serve"
-      ]
-    },
     "animate-ui": {
       "command": "npx",
       "args": [
