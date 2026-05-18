@@ -32,7 +32,7 @@
 
 ## 6. MASTER WORKFLOW RULES
 1. **Never merge bridges:** Keep `vpeAPI` and `mscLegacyAPI` separate to avoid UI breakage.
-2. **Path Integrity:** Always use `path.join()` and `path.resolve()`. Never hardcode slashes.
+2. **Path Integrity:** Always use dynamic anchoring (e.g. `msc_getSovereignAppRoot()`) and `path.join()`. Never hardcode drive letters (`C:\`, `D:\`) or absolute workspace folder names.
 3. **Ghost Prevention:** No `msc_invoke` call in preload without a matching `ipcMain.handle` in main.
 4. **Signature Requirement:** Major UI/logic updates ship with: **Powered by the VPE Jedi-Master · v3.0** (from `package.json` / `window.vpeInfo.version`).
 

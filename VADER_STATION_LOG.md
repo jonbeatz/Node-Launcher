@@ -15,6 +15,7 @@ Elevated the Vader Project Engine to the **Jedi-Master v3.0** baseline. The glob
 - **`src/renderer/components/app-sidebar.tsx`**: Removed sidebar footer block and unused import
 - **`scripts/upload_build.ps1`**: Reads version from `package.json`, ZIP = `Node-Launcher-vX.Y-JEDI-MASTER.zip`, release tag = `VPE-Jedi-Master-vX.Y`
 - **Git branch**: `VPE-Jedi-Master-v3.0` (commit `df3f99f`, pushed)
+- **Absolute Portability**: Enforced `msc_getSovereignAppRoot()` dynamic anchoring for all SQLite, icon, and data paths. Fixed hardcoded workspace tags in port killer. App is now 100% path-agnostic.
 
 ### Version Convention (going forward)
 | App Display | Git Branch | Build ZIP |

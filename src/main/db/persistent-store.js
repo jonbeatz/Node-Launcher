@@ -99,12 +99,13 @@ function msc_getSovereignAppRoot() {
  * @returns {{ storeDir: string, sqlitePath: string, jsonPath: string }}
  */
 function msc_getStorePaths() {
-  const primaryDir = path.join(process.cwd(), 'src', 'main', 'db');
+  const root = msc_getSovereignAppRoot();
+  const primaryDir = path.join(root, 'src', 'main', 'db');
 
   // Priority 1: explicit env var override.
   if (process.env.VPE_SOVEREIGN_DB_DIR) {
     const raw = String(process.env.VPE_SOVEREIGN_DB_DIR).trim();
-    const resolved = path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+    const resolved = path.isAbsolute(raw) ? raw : path.resolve(root, raw);
     const isAppData = /[/\\](AppData|appdata)[/\\]/i.test(resolved);
     if (!isAppData) {
       return {
@@ -123,7 +124,7 @@ function msc_getStorePaths() {
   if (isAppData) {
     console.warn(`[VPE] DB path resolved to AppData — rejected. Forcing primary home: ${primaryDir}`);
   }
-  const storeDir = isAppData ? path.join(process.cwd(), 'src', 'main', 'db') : primaryDir;
+  const storeDir = isAppData ? path.join(root, 'src', 'main', 'db') : primaryDir;
 
   return {
     storeDir,
@@ -143,7 +144,8 @@ function msc_getStorePaths() {
  * locked during the copy.
  */
 function msc_consolidateDataDirToSrcMainDb(targetSqlitePath) {
-  const legacyDataDir = path.join(process.cwd(), 'data');
+  const root = msc_getSovereignAppRoot();
+  const legacyDataDir = path.join(root, 'data');
   const legacySqlite = path.join(legacyDataDir, 'vader.sqlite');
 
   // Nothing to migrate — already clean.

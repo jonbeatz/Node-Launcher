@@ -90,7 +90,7 @@ function killPort(port) {
 // ── Step 1: Kill orphaned workspace-specific electron / node processes ───────
 
 function killWorkspaceOrphans() {
-  const workspaceTag = 'Node-Launcher-v2';
+  const workspaceTag = path.basename(path.resolve(__dirname, '..'));
   try {
     // Kill electron.exe processes whose binary path contains our workspace directory.
     execSync(

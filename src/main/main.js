@@ -48,13 +48,20 @@ function msc_ironCurtainVersionAudit(appVer) {
   }
 }
 
+function msc_getSovereignAppRoot() {
+  if (app && app.isPackaged) {
+    return path.dirname(process.execPath);
+  }
+  return app.getAppPath();
+}
+
 /**
- * Local-first `userData`: when running from a Node-Launcher checkout or with `--portable`,
- * keep SQLite/cache under `process.cwd()/vpe-local-data` so legacy trees on D: do not share
- * `%LocalAppData%/VaderProjectEngine` with other installs.
+ * Local-first `userData`: keep SQLite/cache under `./vpe-local-data` relative
+ * to the app root so legacy trees do not share `%LocalAppData%` with other installs.
  */
 function msc_vpeDetectLocalFirstUserData() {
-  const pkgPath = path.join(__dirname, '..', '..', 'package.json');
+  const root = msc_getSovereignAppRoot();
+  const pkgPath = path.join(root, 'package.json');
   let appVer = '0.0.0';
   try {
     appVer = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '0.0.0').trim();
@@ -64,20 +71,13 @@ function msc_vpeDetectLocalFirstUserData() {
 
   if (process.env.VPE_E2E_USER_DATA) return;
   if (process.env.VPE_PORTABLE_USER_DATA_ROOT) return;
-  const cwd = process.cwd();
-  const portableArgv =
-    process.argv.includes('--portable') || String(process.env.VPE_PORTABLE || '') === '1';
-  const cwdNodeLauncher = /node[-_]?launcher/i.test(cwd);
-  if (portableArgv || cwdNodeLauncher || true) {
-    process.env.VPE_LOCAL_USERDATA_ROOT = path.resolve(path.join(cwd, 'vpe-local-data'));
-    console.log('[VPE] Local-first userData profile:', process.env.VPE_LOCAL_USERDATA_ROOT);
-  }
 
-  // JEDI_MOD_23: Portable Sync Lock — Force project root for all data
-  const vaderDataPath = path.join(process.cwd(), 'vpe-local-data');
+  const vaderDataPath = path.join(root, 'vpe-local-data');
+  process.env.VPE_LOCAL_USERDATA_ROOT = vaderDataPath;
   app.setPath('userData', vaderDataPath);
+
+  console.log('[VPE] Local-first userData applied:', vaderDataPath);
   console.log('[SECURITY] Iron Curtain Active: Guarding Vault v2.2.5');
-  console.log('Vader Data Path:', app.getPath('userData'));
 }
 msc_vpeDetectLocalFirstUserData();
 
@@ -547,10 +547,9 @@ msc_registerVpeVaultPrivilegedScheme();
 function msc_resolveAppIconPath() {
   const candidates = [];
   if (isDev) {
-    candidates.push(path.join(__dirname, '..', '..', 'media', 'icon.ico'));
-    candidates.push(path.join(process.cwd(), 'media', 'icon.ico'));
-    candidates.push(path.join(__dirname, '..', '..', 'build', 'icon.ico'));
-    candidates.push(path.join(process.cwd(), 'build', 'icon.ico'));
+    const root = msc_getSovereignAppRoot();
+    candidates.push(path.join(root, 'media', 'icon.ico'));
+    candidates.push(path.join(root, 'build', 'icon.ico'));
   } else {
     candidates.push(path.join(process.resourcesPath, 'icon.ico'));
   }
@@ -960,7 +959,8 @@ app.on('will-quit', () => {
       s.auto_sync_db_on_close === 1 ||
       String(s.auto_sync_db_on_close).toLowerCase() === 'true';
     if (syncOn) {
-      const r = msc_vpePortableBackupFromStore(store, process.cwd());
+      const root = msc_getSovereignAppRoot();
+      const r = msc_vpePortableBackupFromStore(store, root);
       if (r.ok) console.log(`[VPE] Portable DB snapshot (quit): ${r.path}`);
       else console.warn('[VPE] Portable DB snapshot (quit) failed:', r.error);
     }
