@@ -1,4 +1,4 @@
-# 🛸 THE VADER PROJECT BIBLE (v2.2.6-SOVEREIGN)
+# 🛸 THE VADER PROJECT BIBLE (VPE Jedi-Master v3.0)
 
 ## 1. CORE ARCHITECTURE & HANDSHAKE
 - **The Bridge:** The app uses a "Dual-Bridge" IPC strategy via `preload.js`.
@@ -10,7 +10,7 @@
 ## 2. DATA SOVEREIGNTY & DATABASES
 - **SQLite Engine:** The primary catalog is SQLite under the **sovereign** project `data/` tree (see `persistent-store.js` / `LOGIC_MOD_01`); dev also uses `vpe-local-data` where configured.
 - **JSON fallback (`vader-engine.json`):** When `better-sqlite3` cannot load, `JsonPersistence` uses `data/vader-engine.json` as the active store and migration may copy legacy JSON into `data/`. **SQLite is primary in normal builds**; treat JSON as fallback / recovery path, not the source of truth for production assumptions.
-- **The Iron Curtain (v2.2.6-SOVEREIGN Baseline):** A version-gate in `main.js` (`msc_ironCurtainVersionAudit`) blocks any engine **older than v2.2.5** (semver core) from mounting legacy-incompatible layouts—prevents registry/vault corruption when a stale EXE opens new data. **Ship:** **v2.2.6-SOVEREIGN** (`package.json`). This gate is **semver-based**, not “JSON vs SQLite file shape.”
+- **The Iron Curtain (v3.0.0 (Jedi-Master v3.0) Baseline):** A version-gate in `main.js` (`msc_ironCurtainVersionAudit`) blocks any engine **older than v2.2.5** (semver core) from mounting legacy-incompatible layouts—prevents registry/vault corruption when a stale EXE opens new data. **Ship:** **v3.0.0 (Jedi-Master v3.0)** (`package.json`). This gate is **semver-based**, not “JSON vs SQLite file shape.”
 - **Persistence:** Settings and project states are managed via `persistent-store.js`.
 
 ## 3. MEDIA VAULT & PROTOCOLS
@@ -34,9 +34,9 @@
 1. **Never merge bridges:** Keep `vpeAPI` and `mscLegacyAPI` separate to avoid UI breakage.
 2. **Path Integrity:** Always use `path.join()` and `path.resolve()`. Never hardcode slashes.
 3. **Ghost Prevention:** No `msc_invoke` call in preload without a matching `ipcMain.handle` in main.
-4. **Signature Requirement:** Major UI/logic updates ship with: **Powered by the MSC Media Engine · v2.2.6-SOVEREIGN** (from `package.json` / `window.vpeInfo.version`).
+4. **Signature Requirement:** Major UI/logic updates ship with: **Powered by the VPE Jedi-Master · v3.0** (from `package.json` / `window.vpeInfo.version`).
 
-## 7. MSC Media Engine: Command Lexicon (v2.2.6-SOVEREIGN)
+## 7. VPE Jedi-Master: Command Lexicon (v3.0)
 
 Single reference for **maintenance, vault, and build** flows. Authoritative list: root **`package.json`** → `scripts`.
 
@@ -114,4 +114,4 @@ Unix-style manual reset (no npm script): `rm -rf node_modules .next dist && npm 
 
 **Baseline Established:** May 12, 2026  
 **Sovereign Status:** ACTIVE  
-**Signature:** Powered by the MSC Media Engine · v2.2.6-SOVEREIGN
+**Signature:** Powered by the VPE Jedi-Master · v3.0

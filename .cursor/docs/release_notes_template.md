@@ -20,4 +20,4 @@
 2. **{{VERSION}}.zip**: Portable `win-unpacked` bundle.
 
 ---
-*Powered by the MSC Media Engine 🦾✨*
+*Powered by the VPE Jedi-Master 🦾✨*

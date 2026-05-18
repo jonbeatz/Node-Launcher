@@ -41,7 +41,7 @@ Internal vault artifacts: `.vpe_keep`, `_vpe_thumb.png` (and related), excluded 
    **Note:** `vpe:scorched-earth` treats dev as unpackaged **or** `NODE_ENV === 'development'`. Footer port purge uses `msc_isActuallyDevEnvironment()` in `vpe-ipc.js` (same idea plus `VPE_FORCE_*` overrides). Keep both call sites aligned when changing dev detection.
 
 3. **Hardware / I/O:** Prefer keeping heavy main-process work bounded; for large AST or media pipelines, follow `.cursor/rules/vader-hardware-optimization.mdc` (e.g. consider `worker_threads` where implemented).
-4. **Design:** Studio Dark, HUD chrome; footer must retain **“Powered by the MSC Media Engine”** (version from `window.vpeInfo?.version`, default **2.1.0** in `footer.tsx`).
+4. **Design:** Studio Dark, HUD chrome; footer must retain **“Powered by the VPE Jedi-Master”** (version from `window.vpeInfo?.version`, default **2.1.0** in `footer.tsx`).
 
 ---
 
@@ -110,4 +110,4 @@ Use an **explicit** `Msc_ProjectCardProps` interface and destructure only what t
 
 This manifest summarizes **current** layout and behavior; when they diverge, **the repo wins**. Keep this file pinned in Cursor and update it when IPC channels, paths, or purge semantics change.
 
-**Signature:** Powered by the MSC Media Engine v2.1.0
+**Signature:** Powered by the VPE Jedi-Master v2.1.0

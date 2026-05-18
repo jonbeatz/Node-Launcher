@@ -1,15 +1,28 @@
-# CHECKPOINT (v2.2.6-SOVEREIGN)
+# CHECKPOINT (v3.0.0 (Jedi-Master v3.0))
 
 This document serves as the authoritative build and branch history for the Vader Project Engine.
 
-## 📦 Active Branch: VPE-JediBuild-v1.4
+## 📦 Active Branch: VPE-Jedi-Master-v3.0
 
 ### Build History & Milestones
 
-#### [2026-05-18] - MCP Reliability, Port Conflict Resolution & Workflow Verification (v2.2.6-SOVEREIGN)
+#### [2026-05-18] — VPE Jedi-Master v3.0 Baseline (commit `df3f99f`)
+
+- **Status:** COMMITTED & PUSHED
+- **Branch:** `VPE-Jedi-Master-v3.0` (renamed from `VPE-JediBuild-v1.4`)
+- **Files Changed:**
+  - `package.json` — version `3.0.0`, description updated to Jedi-Master
+  - `src/renderer/lib/vpe-bridge.ts` — footer branding → "Powered by the VPE Jedi-Master · v{version}"
+  - `src/renderer/components/app-sidebar.tsx` — removed sidebar footer version block + unused import
+  - `scripts/upload_build.ps1` — full refactor: reads version from `package.json`, ZIP = `Node-Launcher-vX.Y-JEDI-MASTER.zip`, repo-relative paths
+  - All core docs — version/signature strings updated to Jedi-Master v3.0
+- **TypeScript:** `npx tsc --noEmit` → Exit 0
+- **Branch Convention:** `VPE-Jedi-Master-vX.Y` ↔ app display `Powered by the VPE Jedi-Master · vX.Y` ↔ ZIP `Node-Launcher-vX.Y-JEDI-MASTER.zip`
+
+#### [2026-05-18] - MCP Reliability, Port Conflict Resolution & Workflow Verification (v3.0.0 (Jedi-Master v3.0))
 
 - **Status:** COMMITTED & PUSHED (`4e24783`)
-- **Branch:** `VPE-JediBuild-v1.4`
+- **Branch:** `VPE-JediBuild-v1.4` (historical — renamed to `VPE-Jedi-Master-v3.0`)
 - **Files Changed:**
   - `package.json` — `dev:main` CDP port changed `9222` → `9226`; `cross-env VPE_REMOTE_DEBUG_PORT=9226` added; `kill-dev-ports.cjs` pre-step wired into `dev` and `vader:dev` scripts
   - `scripts/kill-dev-ports.cjs` — new file; PowerShell `Get-NetTCPConnection`-based port cleaner + headless Electron process killer; runs before every dev start
@@ -30,7 +43,7 @@ This document serves as the authoritative build and branch history for the Vader
 
 ---
 
-#### [2026-05-18] - Zero-Hardcoding Path Refactor & Ghost Vault Fix (v2.2.6-SOVEREIGN Patch)
+#### [2026-05-18] - Zero-Hardcoding Path Refactor & Ghost Vault Fix (v3.0.0 (Jedi-Master v3.0) Patch)
 
 - **Status:** PATCHED & VERIFIED (no version bump; architectural hardening on sovereign baseline).
 - **Branch:** `VPE-JediBuild-v1.3` (working tree changes, not committed)
@@ -46,7 +59,7 @@ This document serves as the authoritative build and branch history for the Vader
   3. **Double vault folder** on Add Project (e.g., `PUBLIC/` + `TSL-v2/`): caused by `vpe:pick-thumbnail` writing vault in draft mode before final name confirmed
 - **Validation:** `npm run start-project:smoke` → exit 0 after each change
 
-#### [2026-05-17] - WordPress-Local Bug Sprint (v2.2.6-SOVEREIGN Patch)
+#### [2026-05-17] - WordPress-Local Bug Sprint (v3.0.0 (Jedi-Master v3.0) Patch)
 - **Status:** PATCHED & VERIFIED (no version bump; all changes are runtime/UI hardening on the existing sovereign baseline).
 - **Branch:** `VPE-JediBuild-v1.3` (uncommitted — working tree changes, operator did not request commit)
 - **Files Changed:**
@@ -67,7 +80,7 @@ This document serves as the authoritative build and branch history for the Vader
 - **Status:** SHIPPED (working tree, not committed).
 - **Highlights:** Added `msc_writeWpVpeMuPlugin()` / `msc_removeWpVpeMuPlugin()` to force `WP_HOME`/`WP_SITEURL` to `http://` via mu-plugin, preventing WordPress 301 → HTTPS redirect loops. Added `msc_findLocalExePath()` multi-path discovery for `Local.exe`.
 
-#### [2026-05-15] - v2.2.6-SOVEREIGN (Current Baseline)
+#### [2026-05-15] - v3.0.0 (Jedi-Master v3.0) (Current Baseline)
 - **Status:** READY FOR DUTY.
 - **Commit:** `0ef167b` (docs(mcp): integrate agent-browser and design validation workflows).
 - **Major Features:**

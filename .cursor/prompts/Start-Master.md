@@ -1,4 +1,4 @@
-# Start-Master — VPE session & cold-start guide (v2.2.6-SOVEREIGN)
+# Start-Master — VPE session & cold-start guide (v3.0.0 (Jedi-Master v3.0))
 
 This file is the **single** “start the VPE repo / agent cold start for engine work” checklist (merged from the retired **Start-Master-Build***, **Step2–Step6**, and earlier **Start-Master** split). Deep law: **[`../docs/TRUTH.md`](../docs/TRUTH.md)** · commands: **[`../docs/Project-Bible.md`](../docs/Project-Bible.md) §7** · repairs: **[`../docs/REPAIR_PROTOCOLS.md`](../docs/REPAIR_PROTOCOLS.md)** · rules: **[`../../.cursorrules`](../../.cursorrules)**.
 
@@ -51,7 +51,7 @@ Do not recreate this tree from scratch unless you are explicitly scaffolding a *
 
 - **Background `#121212`** · **Surface `#1c1c1c`** · **Accent `#e02b20`** · **Border `#333333`**
 - **HUD framing** — subtle top/bottom accent lines where the live layout uses them.
-- **Footer / chrome** — **Powered by the MSC Media Engine** + version from **`package.json`** / **`msc_mscEngineFooterLine()`**.
+- **Footer / chrome** — **Powered by the VPE Jedi-Master** + version from **`package.json`** / **`msc_mscEngineFooterLine()`**.
 - **Cards** — **9700x Tuned** (or equivalent) only if the live component still ships it; do not add dead badges.
 - **Staging / Idle (amber)** — official relaxed state for unlinked or non-HTTP-runnable projects; not a default error.
 
@@ -115,4 +115,4 @@ When extending **`Msc_ProjectCard`** (or any component that spreads props onto a
 
 ---
 
-**Signature:** Powered by the MSC Media Engine · v2.2.6-SOVEREIGN
+**Signature:** Powered by the VPE Jedi-Master · v3.0

@@ -201,4 +201,4 @@ Expect **HTTP 200** and JSON (not HTML).
 - **`.cursor/docs/TRUTH.md` §7** — constitutional bridge notes.
 - **LiteLLM Cursor tutorial:** [Cursor Integration](https://docs.litellm.ai/docs/tutorials/cursor_integration) (read alongside this file; **base URL choice follows the table above** for Gemini 3 on this repo).
 
-**Signature:** Powered by the MSC Media Engine · match root **`package.json`** version.
+**Signature:** Powered by the VPE Jedi-Master · match root **`package.json`** version.

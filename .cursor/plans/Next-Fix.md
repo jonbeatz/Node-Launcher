@@ -1,4 +1,4 @@
-# Next-Fix — audit reconciliation (v2.2.6-SOVEREIGN)
+# Next-Fix — audit reconciliation (v3.0.0 (Jedi-Master v3.0))
 
 This file reconciles the **external audit** with the **shipped codebase**. Use it as an operator checklist; do **not** paste audit snippets into production without verifying against the tree.
 
@@ -75,4 +75,4 @@ Prefer UI edits where available; use raw SQL only with a **backup** of `data/vad
 
 ---
 
-**Baseline:** v2.2.6-SOVEREIGN · checklist last aligned with repo **2026-05-12**
+**Baseline:** v3.0.0 (Jedi-Master v3.0) · checklist last aligned with repo **2026-05-12**

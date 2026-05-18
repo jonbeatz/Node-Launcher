@@ -4,6 +4,28 @@
 
 ---
 
+## [2026-05-18] — VPE Jedi-Master v3.0 Baseline Synchronization (v3.0.0)
+
+### Summary
+Elevated the Vader Project Engine to the **Jedi-Master v3.0** baseline. The global app footer is now "Powered by the VPE Jedi-Master · v3.0", the redundant version text in the sidebar footer was removed, `package.json` is at `3.0.0`, the automated build script (`upload_build.ps1`) dynamically reads the version and names ZIPs `Node-Launcher-vX.Y-JEDI-MASTER.zip`, and the Git branch was renamed from `VPE-JediBuild-v1.4` → `VPE-Jedi-Master-v3.0`. All core docs updated to reflect the new naming convention. TypeScript check: Exit 0.
+
+### Key Changes
+- **`package.json`**: `version` → `"3.0.0"`, description → `"Vader Project Engine — Jedi-Master (v3.0)"`
+- **`src/renderer/lib/vpe-bridge.ts`**: `msc_mscEngineFooterLine()` → `"Powered by the VPE Jedi-Master · v{version}"`
+- **`src/renderer/components/app-sidebar.tsx`**: Removed sidebar footer block and unused import
+- **`scripts/upload_build.ps1`**: Reads version from `package.json`, ZIP = `Node-Launcher-vX.Y-JEDI-MASTER.zip`, release tag = `VPE-Jedi-Master-vX.Y`
+- **Git branch**: `VPE-Jedi-Master-v3.0` (commit `df3f99f`, pushed)
+
+### Version Convention (going forward)
+| App Display | Git Branch | Build ZIP |
+|---|---|---|
+| `Powered by the VPE Jedi-Master · v3.0` | `VPE-Jedi-Master-v3.0` | `Node-Launcher-v3.0-JEDI-MASTER.zip` |
+| `Powered by the VPE Jedi-Master · v3.1` | `VPE-Jedi-Master-v3.1` | `Node-Launcher-v3.1-JEDI-MASTER.zip` |
+
+To bump version: update `package.json` `version` (e.g. `3.1.0`), rename branch to `VPE-Jedi-Master-v3.1`, run `upload_build.ps1`.
+
+---
+
 ## [2026-05-18] — Thumbnail Vault ENOENT Fix, file:// Routing & Duplicate Path UX (v2.2.6-SOVEREIGN)
 
 ### Summary

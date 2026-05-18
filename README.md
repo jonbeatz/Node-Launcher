@@ -2,7 +2,7 @@
 
 [![Build: CI](https://github.com/jonbeatz/Node-Launcher/actions/workflows/ci.yml/badge.svg)](https://github.com/jonbeatz/Node-Launcher/actions/workflows/ci.yml)
 
-> **MSC Media Engine — `package.json` `2.2.6-SOVEREIGN`** (Sovereign baseline; narrative in [`VADER_STATION_LOG.md`](VADER_STATION_LOG.md); operator commands in [`.cursor/docs/Project-Bible.md`](.cursor/docs/Project-Bible.md) **§7**)
+> **VPE Jedi-Master — `package.json` `3.0.0`** (Jedi-Master v3.0 baseline; narrative in [`VADER_STATION_LOG.md`](VADER_STATION_LOG.md); operator commands in [`.cursor/docs/Project-Bible.md`](.cursor/docs/Project-Bible.md) **§7**)
 
 The **Vader Project Engine (VPE)** is a tactical desktop command center for the **My Studio Channel (MSC)** workflow—process-aware, PM2-backed, and tuned for the **Vader** workstation (AMD Ryzen 9700x / Gigabyte B650).
 
@@ -97,6 +97,7 @@ Batch I/O where possible; whitelist dev paths in Defender when needed. Prefer **
 ---
 
 **Author:** Jon Beatz (MSC)  
-**Status:** **v2.2.6-SOVEREIGN** — Iron Curtain **v2.2.6-SOVEREIGN Baseline** (engines older than **v2.2.5** blocked from mounting modern data; see `main.js`).
+**Status:** **v3.0.0 Jedi-Master** — Iron Curtain **v2.2.6-SOVEREIGN Baseline** still enforces minimum engine v2.2.5 (semver floor); see `main.js`.  
+**Branch convention:** App version `Powered by the VPE Jedi-Master · vX.Y` → Git branch `VPE-Jedi-Master-vX.Y` → ZIP `Node-Launcher-vX.Y-JEDI-MASTER.zip`.
 
-**Signature:** Powered by the MSC Media Engine · v2.2.6-SOVEREIGN
+**Signature:** Powered by the VPE Jedi-Master · v3.0

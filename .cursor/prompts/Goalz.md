@@ -1,4 +1,4 @@
-# Goalz — VPE personal compass (v2.2.6-SOVEREIGN)
+# Goalz — VPE personal compass (v3.0.0 (Jedi-Master v3.0))
 
 One-page merge of **`Goal-Prompt.md`** and **`Goal-Prompt-v2.md`**, updated for how the repo actually works today. For full law, use **[`TRUTH.md`](../docs/TRUTH.md)** and **[`Project-Bible.md`](../docs/Project-Bible.md)**.
 
@@ -43,7 +43,7 @@ The two old prompts disagreed on hex depth (`#0c0c0c` vs `#121212`, rounded vs �
 ## System and security (non-negotiable)
 
 - **Vader Shield:** **`contextBridge`**, **`nodeIntegration: false`**, no Node in **`src/renderer`**; IPC only through **`src/preload/preload.js`**.
-- **Iron Curtain:** **v2.2.6-SOVEREIGN Baseline** — ship string in **`package.json`**; legacy engines **below v2.2.5** (semver core) are blocked from mounting modern data (**`main.js`**).
+- **Iron Curtain:** **v3.0.0 (Jedi-Master v3.0) Baseline** — ship string in **`package.json`**; legacy engines **below v2.2.5** (semver core) are blocked from mounting modern data (**`main.js`**).
 - **OS:** Windows **11** focus; batch I/O where it helps **Defender** churn; heavy work off the UI thread when practical (**see `vader-hardware-optimization.mdc`**).
 
 ---
@@ -64,4 +64,4 @@ The two old prompts disagreed on hex depth (`#0c0c0c` vs `#121212`, rounded vs �
 
 ## Signature
 
-**Powered by the MSC Media Engine · v2.2.6-SOVEREIGN** (match **`package.json`** / footer.)
+**Powered by the VPE Jedi-Master · v3.0** (match **`package.json`** / footer.)

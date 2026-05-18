@@ -1,4 +1,4 @@
-# REPAIR PROTOCOLS (v2.2.6-SOVEREIGN)
+# REPAIR PROTOCOLS (VPE Jedi-Master v3.0)
 
 This document contains runbooks for **Nuke**, **Forge**, and **Vault** maintenance in the Vader Project Engine. **Canonical command tables:** **[`Project-Bible.md`](./Project-Bible.md) §7 — Command Lexicon**.
 
@@ -67,4 +67,4 @@ The catalog uses **WAL journal mode** (`persistent-store.js`). On a **normal qui
 
 **Operator rule:** Before **copying** `vader.sqlite` / `vader.sqlite-wal` / `vader.sqlite-shm` by hand (backup, sync, cloud upload), **quit Vader Project Engine** so files are not mid-write and the WAL is checkpointed. Copying a live DB can strand WAL pages or produce inconsistent snapshots.
 
-**Signature:** Powered by the MSC Media Engine · v2.2.6-SOVEREIGN
+**Signature:** Powered by the VPE Jedi-Master · v3.0

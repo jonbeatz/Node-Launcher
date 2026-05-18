@@ -4,6 +4,62 @@ This document serves as a check-in and reference tracker. Whenever we do an "Upd
 
 ---
 
+## [2026-05-18] — VPE Jedi-Master v3.0 Baseline Synchronization & UI Refinement
+
+### 🛠 Changes
+
+#### 1. Package Version Bumped to `3.0.0` (`package.json`)
+- **Previous:** `"version": "2.2.6-SOVEREIGN"`
+- **New:** `"version": "3.0.0"`, description updated to "Vader Project Engine — Jedi-Master (v3.0)"
+
+#### 2. Footer Rebranded to VPE Jedi-Master (`src/renderer/lib/vpe-bridge.ts`)
+- **Previous:** `msc_mscEngineFooterLine()` returned `"Powered by the MSC Media Engine · v{version}"`
+- **New:** Returns `"Powered by the VPE Jedi-Master · v{version}"` — version still sourced dynamically from `window.vpeInfo.version` → `package.json`
+
+#### 3. Sidebar Footer Version Line Removed (`src/renderer/components/app-sidebar.tsx`)
+- **Previous:** A `msc-sidebar-engine-line` `<div>` at the bottom of the sidebar rendered the same branding string as the global footer.
+- **New:** Completely removed. The lower sidebar region is now clean (only STOP ALL + Settings buttons). The global footer at the bottom of the main window is the single source of branding.
+- Also removed the now-unused `msc_mscEngineFooterLine` import.
+
+#### 4. Automated Build Script Refactored (`scripts/upload_build.ps1`)
+- **Previous:** Hard-coded to `Node-Launcher-v3\dist`, branch prefix `VPE-JediBuild-*`, ZIP name was the raw branch name.
+- **New:**
+  - Reads version from `package.json` automatically (`$pkgJson.version` → display form `major.minor`).
+  - ZIP always named `Node-Launcher-vX.Y-JEDI-MASTER.zip`.
+  - Release tag always `VPE-Jedi-Master-vX.Y` (or `VPE-Jedi-Master-vX.Y-bN` if tag already exists).
+  - All paths use `$repoRoot = Split-Path -Parent $PSScriptRoot` — no hard-coded drive letters.
+
+#### 5. Git Branch Renamed to `VPE-Jedi-Master-v3.0`
+- **Previous branch:** `VPE-JediBuild-v1.4`
+- **New branch:** `VPE-Jedi-Master-v3.0` (pushed to GitHub remote)
+- **Convention going forward:** App display `Powered by the VPE Jedi-Master · vX.Y` ↔ Git branch `VPE-Jedi-Master-vX.Y`
+
+#### 6. Documentation Sync (all core docs)
+- All doc headers, signatures, and version references updated from `MSC Media Engine · v2.2.6-SOVEREIGN` → `VPE Jedi-Master · v3.0`.
+- Files updated: `README.md`, `VADER_STATION_LOG.md`, `REPAIR_PROTOCOLS.md`, `TRUTH.md`, `Project-Bible.md`, `Start-Master.md`, `VADER_MASTER_MANIFEST.md`, `Goalz.md`.
+
+### ✅ Verification
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit -p src/renderer/tsconfig.json` | ✅ Exit 0 |
+| VPE boots, vault lock logs `3.0.0` | ✅ |
+| App footer shows "Powered by the VPE Jedi-Master · v3.0" | ✅ |
+| Sidebar lower region clean (no version text) | ✅ |
+| Git branch = `VPE-Jedi-Master-v3.0` | ✅ |
+
+### 📝 Files Changed
+
+| File | Change |
+|---|---|
+| `package.json` | version `3.0.0`, description updated |
+| `src/renderer/lib/vpe-bridge.ts` | Footer string → VPE Jedi-Master |
+| `src/renderer/components/app-sidebar.tsx` | Removed sidebar footer block + unused import |
+| `scripts/upload_build.ps1` | Full refactor: version from package.json, Jedi-Master ZIP naming, repo-relative paths |
+| All core docs | Version + signature strings updated |
+
+---
+
 ## [2026-05-18] — Thumbnail Vault Staging: ENOENT Self-Copy Fix, file:// Routing & Duplicate Path UX
 
 ### 🛠 Fixes & Root Issues Resolved
