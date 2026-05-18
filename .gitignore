@@ -56,10 +56,13 @@ Thumbs.db
 # Data and dev profiles
 # MCP test session artifacts (screenshots, ARIA snapshots) — never commit
 .playwright-mcp/
-# Do not ignore /data/ — `data/vader.sqlite` is tracked for operator backup (catalog).
+# Do not ignore vader.sqlite — tracked for operator backup (catalog).
 # SQLite WAL mode ephemeral files — regenerated at runtime, never commit.
+# Covers both legacy data/ location and canonical src/main/db/ location.
 data/vader.sqlite-shm
 data/vader.sqlite-wal
+src/main/db/vader.sqlite-shm
+src/main/db/vader.sqlite-wal
 
 # VPE repo-local runtime (Electron userData, cache, session — regenerates; keep out of commits)
 vpe-local-data/cache/
