@@ -839,24 +839,91 @@ app.on('ready', () => {
   msc_createWindow();
 });
 
-app.on('before-quit', () => {
+/**
+ * Lifecycle master teardown flag — prevents the async cleanup from re-entering
+ * when `app.quit()` is called a second time after cleanup finishes.
+ */
+let msc_vpeLifecycleTeardownDone = false;
+
+/**
+ * LIFECYCLE MASTER CONTROLLER — async before-quit hook.
+ *
+ * When the user (or OS) triggers a quit:
+ *   1. Block the default synchronous quit via event.preventDefault().
+ *   2. Await `stopAllWordPressSites(false)` — sends GraphQL `stopSite` for every
+ *      running WP site and removes the VPE mu-plugin on each. Fully awaited via
+ *      Promise.all so no GraphQL mutations are abandoned mid-flight.
+ *   3. Forcibly terminate Local.exe from the Windows process list so no ghost
+ *      router processes remain draining RAM after VPE closes.
+ *   4. Stop PM2-managed projects and disconnect the RPC socket.
+ *   5. Kill any remaining PTY/Node child processes via tree-kill.
+ *   6. Re-trigger app.quit() — this time teardown is done, so the handler exits
+ *      immediately and Electron proceeds to will-quit → process exit.
+ *
+ * The `minimizeLocal` arg is passed as `false` to stopAllWordPressSites because
+ * we are about to kill Local.exe anyway — minimizing first would be redundant.
+ */
+app.on('before-quit', (event) => {
+  // Second pass (after cleanup) — let Electron exit normally.
+  if (msc_vpeLifecycleTeardownDone) return;
+
+  event.preventDefault();
   msc_vpeAppQuitting = true;
-  if (isDev) {
-    msc_onDevExitCompanionSweep();
-  }
-  if (pm2Manager && typeof pm2Manager.stopAll === 'function') {
-    pm2Manager.stopAll().catch(() => {});
-  }
-  if (pm2Manager && typeof pm2Manager.msc_disconnectPm2Rpc === 'function') {
-    pm2Manager.msc_disconnectPm2Rpc();
-  }
-  if (projectRunner) {
+  msc_vpeLifecycleTeardownDone = true;
+
+  console.log('[VPE LIFECYCLE] App close detected — running master teardown...');
+
+  (async () => {
+    // ── STEP 1: Stop all running WordPress-Local sites ──────────────────────
     try {
-      projectRunner.killAll();
-    } catch (_) {
-      /* ignore */
+      if (projectRunner && typeof projectRunner.stopAllWordPressSites === 'function') {
+        await projectRunner.stopAllWordPressSites(false); // false = don't minimize, we'll kill
+        console.log('[VPE LIFECYCLE] WordPress sites stopped.');
+      }
+    } catch (e) {
+      console.warn('[VPE LIFECYCLE] WordPress teardown error:', e?.message ?? e);
     }
-  }
+
+    // ── STEP 2: Forcibly terminate Local.exe ────────────────────────────────
+    try {
+      const { execSync: _execSync } = require('child_process');
+      _execSync('taskkill /IM Local.exe /F', {
+        windowsHide: true,
+        stdio: 'ignore',
+        timeout: 5000,
+      });
+      console.log('[VPE LIFECYCLE] Local.exe terminated.');
+    } catch (_) {
+      // Non-zero exit = Local was already closed; silently ignore.
+    }
+
+    // ── STEP 3: Stop PM2 processes ───────────────────────────────────────────
+    try {
+      if (pm2Manager && typeof pm2Manager.stopAll === 'function') {
+        await pm2Manager.stopAll().catch(() => {});
+      }
+    } catch (_) { /* ignore */ }
+
+    // ── STEP 4: Disconnect PM2 RPC ───────────────────────────────────────────
+    try {
+      if (pm2Manager && typeof pm2Manager.msc_disconnectPm2Rpc === 'function') {
+        pm2Manager.msc_disconnectPm2Rpc();
+      }
+    } catch (_) { /* ignore */ }
+
+    // ── STEP 5: Kill remaining PTY / Node child processes ───────────────────
+    try {
+      if (projectRunner) projectRunner.killAll();
+    } catch (_) { /* ignore */ }
+
+    // ── STEP 6: Dev companion sweep ─────────────────────────────────────────
+    if (isDev) {
+      try { msc_onDevExitCompanionSweep(); } catch (_) { /* ignore */ }
+    }
+
+    console.log('[VPE LIFECYCLE] Teardown complete — exiting.');
+    app.quit();
+  })();
 });
 
 app.on('will-quit', () => {

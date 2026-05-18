@@ -1451,12 +1451,14 @@ class MSC_ProjectRunner extends EventEmitter {
   }
 
   /**
-   * LocalWP headless stop — exec `local.exe stop-site <slug>`.
-   * No PTY/tree-kill teardown required; marks the project stopped synchronously.
+   * LocalWP headless stop — awaits the GraphQL `stopSite` mutation (or CLI fallback)
+   * before returning so callers can reliably `await` full site teardown.
+   *
    * @param {string} projectId
    * @param {Record<string, unknown>} rec
+   * @returns {Promise<{ ok: boolean; status: string }>}
    */
-  _stopWordPressLocal(projectId, rec) {
+  async _stopWordPressLocal(projectId, rec) {
     const row = this.store.getProject(projectId);
     const localExePath = msc_findLocalExePath();
     const siteSlug = row
@@ -1482,25 +1484,32 @@ class MSC_ProjectRunner extends EventEmitter {
       }
     }
 
-    // Tell Local to stop the site — GraphQL preferred, CLI fallback.
+    // Tell Local to stop the site — await GraphQL preferred, CLI fallback.
     const localSiteId2 = (siteEntry2 && siteEntry2.id) ? String(siteEntry2.id) : null;
     if (localSiteId2) {
-      msc_callLocalGraphql('stopSite', localSiteId2)
-        .then((data) => {
-          const status = data?.stopSite?.status ?? 'unknown';
-          this._persistAndBroadcastLog(projectId, 'info',
-            `[vpe] wordpress-local: Local GraphQL stopSite → status: ${status}`);
-        })
-        .catch((gqlErr) => {
-          this._persistAndBroadcastLog(projectId, 'warn',
-            `[vpe] wordpress-local: GraphQL stopSite failed (${gqlErr.message}) — trying CLI`);
-          if (localExePath) {
-            exec(`"${localExePath}" stop-site ${siteSlug}`, { windowsHide: true }, () => {});
-          }
-        });
+      try {
+        const data = await msc_callLocalGraphql('stopSite', localSiteId2);
+        const status = data?.stopSite?.status ?? 'unknown';
+        this._persistAndBroadcastLog(projectId, 'info',
+          `[vpe] wordpress-local: Local GraphQL stopSite → status: ${status}`);
+      } catch (gqlErr) {
+        this._persistAndBroadcastLog(projectId, 'warn',
+          `[vpe] wordpress-local: GraphQL stopSite failed (${gqlErr.message}) — trying CLI`);
+        if (localExePath) {
+          await new Promise((resolve) => {
+            exec(`"${localExePath}" stop-site ${siteSlug}`, { windowsHide: true }, () => resolve());
+          });
+        }
+      }
     } else if (localExePath) {
-      exec(`"${localExePath}" stop-site ${siteSlug}`, { windowsHide: true }, (err) => {
-        if (err) this._persistAndBroadcastLog(projectId, 'warn', `[vpe] wordpress-local: stop-site — ${err.message}`);
+      await new Promise((resolve) => {
+        exec(`"${localExePath}" stop-site ${siteSlug}`, { windowsHide: true }, (err) => {
+          if (err) {
+            this._persistAndBroadcastLog(projectId, 'warn',
+              `[vpe] wordpress-local: stop-site — ${err.message}`);
+          }
+          resolve();
+        });
       });
     } else {
       this._persistAndBroadcastLog(projectId, 'info',
@@ -1604,6 +1613,18 @@ class MSC_ProjectRunner extends EventEmitter {
    * @param {boolean} [minimizeLocal=true] — Minimize Local.exe after all sites stopped.
    * @returns {Promise<void>}
    */
+  /**
+   * Stop all running WordPress-Local sites in parallel, then optionally minimize
+   * Local.exe (STOP ALL button) or leave it for the app-quit hook to terminate.
+   *
+   * Each stop is now fully awaited via `Promise.all` so callers (e.g. the
+   * `before-quit` lifecycle hook) can reliably wait for all GraphQL `stopSite`
+   * mutations to complete before tearing down the process tree.
+   *
+   * @param {boolean} [minimizeLocal=true] — `true` = minimize after stops (STOP ALL);
+   *   `false` = skip minimize (app-quit path will taskkill Local.exe entirely instead).
+   * @returns {Promise<void>}
+   */
   async stopAllWordPressSites(minimizeLocal = true) {
     const allProjects = this.store.listProjectsAlphabetical();
     const wpRunning = allProjects.filter((p) => {
@@ -1611,37 +1632,40 @@ class MSC_ProjectRunner extends EventEmitter {
       return rec?.wpLocal === true;
     });
 
-    for (const project of wpRunning) {
-      try {
-        const rec = this.children.get(project.id) || {};
-        this._stopWordPressLocal(project.id, rec);
-      } catch (err) {
-        console.warn(`[VPE] stopAllWordPressSites: failed to stop ${project.id}`, err?.message);
-      }
-    }
+    // Run all site stops in parallel — each _stopWordPressLocal awaits its GraphQL call.
+    await Promise.all(
+      wpRunning.map(async (project) => {
+        try {
+          const rec = this.children.get(project.id) || {};
+          await this._stopWordPressLocal(project.id, rec);
+        } catch (err) {
+          console.warn(`[VPE] stopAllWordPressSites: failed to stop ${project.id}`, err?.message);
+        }
+      }),
+    );
 
-    if (minimizeLocal && wpRunning.length > 0 && msc_isLocalExeProcessRunning()) {
-      try {
-        // Minimize all Local.exe windows without closing the app.
-        // SW_MINIMIZE = 6 via user32.dll ShowWindow.
-        const minScript = [
-          'Add-Type -TypeDefinition \'using System;using System.Runtime.InteropServices;',
-          'public class VpeWin32 {',
-          '  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmd);',
-          '}\';',
-          'Get-Process -Name Local -ErrorAction SilentlyContinue | ForEach-Object {',
-          '  if ($_.MainWindowHandle -ne [IntPtr]::Zero) {',
-          '    [VpeWin32]::ShowWindow($_.MainWindowHandle, 6) | Out-Null',
-          '  }',
-          '}',
-        ].join(' ');
-        execSync(`powershell -WindowStyle Hidden -Command "${minScript}"`,
-          { windowsHide: true, timeout: 5000, stdio: 'ignore' },
-        );
-        console.log('[VPE] stopAllWordPressSites: Local.exe minimized');
-      } catch (err) {
-        console.warn('[VPE] stopAllWordPressSites: could not minimize Local.exe —', err?.message);
-      }
+    if (!minimizeLocal || wpRunning.length === 0 || !msc_isLocalExeProcessRunning()) return;
+
+    try {
+      // Minimize all Local.exe windows without closing the app (STOP ALL path).
+      // SW_MINIMIZE = 6 via user32.dll ShowWindow.
+      const minScript = [
+        'Add-Type -TypeDefinition \'using System;using System.Runtime.InteropServices;',
+        'public class VpeWin32 {',
+        '  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmd);',
+        '}\';',
+        'Get-Process -Name Local -ErrorAction SilentlyContinue | ForEach-Object {',
+        '  if ($_.MainWindowHandle -ne [IntPtr]::Zero) {',
+        '    [VpeWin32]::ShowWindow($_.MainWindowHandle, 6) | Out-Null',
+        '  }',
+        '}',
+      ].join(' ');
+      execSync(`powershell -WindowStyle Hidden -Command "${minScript}"`,
+        { windowsHide: true, timeout: 5000, stdio: 'ignore' },
+      );
+      console.log('[VPE] stopAllWordPressSites: Local.exe minimized');
+    } catch (err) {
+      console.warn('[VPE] stopAllWordPressSites: could not minimize Local.exe —', err?.message);
     }
   }
 }

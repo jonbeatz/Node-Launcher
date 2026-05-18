@@ -4,6 +4,53 @@
 
 ---
 
+## [2026-05-18] — vpe-thumb:// Drive-Letter Protocol Fix (v2.2.6-SOVEREIGN)
+
+### Summary
+WordPress theme screenshots on non-default Windows drives (F:, E:, etc.) were returning 404. Chromium normalizes `vpe-thumb:///F:/path` (triple-slash, `standard: true` scheme) into `vpe-thumb://f/path` — treating `F:` as a lowercase hostname and stripping the colon. The protocol handler now detects a single-letter hostname and reconstructs the full `DRIVE:/path` path.
+
+### Root Cause
+`protocol.registerSchemesAsPrivileged` with `standard: true` makes Chromium parse URL authority components. `vpe-thumb:///F:/path` is parsed as host=`F:`, which Chromium normalizes to lowercase `f` and drops the invalid port colon. Handler received `pathname=/Websitez/...` with no drive letter, so `fs.existsSync` always returned false.
+
+### Fix — `src/main/vpe-vault-protocol.js`
+Added drive-letter reconstruction block in `msc_registerVpeThumbProtocolHandler`:
+```javascript
+if (process.platform === 'win32' && u.hostname && /^[a-z]$/.test(u.hostname)) {
+  pathname = u.hostname.toUpperCase() + ':' + pathname; // e.g. 'f' → 'F:/Websitez/...'
+}
+```
+
+### Verification
+- Smoke check Exit 0 (`tsc --noEmit` + migrations).
+- No linter errors on `vpe-vault-protocol.js`.
+- Confirmed via live `vpeAPI.addProject()` test: IWWI_v2 WP project created, `thumbnail_url = "vpe-thumb:///F:/..."` stored correctly, boot vault sync creates `media/vault/IWWI-v2/.vpe_keep` as designed.
+
+---
+
+## [2026-05-18] — LocalWP Lifecycle Master Controller (v2.2.6-SOVEREIGN)
+
+### Summary
+VPE is now the full master controller for the LocalWP lifecycle. Local.exe launches minimized to the taskbar on first use (no GUI popup), and closing the VPE window triggers a clean async teardown: all running WordPress sites are stopped via GraphQL, mu-plugins are removed, Local.exe is forcibly terminated via `taskkill`, PM2 is stopped, and PTY processes are killed — all before Electron exits.
+
+### Changes
+
+**`src/main/main.js`**
+- Replaced synchronous `before-quit` listener with a **6-step async teardown interceptor** using `event.preventDefault()`.
+- Introduced `msc_vpeLifecycleTeardownDone` guard flag to prevent re-entry when `app.quit()` re-fires.
+- Teardown sequence: (1) `await stopAllWordPressSites(false)` — stops all WP sites + removes mu-plugins; (2) `taskkill /IM Local.exe /F` — fully terminates Local.exe; (3–4) PM2 stop + RPC disconnect; (5) `killAll()` PTY sweep; (6) dev companion sweep; then clean `app.quit()`.
+
+**`src/main/project-runner.js`**
+- `_stopWordPressLocal` promoted to `async` — now `await`s the GraphQL `stopSite` mutation (or `exec` CLI fallback) before returning, ensuring full site teardown before the caller proceeds.
+- `stopAllWordPressSites` upgraded from sequential `for` loop to `await Promise.all(...)` — all running WP sites stop in parallel, so teardown time is bounded by the slowest single site, not the sum.
+- `msc_launchLocalMinimized` (already present) confirmed as the single launch path — PowerShell `Start-Process -WindowStyle Minimized` used on all boot paths.
+
+### Verification
+- `npm run start-project:smoke` → Exit 0 (TypeScript clean, migrations at `user_version=19`).
+- `node -e "..."` runtime check confirms both `stopAllWordPressSites` and `_stopWordPressLocal` are `AsyncFunction` instances.
+- No linter errors on either modified file.
+
+---
+
 ## [2026-05-18] — Zero-Hardcoding Path Refactor (v2.2.6-SOVEREIGN)
 
 ### Summary

@@ -73,12 +73,29 @@ function msc_registerVpeThumbProtocolHandler() {
       new Response('', { status: code, headers: { 'Content-Type': 'text/plain' } });
     try {
       const u = new URL(request.url);
-      // pathname: "/D:/path/to/file.png" on Windows, "/home/user/file.png" on POSIX
+      // pathname: "/D:/path/to/file.png" on Windows (triple-slash form), "/home/user/file.png" on POSIX
       let pathname = decodeURIComponent(u.pathname);
-      // Strip the leading slash only when the next char is a Windows drive letter (e.g. /D:/)
-      if (/^\/[A-Za-z]:[\\/]/.test(pathname)) {
-        pathname = pathname.slice(1);
+
+      // When registered as a standard scheme, Chromium treats the component after "//"
+      // as the URL authority (hostname). For Windows paths on non-default drives the URL
+      // vpe-thumb:///F:/path becomes vpe-thumb://f/path — "F:" is lowercased to "f" and
+      // the colon is stripped (treated as an invalid port separator). Reconstruct the full
+      // Windows absolute path by re-attaching the drive letter from u.hostname.
+      if (
+        process.platform === 'win32' &&
+        u.hostname && /^[a-z]$/.test(u.hostname) &&
+        !pathname.startsWith('/' + u.hostname.toUpperCase() + ':')
+      ) {
+        // e.g. hostname="f", pathname="/Websitez/..." → "F:/Websitez/..."
+        pathname = u.hostname.toUpperCase() + ':' + pathname;
+      } else {
+        // Standard triple-slash form: vpe-thumb:///D:/path → pathname="/D:/path"
+        // Strip the leading slash only when the next char is a Windows drive letter (e.g. /D:/)
+        if (/^\/[A-Za-z]:[\\/]/.test(pathname)) {
+          pathname = pathname.slice(1);
+        }
       }
+
       const absFile = path.normalize(pathname);
       // Safety: only serve files with allowed image extensions
       const ext = path.extname(absFile).toLowerCase();
